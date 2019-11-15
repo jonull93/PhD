@@ -6,7 +6,7 @@ import os
 import sys
 import threading
 from queue import Queue
-
+import random
 
 print("Script started at",dt.datetime.now().strftime('%H:%M:%S'))
 path = "Z:\\models\\" #where your main-file is located
@@ -17,19 +17,19 @@ errors=0
 
 #Create dictionary of scenario-code
 regions = ["ES3"]#, "HU", "IE", "SE2"]
-modes = ["OR"]#["pre","leanOR","OR"]#,"inertia","leanOR+inertia"]
+modes = ["leanOR"]#,"inertia","leanOR+inertia"]
 i=0
 scenarios = {}
 for mode in modes:
     for region in regions: #looping through regions and modes in this way means that it will first run all "pre", then all "OR" and so on, instead of first solving all modes for each region
         #I create my scenario-code by using what is called an fstring. This allows me to put variables and if-statements in my string-text. Very convenient :)
-        scenarios[region+"_"+mode] =  \
+        scenarios[region+"_"+mode+"_test"] =  \
         f"""
-$setglobal tot_opt "{region}_{mode}_2" 
+$setglobal tot_opt "{region}_{mode}" 
 $setglobal ireg {region}
 $setglobal flexlim yes
 $setglobal which_year 2050
-$setglobal cores 0
+$setglobal cores 4
 $setglobal OR {"yes" if "OR" in mode else "no"}
 $setglobal lean {"yes" if "lean" in mode else "no"}
 $setglobal inertia {"yes" if "inertia" in mode else "no"}
@@ -41,7 +41,7 @@ $setglobal double_use {"no" if "noDoubleUse" in mode else "yes"}
 
 $setglobal SNSP no
 * Temporal resolution 1, 3 or 6 h
-$setglobal hour_resolution 6"""
+$setglobal hour_resolution 100"""
         i+=1
 
 #create .inc file for each scenario
@@ -71,6 +71,7 @@ def crawl(q,ws, cp, io_lock):
             run_scenario(ws, cp, io_lock, scen)
         except Exception as e:
             identifier = "Error in crawler"
+            global errors
             errors += 1
             print(identifier, "scenario",scen[0],"exception:",e)
         q.task_done()   #signal to the queue that task has been processed
@@ -81,24 +82,31 @@ def crawl(q,ws, cp, io_lock):
 #Function which does gets called to actually run the model
 def run_scenario(workspace, checkpoint, io_lock, scen):
     starttime[scen[0]] = tm.time()
-    t6 = workspace.add_job_from_file(gmsfile)
-    opt = workspace.add_options()    
-    opt.defines["scenariofile"] = scen[1]
-    #opt.defines["logOption"] = "2"
-    #opt.defines["logFile"] = "%tot_opt%.log"
+    job = workspace.add_job_from_file(gmsfile)
+    randint = random.randrange(99999999999) #we create a scenario-specific options file with this identifier (to avoid reading the wrong options file)
+    f = open(path+"options_"+str(randint)+".txt","w")
+    f.write("LogOption 2\nLogFile "+scen[1]+".log")
+    f.close()
+    opt = workspace.add_options(opt_file=path+"options_"+str(randint)+".txt")
+    os.remove(path+"options_"+str(randint)+".txt") #then remove the scenario-specific options file since its not interesting
+    opt.defines["scenariofile"] = scen[1] #give gams the variable 'scenarioname' with value scen[1]
     print(" --- Starting scenario", scen[0], "in thread",thread_nr[threading.get_ident()],"---")
-    t6.run(opt, checkpoint=cp) #output=sys.stdout can be used to see the gams log, but this will probably look weird with several threads running
+    job.run(opt, create_out_db=False)
     io_lock.acquire() # we need to make the ouput a critical section to avoid messed up report informations
-    print("Thread", thread_nr[threading.get_ident()], "finished scenario",scen[1], "at", dt.datetime.now().strftime('%H:%M:%S'), "...")
-    if t6.out_db["ms"][()].value <= 2 and t6.out_db["ss"][()].value <= 2:
-        print("  Model and Solve status OK!")
-    else:
-        print("  OBS BAD STATUS! Modelstatus: " + str(t6.out_db["ms"][()].value) + " and Solvestatus: " + str(t6.out_db["ss"][()].value),"(1s and 2s are good)")
-    print("  Obj: " + str(t6.out_db["vtotcost"][()].level))
+    print("Thread", thread_nr[threading.get_ident()], "finished scenario",scen[1],"(#"+str(scen[0])+") at", dt.datetime.now().strftime('%H:%M:%S'), "...")
+    try: #these things require job.run to NOT have create_out_db=False
+        if job.out_db["ms"][()].value <= 2 and job.out_db["ss"][()].value <= 2:
+            print("  Model- and solvestatus OK!")
+        else:
+            print("  OBS BAD STATUS! Modelstatus: " + str(job.out_db["ms"][()].value) + " and Solvestatus: " + str(job.out_db["ss"][()].value),"(1s and 2s are good)")
+        print("  Obj: " + str(job.out_db["vtotcost"][()].level))
+    except:
+        None
     print("  Time to solve: ",str(round((tm.time()-starttime[scen[0]])/60,1)),"min")
     io_lock.release()
 
-cp = ws.add_checkpoint()
+#cp = ws.add_checkpoint()
+cp = ""
 io_lock = threading.Lock()
 threads = {}
 thread_nr={}
