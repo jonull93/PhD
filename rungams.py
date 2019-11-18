@@ -9,21 +9,25 @@ from queue import Queue
 import random
 
 print("Script started at",dt.datetime.now().strftime('%H:%M:%S'))
-path = "Z:\\models\\" #where your main-file is located
+
+if "C18" in os.environ['COMPUTERNAME']: #This allows you to change path depending on which computer you run script from
+    path = "C:\\enode\\" #where your main-file is located
+else:
+    path = "Y:\\enode\\" #where your main-file is located
 ws = GamsWorkspace(path)
 gmsfile = "total_optimum.gms" #name of your main-file
-starttime = {}
+starttime = {0:0}
 errors=0
 
 #Create dictionary of scenario-code
-regions = ["ES3"]#, "HU", "IE", "SE2"]
-modes = ["leanOR"]#,"inertia","leanOR+inertia"]
+regions = ["ES3", "HU", "IE", "SE2"]
+modes = ["inertia_noSyn"]#["leanOR", "OR","OR+inertia","leanOR+inertia", "inertia","inertia_noSyn","inertia_2x","OR+inertia_noDoubleUse"]
 i=0
 scenarios = {}
 for mode in modes:
     for region in regions: #looping through regions and modes in this way means that it will first run all "pre", then all "OR" and so on, instead of first solving all modes for each region
         #I create my scenario-code by using what is called an fstring. This allows me to put variables and if-statements in my string-text. Very convenient :)
-        scenarios[region+"_"+mode+"_test"] =  \
+        scenarios[region+"_"+mode+""] =  \
         f"""
 $setglobal tot_opt "{region}_{mode}" 
 $setglobal ireg {region}
@@ -41,7 +45,7 @@ $setglobal double_use {"no" if "noDoubleUse" in mode else "yes"}
 
 $setglobal SNSP no
 * Temporal resolution 1, 3 or 6 h
-$setglobal hour_resolution 100"""
+$setglobal hour_resolution 1"""
         i+=1
 
 #create .inc file for each scenario
@@ -53,7 +57,7 @@ for scen in scenarios:
 #set up the queue to hold all the urls
 q = Queue(maxsize=0) #infinite max-size
 # Use many threads (4 max, or one for each scenario)
-num_theads = min(5, len(scenarios))
+num_theads = min(2, len(scenarios))
 
 #Populating Queue with tasks
 for i,scen in enumerate(scenarios):
@@ -76,10 +80,11 @@ def crawl(q,ws, cp, io_lock):
             print(identifier, "scenario",scen[0],"exception:",e)
         q.task_done()   #signal to the queue that task has been processed
         antistuck += 1
+    if q.empty(): print("--- Queue is now empty ---")
     if antistuck > len(scenarios)*2-2: print("OBS: the crawl function hit its antistuck limit!")
     return True
 
-#Function which does gets called to actually run the model
+#Function which gets called to actually run the model
 def run_scenario(workspace, checkpoint, io_lock, scen):
     starttime[scen[0]] = tm.time()
     job = workspace.add_job_from_file(gmsfile)
@@ -93,7 +98,7 @@ def run_scenario(workspace, checkpoint, io_lock, scen):
     print(" --- Starting scenario", scen[0], "in thread",thread_nr[threading.get_ident()],"---")
     job.run(opt, create_out_db=False)
     io_lock.acquire() # we need to make the ouput a critical section to avoid messed up report informations
-    print("Thread", thread_nr[threading.get_ident()], "finished scenario",scen[1],"(#"+str(scen[0])+") at", dt.datetime.now().strftime('%H:%M:%S'), "...")
+    print("Thread", thread_nr[threading.get_ident()], "finished scenario",scen[1],"(#"+str(scen[0])+") at", dt.datetime.now().strftime('%H:%M:%S'))
     try: #these things require job.run to NOT have create_out_db=False
         if job.out_db["ms"][()].value <= 2 and job.out_db["ss"][()].value <= 2:
             print("  Model- and solvestatus OK!")
