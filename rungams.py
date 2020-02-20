@@ -13,16 +13,18 @@ print("Script started at",dt.datetime.now().strftime('%H:%M:%S'))
 if "C18" in os.environ['COMPUTERNAME']: #This allows you to change path depending on which computer you run script from
     path = "C:\\enode\\" #where your main-file is located
 else:
-    path = "Y:\\enode\\" #where your main-file is located
+    path = "Y:\\" #where your main-file is located
 ws = GamsWorkspace(path)
-gmsfile = "total_optimum.gms" #name of your main-file
+gmsfile = "total_optimum.gms" #name of your main-file [NEEDS TO BE EDITED WHEN SETTING SCRIPT UP]
 starttime = {0:0}
 errors=0
 
 #Create dictionary of scenario-code
 regions = ["ES3", "HU", "IE", "SE2"]
-modes = ["inertia_noSyn"]#["leanOR", "OR","OR+inertia","leanOR+inertia", "inertia","inertia_noSyn","inertia_2x","OR+inertia_noDoubleUse"]
-i=0
+modes = ["leanOR", "OR"]
+#["pre", "leanOR", "OR","leanOR+inertia","OR+inertia", "inertia","inertia_2x","inertia_noSyn"]
+#["leanOR", "OR","OR+inertia","leanOR+inertia", "inertia","inertia_noSyn","inertia_2x","OR+inertia_noDoubleUse"]
+
 scenarios = {}
 for mode in modes:
     for region in regions: #looping through regions and modes in this way means that it will first run all "pre", then all "OR" and so on, instead of first solving all modes for each region
@@ -39,14 +41,18 @@ $setglobal lean {"yes" if "lean" in mode else "no"}
 $setglobal inertia {"yes" if "inertia" in mode else "no"}
 $setglobal inertia_scaling {"2" if "2x" in mode else "1"}
 $setglobal forecast_scaling 1
+$setglobal flywheel_price 1
 
 $setglobal synthetic_inertia {"no" if "noSyn" in mode else "yes"}
 $setglobal double_use {"no" if "noDoubleUse" in mode else "yes"}
 
 $setglobal SNSP no
 * Temporal resolution 1, 3 or 6 h
-$setglobal hour_resolution 1"""
-        i+=1
+$setglobal hour_resolution 1""" #[NEEDS TO BE EDITED WHEN SETTING SCRIPT UP]
+
+num_theads = min(4, len(scenarios)) # should probably be equal or half of your nr of cores (or nr of scenarios, whichever is lower)
+
+print("Number of scenarios:",len(scenarios))
 
 #create .inc file for each scenario
 for scen in scenarios:
@@ -56,8 +62,6 @@ for scen in scenarios:
 
 #set up the queue to hold all the urls
 q = Queue(maxsize=0) #infinite max-size
-# Use many threads (4 max, or one for each scenario)
-num_theads = min(2, len(scenarios))
 
 #Populating Queue with tasks
 for i,scen in enumerate(scenarios):
@@ -71,13 +75,12 @@ def crawl(q,ws, cp, io_lock):
     while not q.empty() or antistuck < len(scenarios)*2:
         scen = q.get()  #fetch new work from the Queue
         try:
-            #print("Requested scenario # " + str(scen[0]))
             run_scenario(ws, cp, io_lock, scen)
         except Exception as e:
-            identifier = "Error in crawler"
+            identifier = thread_nr[threading.get_ident()]
             global errors
             errors += 1
-            print(identifier, "scenario",scen[0],"exception:",e)
+            print("Error in crawler",identifier,"- scenario",scen[0],"exception:",e)
         q.task_done()   #signal to the queue that task has been processed
         antistuck += 1
     if q.empty(): print("--- Queue is now empty ---")
