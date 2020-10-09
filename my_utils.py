@@ -1,5 +1,7 @@
 import pickle  # for dumping and loading variable to/from file
 from enum import Enum
+import itertools
+import string
 
 
 class TECH(str, Enum):
@@ -166,6 +168,52 @@ order = [
     'PTES_M_EB',
     'TTES_HX_EB',
     'TTES_EB']
+tech_names = {'RO': 'Hydro', 'U': 'Nuclear', 'CHP_wa': 'Waste CHP', 'CHP_bio': 'Woodchip CHP', 'CHP_WG_L': 'Biogas CHP',
+              "bat_discharge": "Battery (dis)charge",
+              'GWGCCS': 'Gas-mix CCS', 'WG': 'Biogas CCGT', 'WG_peak': 'Biogas GT', 'wind_offshore': 'Offshore wind',
+              "flywheel": "Flywheel", "bat": "Battery SoC", "sync_cond": "Sync. Cond.",
+              'wind_onshore': 'Onshore wind', 'PV_cSiOPT': 'Solar PV', 'EB': 'EB', 'HP': 'HP', 'HOB_WG': 'Biogas HOB',
+              'HOB_bio': 'Woodchip HOB', 'solarheat': 'Solar heating',
+              'Load': 'Load'}
+color_dict = {'wind_onshore': '#B9B9B9', 'wind_offshore': '#DADADA', 'RO': 'xkcd:ocean blue', 'U': 'xkcd:grape',
+              'GWGCCS': 'xkcd:dark peach', 'CHP_wa': 'xkcd:deep lavender', 'CHP_bio': 'xkcd:tree green',
+              'WG': 'xkcd:pea', 'WG_peak': 'xkcd:red', 'PV_cSiOPT': 'xkcd:mustard', 'CHP_WG_L': 'xkcd:mid green',
+              'HP': (255 / 255, 192 / 255, 0), 'EB': (91 / 255, 155 / 255, 213 / 255), 'CHP_WG': (0, 176 / 255, 80 / 255),
+              'HOB_WG': (128 / 255, 128 / 255, 0),
+              'solarheat': (204 / 255, 51 / 255, 0), 'HOB_bio': 'green', 'Load': 'Black',
+              "bat_discharge": "xkcd:amber",
+              'bat': "xkcd:deep lavender", "sync_cond": 'xkcd:aqua'}
+
+
 # print(order[2])
 # pickle.dump( order, open( "tech_order.pickle", "wb" ) )
 # pickle.dump( TECH, open( "TECH.pickle", "wb" ) )
+def label_axes(fig, labels=None, loc=None, **kwargs):
+    """
+    Walks through axes and labels each.
+
+    kwargs are collected and passed to `annotate`
+
+    Parameters
+    ----------
+    fig : Figure
+         Figure object to work on
+
+    labels : iterable or None
+        iterable of strings to use to label the axes.
+        If None, lower case letters are used.
+
+    loc : len=2 tuple of floats
+        Where to put the label in axes-fraction units
+    """
+    if labels is None:
+        labels = string.ascii_lowercase
+
+    # re-use labels rather than stop labeling
+    labels = itertools.cycle(labels)
+    if loc is None:
+        loc = (.9, .9)
+    for ax, lab in zip(fig.axes, labels):
+        ax.annotate(lab, xy=loc,
+                    xycoords='axes fraction',
+                    **kwargs)

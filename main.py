@@ -2,7 +2,8 @@
 # from gams import *
 import pickle  # for dumping and loading variable to/from file
 
-indicators = ["cost_tot", "VRE_share", "solar_share", "wind_share", 'curtailment', 'flywheel', 'bat', 'FC', 'H2store']
+indicators = ["cost_tot", "VRE_share", "solar_share", "wind_share", 'curtailment', 'flywheel', 'sync_cond', 'bat', 'FC',
+              'H2store']
 cases = []
 for reg in ["SE2", "HU", "ES3", "IE"]:
     for scen in ["reg_pre", "reg_OR", "reg_OR_inertia", "reg_inertia", "reg_inertia_noSyn"]:

@@ -9,7 +9,7 @@ from multiprocessing import cpu_count
 from queue import Queue
 import pandas as pd
 from gams import *
-from tech_order import TECH, order
+from my_utils import TECH, order
 from main import overwrite, path, indicators, old_data, run_output, cases, name, gdxpath
 try:
     _ = path  # this will work if file was run from main since path is defined there
@@ -390,6 +390,7 @@ def run_case(scen, data, gdxpath):
         solar_share = [solar_tot / el_tot]
         bat = [str(round(cap[TECH.BATTERY], 2)) + " / " + str(round(cap[TECH.BATTERY_CAP], 2))]
         flywheel = [round(cap[TECH.FLYWHEEL], 3)]
+        sync_cond = [round(cap[TECH.SYNCHRONOUS_CONDENSER], 3)]
         FC = cap[TECH.FUEL_CELL]
         if TECH.H2_STORAGE in cap:
             H2store = cap[TECH.H2_STORAGE]  # +cap["H2LRC"]
@@ -423,6 +424,7 @@ def run_case(scen, data, gdxpath):
              solar_share,
              curtailment,
              flywheel,
+             sync_cond,
              bat,
              FC,
              H2store] +
