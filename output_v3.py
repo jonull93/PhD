@@ -11,6 +11,7 @@ import pandas as pd
 from gams import *
 from my_utils import TECH, order
 from main import overwrite, path, indicators, old_data, run_output, cases, name, gdxpath
+
 try:
     _ = path  # this will work if file was run from main since path is defined there
 except:
@@ -328,7 +329,8 @@ def run_case(scen, data, gdxpath):
         inertia_factor = {i: 0. for i in gen if i in allthermal + allwind + [TECH.HYDRO, TECH.HYDRO_IMPORT]}
         for i in allwind: inertia_factor[i] = 0.13
         for i in allthermal: inertia_factor[i] = 0.32
-        inertia_factor["U"] = 0.48
+        inertia_factor[TECH.NUCLEAR] = 0.48
+        inertia_factor[TECH.SYNCHRONOUS_CONDENSER] = 0.48
         inertia_factor[TECH.HYDRO] = 0.24
         inertia_factor[TECH.HYDRO_IMPORT] = 0.24
         if nosyn:
@@ -345,7 +347,7 @@ def run_case(scen, data, gdxpath):
             elif tech in [TECH.FLYWHEEL]:
                 inertia[tech] = [cap[tech] * 6 for t in iter_t]
             elif tech in [TECH.SYNCHRONOUS_CONDENSER]:
-                inertia[tech] = [cap[tech] for t in iter_t]
+                inertia[tech] = [cap[tech] * inertia_factor[tech] for t in iter_t]
             elif tech in [TECH.BATTERY]:
                 inertia[tech] = [max(min(cap[TECH.BATTERY_CAP], gen[tech][t] * 60) + charge[tech][t] - discharge[tech][t], 0)
                                  for t in iter_t]
@@ -418,15 +420,15 @@ def run_case(scen, data, gdxpath):
              "OR_up_min",
              "el_tot",
              "inertia"],
-            [cost_tot,  # [indicators]
+            [cost_tot,
              VRE_share,
              wind_share,
              solar_share,
              curtailment,
-             flywheel,
+             # flywheel,
              sync_cond,
              bat,
-             FC,
+             # FC',
              H2store] +
             [htimestep,
              cap,
@@ -458,7 +460,14 @@ def excel(scen, data, row):
     OR_up = data["OR_up"]
     vPS_ESS_up = data["vPS_ESS_up"]
     inertia = data["inertia"]
-    real_FLH = {i: sum([j for j in gen[i]]) / cap[i] for i in cap if cap[i] > 0}
+    try:
+        real_FLH = {i: sum(gen[i]) / cap[i] for i in cap if cap[i] > 0}
+    except:
+        print("RAN INTO THE WEIRD FLH ERROR IN", scen)
+        print("DATA keys:", data.keys())
+        print("gen keys:", gen.keys())
+        print("cap keys:", data["cap"])
+        real_FLH = {i: 0 for i in cap if cap[i] > 0}
 
     print_num([scen], "Indicators", row + 1, 0, 0)
     c = 1
@@ -495,23 +504,23 @@ def excel(scen, data, row):
     print_gen2(scen, length + 11 + len(inertia) + len(data["OR_up"]), 0,
                {("OR_cost", i): data["PS_OR_cost_up"][i] for i in data["PS_OR_cost_up"]})
 
-    print_cap({x: y for x, y in cap.items() if y > 0}, scen, len(gen) + len(OR_up) * 2 + len(data["vPS_ESS_up"]) + 15,
+    print_cap({x: y for x, y in cap.items() if y > 0}, scen, len(gen) + len(OR_up) + len(inertia) + len(data["vPS_ESS_up"]) + 15,
               1, ["Cap"])
     c = 0
-    print_num(["share"], scen, len(gen) + len(OR_up) * 2 + len(data["vPS_ESS_up"]) + 15, 3, 0)
+    print_num(["share"], scen, len(gen) + len(OR_up) + len(inertia) + len(data["vPS_ESS_up"]) + 15, 3, 0)
     for i in cap:
         if cap[i] > 0:
             c += 1
             num = sum(gen[i]) / el_tot
-            print_num([num], scen, len(gen) + len(OR_up) * 2 + len(data["vPS_ESS_up"]) + 15 + c, 3, 0)
+            print_num([num], scen, len(gen) + len(OR_up) + len(inertia) + len(data["vPS_ESS_up"]) + 15 + c, 3, 0)
 
     c = 0
-    print_num(["FLH"], scen, len(gen) + len(OR_up) * 2 + len(data["vPS_ESS_up"]) + 15, 4, 0)
+    print_num(["FLH"], scen, len(gen) + len(OR_up) + len(inertia) + len(data["vPS_ESS_up"]) + 15, 4, 0)
     for i in cap:
         if cap[i] > 0:
             c += 1
             num = real_FLH[i]
-            print_num([num], scen, len(gen) + len(OR_up) * 2 + len(data["vPS_ESS_up"]) + 15 + c, 4, 0)
+            print_num([num], scen, len(gen) + len(OR_up) + len(inertia) + len(data["vPS_ESS_up"]) + 15 + c, 4, 0)
 
 
 todo_gdx = []
@@ -539,7 +548,7 @@ threads = {}
 thread_nr = {}
 num_threads = min(max(cpu_count() - 1, 6), len(todo_gdx))
 writer = pd.ExcelWriter(path + "output_" + name + ".xlsx", engine="openpyxl")
-# Starting worker threads on queue processing
+opened_file = False
 try:
     f = open(path + "output_" + name + ".xlsx", "r+")
     f.close()
@@ -547,8 +556,10 @@ except Exception as e:
     if "No such" in str(e):
         None
     elif "one sheet" not in str(e):
+        opened_file = True
         print("OBS: EXCEL FILE MAY BE OPEN - PLEASE CLOSE IT BEFORE SCRIPT FINISHES ", e)
 
+# Starting worker threads on queue processing
 print('Starting excel thread(s)')
 worker = threading.Thread(target=crawl_excel)
 worker.start()
@@ -562,6 +573,7 @@ for i in range(num_threads):
 # now we wait until the queue has been processed
 q_gdx.join()  # first we make sure there are no gdx files waiting to get processed
 isgdxdone = True
+if opened_file: print(" ! REMINDER TO MAKE SURE EXCEL FILE IS CLOSED !")
 print("GDX queue empty!")
 q_excel.join()  # and then we make sure the excel queue is also empty
 

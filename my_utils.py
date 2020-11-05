@@ -126,6 +126,7 @@ order = [
     'bat_cap_PS',
     'flywheel',
     'sync_cond',
+    'curtailment',
     # 'bat_LiIon',
     # 'bat_LiIon_PS',
     # 'bat_flow',
@@ -173,16 +174,19 @@ tech_names = {'RO': 'Hydro', 'U': 'Nuclear', 'CHP_wa': 'Waste CHP', 'CHP_bio': '
               'GWGCCS': 'Gas-mix CCS', 'WG': 'Biogas CCGT', 'WG_peak': 'Biogas GT', 'wind_offshore': 'Offshore wind',
               "flywheel": "Flywheel", "bat": "Battery SoC", "sync_cond": "Sync. Cond.",
               'wind_onshore': 'Onshore wind', 'PV_cSiOPT': 'Solar PV', 'EB': 'EB', 'HP': 'HP', 'HOB_WG': 'Biogas HOB',
-              'HOB_bio': 'Woodchip HOB', 'solarheat': 'Solar heating',
-              'Load': 'Load'}
+              'HOB_bio': 'Woodchip HOB', 'solarheat': 'Solar heating', "curtailment": "Curtailment",
+              'Load': 'Load', 'bat_PS': "Battery (PS)", 'bat_cap_PS': "Battery cap (PS)"}
+scen_names = {"_pre": "Base case", "_leanOR": "Lean OR", "_OR": "OR", "_OR_fixed": "OR", "_OR_inertia": "OR + Inertia",
+                      "_OR+inertia_fixed": "OR + Inertia", "_inertia": "Inertia", "_inertia_2x": "2x Inertia",
+                      "_inertia_noSyn": "Inertia (noSyn)", "_OR_inertia_3xCost": "OR + Inertia (3x)",
+                      "_inertia_3xCost": "Inertia (3x)", "_inertia_noSyn_3xCost": "Inertia (noSyn) (3x)"}
 color_dict = {'wind_onshore': '#B9B9B9', 'wind_offshore': '#DADADA', 'RO': 'xkcd:ocean blue', 'U': 'xkcd:grape',
               'GWGCCS': 'xkcd:dark peach', 'CHP_wa': 'xkcd:deep lavender', 'CHP_bio': 'xkcd:tree green',
               'WG': 'xkcd:pea', 'WG_peak': 'xkcd:red', 'PV_cSiOPT': 'xkcd:mustard', 'CHP_WG_L': 'xkcd:mid green',
               'HP': (255 / 255, 192 / 255, 0), 'EB': (91 / 255, 155 / 255, 213 / 255), 'CHP_WG': (0, 176 / 255, 80 / 255),
-              'HOB_WG': (128 / 255, 128 / 255, 0),
-              'solarheat': (204 / 255, 51 / 255, 0), 'HOB_bio': 'green', 'Load': 'Black',
-              "bat_discharge": "xkcd:amber",
-              'bat': "xkcd:deep lavender", "sync_cond": 'xkcd:aqua'}
+              'HOB_WG': (128 / 255, 128 / 255, 0), 'solarheat': (204 / 255, 51 / 255, 0), 'HOB_bio': 'green',
+              'Load': 'Black', "bat_discharge": "xkcd:amber", 'bat': "xkcd:deep lavender", 'bat_PS': "xkcd:deep lavender",
+              'bat_cap_PS': "xkcd:deep lavender", "sync_cond": 'xkcd:aqua', "curtailment": "xkcd:slate"}
 
 
 # print(order[2])
