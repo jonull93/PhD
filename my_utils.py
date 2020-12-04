@@ -172,7 +172,7 @@ order = [
 tech_names = {'RO': 'Hydro', 'U': 'Nuclear', 'CHP_wa': 'Waste CHP', 'CHP_bio': 'Woodchip CHP', 'CHP_WG_L': 'Biogas CHP',
               "bat_discharge": "Battery (dis)charge",
               'GWGCCS': 'Gas-mix CCS', 'WG': 'Biogas CCGT', 'WG_peak': 'Biogas GT', 'wind_offshore': 'Offshore wind',
-              "flywheel": "Flywheel", "bat": "Battery SoC", "sync_cond": "Sync. Cond.",
+              "flywheel": "Flywheel", "bat": "Battery", "sync_cond": "Sync. Cond.",
               'wind_onshore': 'Onshore wind', 'PV_cSiOPT': 'Solar PV', 'EB': 'EB', 'HP': 'HP', 'HOB_WG': 'Biogas HOB',
               'HOB_bio': 'Woodchip HOB', 'solarheat': 'Solar heating', "curtailment": "Curtailment",
               'Load': 'Load', 'bat_PS': "Battery (PS)", 'bat_cap_PS': "Battery cap (PS)"}
