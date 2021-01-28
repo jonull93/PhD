@@ -23,7 +23,7 @@ errors = 0
 # Create dictionary of scenario-code
 years = [2025]
 regions = ["nordic","brit","iberia"]  # ["SE2","HU","ES3","IE"]
-modes = ["noFlex"]
+modes = ["flex", "noFlex"]
 timeResolution = 3
 # ["pre", "OR","OR_inertia", "inertia","inertia_noSyn"]
 # ["leanOR", "OR","OR+inertia","leanOR+inertia", "inertia","inertia_noSyn","inertia_2x","OR+inertia_noDoubleUse"]
@@ -36,20 +36,24 @@ scenarios = {}
 for mode in modes:
     for region in regions:
         for year in years:
-            scenarios[f"{region}_{mode}_{year}"] = \
+            scenarios[f"{region}_{mode}_{year}{'' if timeResolution == 1 else '_'+str(timeResolution)+'h'}"] = \
                 f"""
-$setglobal scenario "{region}_{mode}_{year}{"_3h" if "_3h" in mode else ""}"
-$setglobal ireg {region}
-$setglobal flexlim no
-$setglobal startuptime no
-$setglobal which_year {year}
+$setglobal scenario "{region}_{mode}_{year}{'' if timeResolution == 1 else '_'+str(timeResolution)+'h'}"
+$setglobal region {region}
+$setglobal flexlim {'no' if 'noflex' in mode.lower() else 'yes'}
+$setglobal startup no
+$setglobal current_year {year}
+$setglobal first_iteration {'yes' if year==years[0] else 'no'} //if no -> will try to read previousInvestments.gdx
 $setglobal cores 6
 $setglobal OR {"yes" if "OR" in mode else "no"}
 $setglobal lean {"yes" if "lean" in mode else "no"}
 $setglobal inertia {"yes" if "inertia" in mode else "no"}
 $setglobal inertia_scaling {"2" if "2x" in mode else "1"}
 $setglobal forecast_scaling 1
+$setglobal flywheel_price 1
 $setglobal sync_cond_price 1
+$setglobal onshore_storage "no"
+$setglobal H2demand 0 
 
 $setglobal synthetic_inertia {"no" if "noSyn" in mode else "yes"}
 $setglobal double_use {"no" if "noDoubleUse" in mode else "yes"}
@@ -60,7 +64,7 @@ $setglobal profiling yes
 * Temporal resolution 1, 3 or 6 h
 $setglobal hour_resolution {timeResolution}"""  # [NEEDS TO BE EDITED WHEN SETTING SCRIPT UP]
 
-num_threads = min(8, len(scenarios))
+num_threads = min(5, len(scenarios))
 # The "optimal" number of threads depends on your hardware and model
 # but nr of cores /2 seems good unless you hit RAM limit
 
@@ -105,14 +109,17 @@ def crawl(q, ws, io_lock):
 def run_scenario(workspace, io_lock, scen):
     starttime[scen[0]] = tm.time()
     job = workspace.add_job_from_file(gmsfile)
-    randint = random.randrange(99999999999)  # we create a scenario-specific options file to avoid reading the wrong options file
+    # we create a scenario-specific options file to avoid reading the wrong options file
+    randint = random.randrange(99999999999)  
     f = open(path + "options_" + str(randint) + ".txt", "w")
     f.write("LogOption 2\nLogFile " + scen[1] + ".log\nparallelmode -1")
     f.close()
     opt = workspace.add_options(opt_file=path + "options_" + str(randint) + ".txt")
+    # then remove the scenario-specific options file since its not interesting
     os.remove(
-        path + "options_" + str(randint) + ".txt")  # then remove the scenario-specific options file since its not interesting
-    opt.defines["scenariofile"] = scen[1]  # give gams the variable 'scenarioname' with value scen[1] which is the string
+        path + "options_" + str(randint) + ".txt")  
+    # give gams the variable 'scenarioname' with value scen[1] which is the string
+    opt.defines["scenariofile"] = scen[1]  
     print(f" --- Starting scenario {scen[0]}: {scen[1]} in thread", thread_nr[threading.get_ident()], "at",
           dt.datetime.now().strftime('%H:%M:%S'), "---")
     job.run(opt, create_out_db=False)
@@ -143,7 +150,7 @@ thread_nr = {}
 # Starting worker threads on queue processing
 for i in range(num_threads):
     print('Starting thread', i + 1)
-    worker = threading.Thread(target=crawl, args=(q, ws, cp, io_lock))
+    worker = threading.Thread(target=crawl, args=(q, ws, io_lock))
     worker.setDaemon(True)  # setting threads as "daemon" allows main program to
     # exit eventually even if these dont finish
     # correctly.
