@@ -3,9 +3,8 @@ import time
 import re
 
 from copy import deepcopy
+from my_utils import write_inc
 import numpy as np
-import pandas as pd
-import xlsxwriter
 
 # This file defines three functions which are used in the following order:
 # read_file reads tech profiles from .inc files
@@ -60,15 +59,6 @@ def build_ramp(profiles):
     return ramp
 
 
-def write_inc(filename, ramp):
-    with open(path + filename, "w") as writer:
-        for reg in ramp:
-            for tech in ramp[reg]:
-                for timestep, value in ramp[reg][tech].items():
-                    writer.write(f"{reg} . {tech} . {timestep}  {value}\n")
-    return None
-
-
 WON_profiles = read_file("cf_Windonshore.INC", WON_profiles)
 print("-- Built WON_profiles --")
 WON_ramp = build_ramp(WON_profiles)
@@ -91,5 +81,5 @@ for reg in regions:
         VRE_ramp[reg][tech] = PV_ramp[reg][tech]
 
 print("-- Combined ramps --")
-write_inc("VRE_ramp.inc", VRE_ramp)
+write_inc(path, "VRE_ramp.inc", VRE_ramp)
 print("-- Wrote ramps to .inc file --")
