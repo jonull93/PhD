@@ -80,7 +80,7 @@ if multipleYears: print("  Multiple years detected, will run previousInvestments
 
 # create .inc file for each scenario
 for scen in scenarios:
-    File = open(path + "Include\\scenarios\\" + scen + ".inc",
+    File = open(path + "Include\\pythonScenarios\\" + scen + ".inc",
                 "w")  # here you can choose where the scenario-files should be placed (OBS: folder must already exist)
     File.write(scenarios[scen])
     File.close()
