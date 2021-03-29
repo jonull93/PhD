@@ -47,7 +47,7 @@ for reg, val in gdp.items():
     except:
         None
 
-techs = ["WON" + ab + str(dig) for dig in range(1, 6) for ab in ["A", "B"]]
+techs = ["WON" + ab + str(dig) for dig in range(5, 0, -1) for ab in ["A", "B"]]
 WON_pot = {reg: {tech: 0 for tech in techs} for reg in gdp}
 WOFF_pot = {reg: {'WOFF': 0} for reg in gdp}
 cap_density_WON = 0.1
@@ -127,5 +127,5 @@ for country, cap in national_cap_WOFF.items():
     else:
         filler(cap/1000, existingCapacity, country_to_reg(ratio_gdp, country), country_to_reg(WOFF_pot, country))
 
-write_inc("C:\\git\\multinode\\Include\\", "existingCap_VRE.inc", existingCapacity)
+write_inc("C:\\git\\multinode\\Include\\existingCapacity\\", "existingCap_VRE.inc", existingCapacity)
 
