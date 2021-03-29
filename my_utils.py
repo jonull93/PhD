@@ -177,15 +177,17 @@ tech_names = {'RO': 'Hydro', 'U': 'Nuclear', 'CHP_wa': 'Waste CHP', 'CHP_bio': '
               'HOB_bio': 'Woodchip HOB', 'solarheat': 'Solar heating', "curtailment": "Curtailment",
               'Load': 'Load', 'bat_PS': "Battery (PS)", 'bat_cap_PS': "Battery cap (PS)"}
 scen_names = {"_pre": "Base case", "_leanOR": "Lean OR", "_OR": "OR", "_OR_fixed": "OR", "_OR_inertia": "OR + Inertia",
-                      "_OR+inertia_fixed": "OR + Inertia", "_inertia": "Inertia", "_inertia_2x": "2x Inertia",
-                      "_inertia_noSyn": "Inertia (noSyn)", "_OR_inertia_3xCost": "OR + Inertia (3x)",
-                      "_inertia_3xCost": "Inertia (3x)", "_inertia_noSyn_3xCost": "Inertia (noSyn) (3x)"}
+              "_OR+inertia_fixed": "OR + Inertia", "_inertia": "Inertia", "_inertia_2x": "2x Inertia",
+              "_inertia_noSyn": "Inertia (noSyn)", "_OR_inertia_3xCost": "OR + Inertia (3x)",
+              "_inertia_3xCost": "Inertia (3x)", "_inertia_noSyn_3xCost": "Inertia (noSyn) (3x)"}
 color_dict = {'wind_onshore': '#B9B9B9', 'wind_offshore': '#DADADA', 'RO': 'xkcd:ocean blue', 'U': 'xkcd:grape',
               'GWGCCS': 'xkcd:dark peach', 'CHP_wa': 'xkcd:deep lavender', 'CHP_bio': 'xkcd:tree green',
               'WG': 'xkcd:pea', 'WG_peak': 'xkcd:red', 'PV_cSiOPT': 'xkcd:mustard', 'CHP_WG_L': 'xkcd:mid green',
-              'HP': (255 / 255, 192 / 255, 0), 'EB': (91 / 255, 155 / 255, 213 / 255), 'CHP_WG': (0, 176 / 255, 80 / 255),
+              'HP': (255 / 255, 192 / 255, 0), 'EB': (91 / 255, 155 / 255, 213 / 255),
+              'CHP_WG': (0, 176 / 255, 80 / 255),
               'HOB_WG': (128 / 255, 128 / 255, 0), 'solarheat': (204 / 255, 51 / 255, 0), 'HOB_bio': 'green',
-              'Load': 'Black', "bat_discharge": "xkcd:amber", 'bat': "xkcd:deep lavender", 'bat_PS': "xkcd:deep lavender",
+              'Load': 'Black', "bat_discharge": "xkcd:amber", 'bat': "xkcd:deep lavender",
+              'bat_PS': "xkcd:deep lavender",
               'bat_cap_PS': "xkcd:deep lavender", "sync_cond": 'xkcd:aqua', "curtailment": "xkcd:slate"}
 
 
@@ -221,3 +223,35 @@ def label_axes(fig, labels=None, loc=None, **kwargs):
         ax.annotate(lab, xy=loc,
                     xycoords='axes fraction',
                     **kwargs)
+
+
+def write_inc(path, filename, var, flip=True):
+    """
+
+    Parameters
+    ----------
+    path
+    filename
+    var
+    flip
+
+    Returns
+    -------
+    nothing, but creates path/filename.inc containing a variable with 2 or 3 sets, e.g. tech + reg (+ opt. timestep)
+    """
+    with open(path + filename, "w") as writer:
+        for reg in var:
+            for tech in var[reg]:
+                try:
+                    for timestep, value in var[reg][tech].items():
+                        if flip:
+                            writer.write(f"{tech} . {reg} . {timestep}  {value}\n")
+                        else:
+                            writer.write(f"{reg} . {tech} . {timestep}  {value}\n")
+                except:
+                    value = var[reg][tech]
+                    if flip:
+                        writer.write(f"{tech} . {reg}  {value}\n")
+                    else:
+                        writer.write(f"{reg} . {tech}  {value}\n")
+    return None
