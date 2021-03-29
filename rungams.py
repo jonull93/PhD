@@ -22,9 +22,9 @@ errors = 0
 
 # Create dictionary of scenario-code
 years = [2025]
-regions = ["nordic","brit","iberia"]  # ["SE2","HU","ES3","IE"]
-modes = ["flex", "noFlex"]
-timeResolution = 3
+regions = ["nordic","iberia"]  # ["SE2","HU","ES3","IE"]
+modes = ["noFlex", "flex_OR_inertia"]
+timeResolution = 1
 # ["pre", "OR","OR_inertia", "inertia","inertia_noSyn"]
 # ["leanOR", "OR","OR+inertia","leanOR+inertia", "inertia","inertia_noSyn","inertia_2x","OR+inertia_noDoubleUse"]
 
@@ -44,7 +44,7 @@ $setglobal flexlim {'no' if 'noflex' in mode.lower() else 'yes'}
 $setglobal startup no
 $setglobal current_year {year}
 $setglobal first_iteration {'yes' if year==years[0] else 'no'} //if no -> will try to read previousInvestments.gdx
-$setglobal cores 6
+$setglobal cores 8
 $setglobal OR {"yes" if "OR" in mode else "no"}
 $setglobal lean {"yes" if "lean" in mode else "no"}
 $setglobal inertia {"yes" if "inertia" in mode else "no"}
@@ -64,7 +64,7 @@ $setglobal profiling yes
 * Temporal resolution 1, 3 or 6 h
 $setglobal hour_resolution {timeResolution}"""  # [NEEDS TO BE EDITED WHEN SETTING SCRIPT UP]
 
-num_threads = min(5, len(scenarios))
+num_threads = min(4, len(scenarios))
 # The "optimal" number of threads depends on your hardware and model
 # but nr of cores /2 seems good unless you hit RAM limit
 
