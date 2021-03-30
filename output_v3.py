@@ -23,7 +23,7 @@ print("Excel-writing script started at", datetime.now().strftime('%H:%M:%S'))
 
 def print_gen(sheet, row, entry, data):
     gen_df = pd.DataFrame(entry)
-    gen_df.transpose().to_excel(writer, sheet_name=sheet, freeze_panes=(0, 2), header=data["htimestep"], startrow=row,
+    gen_df.transpose().to_excel(writer, sheet_name=sheet, freeze_panes=(0, 2), header=data["gamsTimestep"], startrow=row,
                                 startcol=1)
 
 
@@ -120,29 +120,47 @@ def run_case(scen, data, gdxpath):
             print("gdx file not found for: " + k + "\n")
             return False
 
-        i_reg = [rec.keys[0] for rec in db["I_reg"]][0]
-        htimestep = [i.keys[0] for i in db["timestep"]]  # "h0001"
-        head = [i[1:] for i in htimestep]  # "0001"
-        timestep = [int(i) for i in head]  # 1
-        iter_t = range(len(timestep))
-        TT = 8784 / len(htimestep)
+        i_reg = [rec.keys[0] for rec in db["I_reg"]]
+        gamsTimestep = [i.keys[0] for i in db["timestep"]]  # "h0001" or "d001a"
+        #head = [i[1:] for i in gamsTimestep]  # "0001"
+        iter_t = range(len(gamsTimestep))
+        timestep = [i+1 for i in iter_t]  # 1
+        TT = 8760 / len(gamsTimestep)
         unsorted_cap = {}
-        for rec in db["vnewcap"]:  # BUILDING CAPACITY VARIABLE
+        for rec in db["v_newcap"]:  # BUILDING CAPACITY VARIABLE
             if rec.keys[1] == i_reg:
                 unsorted_cap[rec.keys[0]] = rec.level
 
         cap = {i: unsorted_cap[i] for i in order if i in unsorted_cap}
         allwind = [rec.keys[0] for rec in db["allwind"] if rec.keys[0] in cap]
-        cost_tot = [rec.level for rec in db["vtotcost"]]
+        cost_tot = [rec.level for rec in db["v_totcost"]]
         # tech = [x.keys[0] for x in db["tech"]]
         allthermal = [rec.keys[0] for rec in db["allthermal"]]
         #        allCCS = [rec.keys[0] for rec in db["allCCS"]]
         #        tech_slowslow = [rec.keys[0] for rec in db["tech_slowslow"]]
-        ESS = [rec.keys[0] for rec in db["ESS"]]
-        withdrawal_rate = {rec.keys[0]: rec.value for rec in db["withdrawal_rate"] if rec.keys[0] in ESS}
-        vPS_ESS_up = {i: {j: [] for j in range(1, 8)} for i in ESS}
-        for rec in db["vPS_ESS_up"]:
-            vPS_ESS_up[rec.keys[0]][int(rec.keys[3])].append(rec.level)
+        allstorage = [rec.keys[0] for rec in db["allstorage"]]
+        withdrawal_rate = {rec.keys[0]: rec.value for rec in db["withdrawal_rate"] if rec.keys[0] in allstorage}
+
+        try:
+            OR_period = [rec.keys[0] for rec in db["OR_period"]]
+            PS = True
+        except:
+            PS = False
+
+        if PS:
+            ESS = [rec.keys[0] for rec in db["ESS"]]
+            v_PS_ESS_up = {i: {j: [] for j in OR_period} for i in ESS}
+            for rec in db["v_PS_ESS_up"]:
+                v_PS_ESS_up[rec.keys[0]][int(rec.keys[3])].append(rec.level)
+
+            ramp = pickle.load(open("PickleJar\\data_ramp2.pickle", "rb"))
+
+            LF_profile = {"wind": [sum([ramp["wind"][i_reg][i][t] * cap[i] for i in ramp["wind"][i_reg] if "WO" in i]) for t in
+                                   iter_t],
+                          "solar": [sum([ramp["solar"][i_reg][i][t] * cap[i] * FLH[i] for i in ramp["solar"][i_reg] if "PV" in i])
+                                    for t in iter_t],
+                          "demand": [rec.value for rec in db["PS_OR_min"] if rec.keys[0] == i_reg]}
+
         #        min_load = {rec.keys[0]:rec.value for rec in db["techprop"] if rec.keys[1]=="minload"}
         #        inv_cost = {rec.keys[0]:rec.value for rec in db["techprop"] if rec.keys[1]=="inv_cost"}
         #        annuity = {rec.keys[0]:rec.value for rec in db["annuity"]}
@@ -152,21 +170,21 @@ def run_case(scen, data, gdxpath):
         PV_profile = {i: [0 for x in range(0, timestep[-1])] for i in [TECH.SOLAR_OPT, TECH.SOLAR_TRACKING]}
         PV_FLH = {i.keys[0]: i.value for i in db["FLH"] if "PV_" in i.keys[0]}
         FLH = {i.keys[0]: i.value for i in db["FLH"]}
-        el_price = [rec.marginal / TT * -1e6 for rec in db["EQUloadbalance"] if rec.keys[0] == i_reg]
-        discharge = {i: [rec.level for rec in db["vdischarge"] if rec.keys[0] == i and rec.keys[1] == i_reg] for i in
+        el_price = [rec.marginal / TT * -1e6 for rec in db["EQU_elecbalance"] if rec.keys[0] == i_reg]
+        discharge = {i: [rec.level for rec in db["v_discharge"] if rec.keys[0] == i and rec.keys[1] == i_reg] for i in
                      [TECH.BATTERY, "bat_PS"]}
 
-        charge = {i: [rec.level for rec in db["vcharge"] if rec.keys[0] == i] for i in [TECH.BATTERY, "bat_PS"]}
+        charge = {i: [rec.level for rec in db["v_charge"] if rec.keys[0] == i] for i in [TECH.BATTERY, "bat_PS"]}
         #        eta_discharge = {rec.keys[0]:rec.value for rec in db["eta_discharge"]}
         #        eta_charge = {rec.keys[0]:rec.value for rec in db["eta_charge"]}
         demand = [db["demand"][i_reg].value]
-        load_profile = [rec.value * demand[0] for rec in db["demandprofile"] if rec.keys[0] == i_reg]
+        load_profile = [rec.value * demand[0] for rec in db["demandprofile_average"] if rec.keys[0] == i_reg]
 
         try:
             OR_up_min = [rec.level for rec in db["vPS_OR_up"] if rec.keys[0] == i_reg]
             #            PS_OR_spin_up = [rec.level for rec in db["vPS_OR_spin_up"]  if rec.keys[0] == i_reg]
             PS_OR_cost_up = {i + 1: [] for i in range(7)}
-            for rec in db["EQU_PS_OR_supply_up"]:
+            for rec in db["EQU_PS_OR_supply"]:
                 PS_OR_cost_up[int(rec.keys[2])].append(rec.marginal / TT * -1e6)
         except Exception as exception:
             print("ran into exception when making OR lists:", exception)
@@ -187,13 +205,6 @@ def run_case(scen, data, gdxpath):
             for i in [j for j in wind_FLH if cap[j] > 0]:
                 wind_FLH[i] += wind_profile[i][t - 1]
 
-        ramp = pickle.load(open("PickleJar\\data_ramp2.pickle", "rb"))
-
-        LF_profile = {"wind": [sum([ramp["wind"][i_reg][i][t] * cap[i] for i in ramp["wind"][i_reg] if "WO" in i]) for t in
-                               iter_t],
-                      "solar": [sum([ramp["solar"][i_reg][i][t] * cap[i] * FLH[i] for i in ramp["solar"][i_reg] if "PV" in i])
-                                for t in iter_t],
-                      "demand": [rec.value for rec in db["PS_OR_min"] if rec.keys[0] == i_reg]}
 
         unsorted_gen = {}
         VRE_tot = 0.
@@ -402,7 +413,7 @@ def run_case(scen, data, gdxpath):
         netload = [load_profile[t] - sum([gen[i][t] for i in allwind + [TECH.SOLAR_OPT] if cap[i] > 0]) for t in iter_t]
         newdata[k] = dict(zip(
             indicators +
-            ["htimestep",
+            ["gamsTimestep",
              "cap",
              "gen",
              "VRE_share",
@@ -430,7 +441,7 @@ def run_case(scen, data, gdxpath):
              bat,
              # FC',
              H2store] +
-            [htimestep,
+            [gamsTimestep,
              cap,
              gen,
              VRE_share,
