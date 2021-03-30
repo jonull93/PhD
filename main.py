@@ -13,30 +13,26 @@ indicators = ["cost_tot",
 #              'FC',
               'H2store']
 cases = []
-for reg in ["SE2", "HU", "ES3", "IE"]:
-    for scen in ["reg_pre",
-                 "reg_OR",
-                 "reg_OR_inertia",
-                 "reg_inertia",
-                 "reg_inertia_noSyn",
-                 "reg_inertia_noSyn_3xCost",
-                 "reg_inertia_noBatteryInertia",
-                 "reg_inertia_noWindInertia"]:
+for reg in ["iberia", "brit", "nordic"]:
+    for flex in ["flex", "noFlex"]:
+        for HBres in [1, 8, 52]:
+            for year in [2025, 2050]:
         # full: ["reg_pre","reg_OR_forcedH2","reg_inertia_forcedH2","reg_leanOR", "reg_OR","reg_OR+inertia","reg_leanOR+inertia", "reg_inertia", "reg_inertia_2timesFWcost", "reg_inertia_3timesFWcost","reg_inertia_noSyn_3timesFWcost", "reg_inertia_noSyn","reg_inertia_2x", "reg_inertia_0.1x"]:
         # base: ["reg_pre", "reg_OR","reg_OR+inertia", "reg_inertia", "reg_inertia_noSyn", "reg_inertia_2x"]:
-        cases.append(scen.replace("reg", reg))
+                cases.append(f"{reg}_{flex}_HB{HBres}_{year}_6h")
 
 # cases.append("OR_ES3_noSyn_noDoubleUse")
-exec(open("./seasons.py").read())
+# exec(open("./seasons.py").read())
 # run_output = input("Enter 'r' to read pickled data, 'w' to (over)write or 'rw' to add missing scenarios: ") #[todo: give option to overwrite specific scenarios]
 run_output = "w"
 # run_plots = input('Should we also plot results? Y/N: ')
 run_plots = "n"
 overwrite = []  # [reg+"_inertia_0.1x" for reg in ["ES3", "HU", "IE", "SE2"]]+[reg+"_inertia" for reg in ["ES3", "HU", "IE", "SE2"]]+[reg+"_inertia_noSyn" for reg in ["ES3", "HU", "IE", "SE2"]]
-name = "PS_full"  # this will be the name of the file: output_%NAME%.xlsx
-path = "C:\\Users\\jonull\\Box\\python\\"
+name = "testing_6h"  # this will be the name of the file: output_%NAME%.xlsx
+#path = "C:\\Users\\jonull\\Box\\python\\"
+path = "D:\\Jonathan\\python\\output\\"
 # gdxpath = path
-gdxpath = "C:\\models\\enode\\new\\"
+gdxpath = "D:\\Jonathan\\multinode\\"  # where to find gdx files
 
 if run_output.lower() == "r" or run_output.lower() == "read":
     try:
