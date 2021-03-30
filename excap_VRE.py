@@ -1,6 +1,8 @@
 from my_utils import write_inc
 
 # To run this file, edit the paths below and make sure you have the GIS capacity_Windonshore.inc in the inc_path
+# And to import from my_utils.py, just make sure it exists in the same folder as this script
+
 destination_path = "C:\\git\\multinode\\Include\\existingCapacity\\"
 inc_path = "C:\\git\\multinode\\Include\\"
 
