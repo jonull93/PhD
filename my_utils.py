@@ -190,10 +190,37 @@ color_dict = {'wind_onshore': '#B9B9B9', 'wind_offshore': '#DADADA', 'RO': 'xkcd
               'bat_PS': "xkcd:deep lavender",
               'bat_cap_PS': "xkcd:deep lavender", "sync_cond": 'xkcd:aqua', "curtailment": "xkcd:slate"}
 
+EPODreg_to_country = {  # dictionary for going between EPODreg to country
+    'AT': 'Austria', 'BE': 'Belgium', 'BO': 'Bosnia', 'BG': 'Bulgaria', 'CR': 'Croatia', 'CY': 'Cyprus',
+    'CZ': 'Czech_Republic', 'DK1': 'Denmark', 'DK2': 'Denmark', 'EE': 'Estonia', 'FI': 'Finland', 'FR1': 'France',
+    'FR2': 'France', 'FR3': 'France', 'FR4': 'France', 'FR5': 'France', 'DE1': 'Germany', 'DE2': 'Germany',
+    'DE3': 'Germany', 'DE4': 'Germany', 'DE5': 'Germany', 'GR': 'Greece', 'HU': 'Hungary', 'IS': 'Iceland',
+    'IE': 'Ireland', 'IT1': 'Italy', 'IT2': 'Italy', 'IT3': 'Italy', 'LV': 'Latvia', 'LT': 'Lithuania',
+    'LU': 'Luxembourg', 'MC': 'Macedonia', 'MT': 'Malta', 'NL': 'Netherlands', 'NO_S': 'Norway', 'NO_N': 'Norway',
+    'NO1': 'Norway', 'NO2': 'Norway', 'NO3': 'Norway', 'PO1': 'Poland', 'PO2': 'Poland', 'PO3': 'Poland',
+    'PT': 'Portugal', 'RO': 'Romania', 'SK': 'Slovakia', 'SI': 'Slovenia', 'ES_N': 'Spain', 'ES_S': 'Spain',
+    'ES1': 'Spain', 'ES2': 'Spain', 'ES3': 'Spain', 'ES4': 'Spain', 'SE_N': 'Sweden', 'SE_S': 'Sweden', 'SE1': 'Sweden',
+    'SE2': 'Sweden', 'SE3': 'Sweden', 'SE4': 'Sweden', 'CH': 'Switzerland', 'UK1': 'UK', 'UK2': 'UK', 'UK3': 'UK'
+}
+EPODs = EPODreg_to_country.keys()
 
-# print(order[2])
-# pickle.dump( order, open( "tech_order.pickle", "wb" ) )
-# pickle.dump( TECH, open( "TECH.pickle", "wb" ) )
+
+def country_to_reg(dictionary, country):
+    """
+
+    Parameters
+    ----------
+    dictionary
+    country
+
+    Returns
+    -------
+    takes a dictionary with reg keys, and a country key, then uses EPODreg_to_country to return a dictionary with only
+    the keys that correspond to that country
+    """
+    return {reg: dictionary[reg] for reg in dictionary if country in EPODreg_to_country[reg]}
+
+
 def label_axes(fig, labels=None, loc=None, **kwargs):
     """
     Walks through axes and labels each.
