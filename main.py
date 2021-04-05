@@ -3,16 +3,14 @@
 import pickle  # for dumping and loading variable to/from file
 
 indicators = ["cost_tot",
-              "VRE_share",
-              "wind_share",
-              "solar_share",
+              "VRE_share_total",
               'curtailment',
               #              'flywheel',
               'sync_cond',
               'bat',
-              #              'FC',
+              'FC',
               'H2store']
-cases = ["brit_flex_HB8_2050_6h"]
+cases = ["brit_12h_52HB"]
 for reg in ["iberia", "brit", "nordic"]:
     for flex in ["flex", "noFlex"]:
         for HBres in [1, 8, 52]:

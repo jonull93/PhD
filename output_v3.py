@@ -5,11 +5,16 @@ import traceback
 from datetime import datetime
 from multiprocessing import cpu_count
 from queue import Queue
-import pandas as pd
-from my_utils import TECH, order
-from get_from_gams_db import gdx
-from main import overwrite, path, indicators, old_data, run_output, cases, name, gdxpath
+from traceback import format_exc
+
 import gdxr
+import pandas as pd
+import numpy as np
+
+from get_from_gams_db import gdx
+from copy import copy
+from main import overwrite, path, indicators, old_data, run_output, cases, name, gdxpath
+from my_utils import TECH, order, order_map
 
 try:
     _ = path  # this will work if file was run from main since path is defined there
@@ -20,16 +25,30 @@ except:
 print("Excel-writing script started at", datetime.now().strftime('%H:%M:%S'))
 
 
-def print_gen(sheet, row, entry, data):
-    gen_df = pd.DataFrame(entry)
-    gen_df.transpose().to_excel(writer, sheet_name=sheet, freeze_panes=(0, 2), header=data["gamsTimestep"],
-                                startrow=row,
-                                startcol=1)
+def print_gen(sheet, row, df, gamsTimestep):
+    df["sort_by"] = df.index.get_level_values(0).map(order_map)
+    df.sort_values("sort_by", inplace=True)
+    df.drop(columns="sort_by", inplace= True)
+    df = df.reorder_levels(["I_reg", "tech"]).sort_index(level=0, sort_remaining=False)
+    df.to_excel(writer, sheet_name=sheet, freeze_panes=(0, 2), startrow=row, startcol=1)
 
 
-def print_gen2(sheet, row, col, data):
-    gen_df = pd.DataFrame(data)
-    gen_df.transpose().to_excel(writer, sheet_name=sheet, freeze_panes=(0, 2), header=False, startrow=row, startcol=col)
+def print_df(df, name, sheet, col=3, header=True, row_inc=1):
+    global scen_row
+    length = 0
+    if type(df.index) == pd.core.indexes.base.Index:
+        length = 1
+    elif type(df.index) == pd.core.indexes.multi.MultiIndex:
+        length = min(len(df.index.levels), 2)
+    worksheet = writer.sheets[sheet]
+    worksheet.column_dimensions["A"].width = 14
+    df.to_excel(writer, sheet_name=sheet, header=header, startrow=scen_row, startcol=col-length)
+    cell = worksheet.cell(scen_row+1, 1, name)
+    alignment = copy(cell.alignment)
+    alignment.wrapText = True
+    cell.alignment = alignment
+    worksheet.merge_cells(f"A{scen_row+1}:A{scen_row + len(df.index)+header}")
+    scen_row += len(df.index)+row_inc
 
 
 def print_num(num, sheet, row, col, ind):
@@ -118,55 +137,76 @@ def run_case(scen, data, gdxpath):
         # el_tot,
         region = k.split("_")[0]
         with gdxr.GdxFile(gdxpath + k + ".gdx") as f:
-            before = locals().keys()
-            curtailment_profiles = gdx(f, "o_curtailment")
+            before = [i for i in locals().keys()]
+            gamsTimestep = gdx(f, "timestep")
+            I_reg = gdx(f, "i_reg")
+            curtailment_profiles = gdx(f, "o_curtailment_hourly")
+            curtailment_profiles.fillna(0, inplace=True)
+            curtailment_profiles[curtailment_profiles < 0] = 0
+            curtailment_profile_total = gdx(f, "o_curtailment_hourly_total")
+            curtailment = gdx(f, "o_curtailment_total")
+            curtailment_regional = gdx(f, "o_curtailment_regional")
             curtailment_wind = gdx(f, "o_curtailment_wind")
             curtailment_PV = gdx(f, "o_curtailment_PV")
-            gen_share = gdx(f, "o_new_share_gen")
+            gen_share = gdx(f, "o_new_share_gen").rename("Share")
+            VRE_share = gdx(f, "o_VRE_share")
+            VRE_share_total = gdx(f, "o_VRE_share_total")
+            wind_share = gdx(f, "o_VRE_share")
+            PV_share = gdx(f, "o_VRE_share")
             cap = gdx(f, "v_newcap")
+            for reg in cap.index.unique(1):
+                if reg not in I_reg:
+                    cap.drop(reg, level="I_reg", inplace=True)
             gen = gdx(f, "o_generation")
             el_price = gdx(f, "o_el_cost")
             load_profile = gdx(f, "demandprofile_average")
             net_load = gdx(f, "o_net_load")
-            I_reg = gdx(f, "i_reg")
             gams_timestep = gdx(f, "timestep")  # "h0001" or "d001a"
             iter_t = range(len(gams_timestep))
             timestep = [i + 1 for i in iter_t]  # 1
             TT = 8760 / len(gams_timestep)
             allwind = gdx(f, "timestep")
-            cost_tot = gdx(f, "cost_tot")
+            cost_tot = gdx(f, "v_totcost").level
             allthermal = gdx(f, "allthermal")
             allstorage = gdx(f, "allwind")
             withdrawal_rate = gdx(f, "withdrawal_rate")
-            FLH = gdx(f, "o_full_load_hours")
+            FLH = gdx(f, "o_full_load_hours").rename("FLH")
             PV_FLH = gdx(f, "o_full_load_PV")
             wind_FLH = gdx(f, "o_full_load_wind")
             el_price = gdx(f, "o_el_cost")
             discharge = gdx(f, "v_discharge")
             charge = gdx(f, "v_charge")
-            gen.loc[TECH.BATTERY_CAP] = discharge.loc[TECH.BATTERY_CAP].level \
-                                        - charge.loc[TECH.BATTERY_CAP].level
             demand = gdx(f, "o_load")
             inv_cost = gdx(f, "inv_cost")
             try:
+                ESS_available = gdx(f, "o_PS_ESS_available")
                 inertia_available = gdx(f, "o_PS_inertia_available")
+                inertia_available_thermals = gdx(f, "o_PS_inertia_available_thermal")
                 inertia_demand = gdx(f, "PS_Nminus1")
                 OR_demand_VRE = gdx(f, "o_PS_OR_demand_VRE")
                 OR_demand_other = gdx(f, "PS_OR_min")
                 OR_available = gdx(f, "o_PS_OR_available")
+                OR_available_thermal = gdx(f, "o_PS_OR_available_thermal")
+                OR_net_import = gdx(f, "o_PS_OR_net_import")
                 OR_cost = gdx(f, "o_PS_OR_cost")
-                OR_demand = {"wind": OR_demand_VRE,
-                             "solar": "",
-                             "other": ""
+                OR_demand = {"wind": OR_demand_VRE.filter(like="WO", axis=0).groupby(level=[1]).sum(),
+                             "PV": OR_demand_VRE.filter(like="PV", axis=0).groupby(level=[1]).sum(),
+                             "other": OR_demand_other,
+                             "total": OR_demand_VRE.groupby(level=[1]).sum() + OR_demand_other.fillna(0)
                              }
-            except:
-                None
+                PS = True
+            except Exception as e:
+                PS = False
+                print("%ancillary_services% was not activated for", k, "because:")
+                print(format_exc())
 
-        flywheel = cap.loc[TECH.FLYWHEEL].level
-        sync_cond = cap.loc[TECH.SYNCHRONOUS_CONDENSER].level
-        FC = cap.loc[TECH.FUEL_CELL].level
-        H2store = cap.loc[TECH.H2_STORAGE].level
-        bat = cap.loc[TECH.BATTERY].level.astype(str) + " / " + cap.loc[TECH.BATTERY_CAP].level.astype(str)
+        flywheel = cap.loc[TECH.FLYWHEEL].level.sum()
+        sync_cond = cap.loc[TECH.SYNCHRONOUS_CONDENSER].level.sum()
+        FC = cap.loc[TECH.FUEL_CELL].level.sum()
+        H2store = cap.loc[TECH.H2_STORAGE].level.sum()
+        bat = cap.loc[TECH.BATTERY].level.sum().round(decimals=2).astype(str) + " / " \
+              + cap.loc[TECH.BATTERY_CAP].level.sum().round(decimals=2).astype(str)
+
         after = locals().keys()
         to_save = [i for i in after if i not in before]
         for i in indicators:
@@ -183,20 +223,10 @@ def run_case(scen, data, gdxpath):
 
 
 def excel(scen, data, row):
-    gen = data["gen"]
-    cap = data["cap"]
-    el_tot = data["el_tot"]
-    OR_up = data["OR_up"]
-    vPS_ESS_up = data["vPS_ESS_up"]
-    inertia = data["inertia"]
-    try:
-        real_FLH = {i: sum(gen[i]) / cap[i] for i in cap if cap[i] > 0}
-    except:
-        print("RAN INTO THE WEIRD FLH ERROR IN", scen)
-        print("DATA keys:", data.keys())
-        print("gen keys:", gen.keys())
-        print("cap keys:", data["cap"])
-        real_FLH = {i: 0 for i in cap if cap[i] > 0}
+    cap = data["cap"].level.rename("Cap")
+    cap = cap[cap!=0]
+    FLH = data["FLH"].astype(int)
+    share = data["gen_share"].round(decimals=3)
 
     print_num([scen], "Indicators", row + 1, 0, 0)
     c = 1
@@ -204,54 +234,59 @@ def excel(scen, data, row):
     for i in indicators:
         # print(data[k][i])
         print_num([i], "Indicators", 0, c, 0)
-        ind_type = type(data[i])
         thing = data[i]
-        if isinstance([],
-                      ind_type):  # this if-statement makes sure that the print_num always gets a list and not a float or int
+        ind_type = type(thing)
+        if isinstance([], ind_type):
             print_num(thing, "Indicators", row + 1, c, 0)
         elif isinstance(1., ind_type):
             print_num([thing], "Indicators", row + 1, c, 0)
-        elif i == "curtailment":
-            print_num([thing["tot"]], "Indicators", row + 1, c, 0)
+        elif isinstance('', ind_type):
+            print_num([thing], "Indicators", row + 1, c, 0)
+        elif ind_type == np.float64:
+            print_num([thing], "Indicators", row + 1, c, 0)
+        elif ind_type == pd.core.series.Series:
+            try: print_num([thing.sum()], "Indicators", row + 1, c, 0)
+            except: print(f"Failed to print {i} to excel!")
         else:
             print(f"some weird variable type ({str(i)}: {ind_type}) entered the excel-printing loop")
             if isinstance({}, ind_type): print(thing.keys())
         c += 1
 
-    length = len(data["gen"])
-    print_gen(scen, 0, data["gen"], data)
-    print_gen2(scen, +2, 1, {"Curtailment": data["OR_up"][1]["curtailment"]})
-    print_gen2(scen, length + 3, 0, {("Marginal cost", "Elec."): data["el_price"]})
-    print_gen2(scen, length + 4, 0, {
-        ("OR", "Cost_up"): [sum([data["PS_OR_cost_up"][j + 1][i] for j in range(7)]) for i in
-                            range(len(data["PS_OR_cost_up"][1]))]})
-    print_gen2(scen, length + 5, 0, {("OR", "Tot"): data["OR_up_min"]})
-    print_gen2(scen, length + 6, 0, {("Forecast error", "wind"): data["LF_profile"]["wind"]})
-    print_gen2(scen, length + 7, 0, {("Forecast error", "solar"): data["LF_profile"]["solar"]})
-    print_gen2(scen, length + 8, 0, {("Loadfollowing", "demand"): data["LF_profile"]["demand"]})
-    print_gen2(scen, length + 10, 0, {("Inertia", tech): inertia[tech] for tech in inertia})
-    print_gen2(scen, length + 10 + len(inertia), 0, {("OR 10-60s", i): data["OR_up"][0][i] for i in data["OR_up"][0]})
-    print_gen2(scen, length + 11 + len(inertia) + len(data["OR_up"]), 0,
-               {("OR_cost", i): data["PS_OR_cost_up"][i] for i in data["PS_OR_cost_up"]})
+    global scen_row
+    cap_len = len(cap.index.get_level_values(0).unique())+1
+    reg_len = len(cap.index.get_level_values(1).unique())+1
+    cappy = cap.to_frame(name="Cap").join(share).join(FLH)
+    cappy["sort_by"] = cappy.index.get_level_values(0).map(order_map)
+    cappy.sort_values("sort_by", inplace=True)
+    cappy.drop(columns="sort_by", inplace=True)
+    cappy = cappy.reorder_levels(["I_reg", "tech"]).sort_index(level=0, sort_remaining=False)
+    for i, reg in enumerate(cappy.index.get_level_values(0).unique()):
+        cappy.filter(like=reg,axis=0).to_excel(writer, sheet_name=scen, startcol=1+5*i, startrow=1)
+    scen_row += cap_len+1
+    print_df(data["curtailment_profile_total"].round(decimals=3), "Curtailment", scen)
+    print_df(data["el_price"].round(decimals=3), "Elec. price", scen, row_inc=2)
+    if data["PS"]:
+        print_df(data["OR_available"].round(decimals=3), "OR: Available", scen, row_inc=2)
+        print_df(data["OR_net_import"].round(decimals=3), "OR: Net-import", scen, header=False)
+        print_df(data["OR_demand"]["wind"].round(decimals=3), "OR demand: Wind", scen, header=True)
+        print_df(data["OR_demand"]["PV"].round(decimals=3), "OR demand: PV", scen, header=True)
+        print_df(data["OR_demand"]["other"].round(decimals=3), "OR demand: Other", scen, header=True)
+        print_df(data["OR_demand"]["total"].round(decimals=3), "OR demand: Total", scen, header=True, row_inc=2)
+        print_df(data["inertia_available"].round(decimals=3), "Inertia: Available", scen, header=True)
+        print_df(data["inertia_available_thermals"].round(decimals=3), "Inertia: Thermals", scen, header=True, row_inc=2)
+    else:
+        print("PS variables were not available for", scen)
 
-    print_cap({x: y for x, y in cap.items() if y > 0}, scen,
-              len(gen) + len(OR_up) + len(inertia) + len(data["vPS_ESS_up"]) + 15,
-              1, ["Cap"])
-    c = 0
-    print_num(["share"], scen, len(gen) + len(OR_up) + len(inertia) + len(data["vPS_ESS_up"]) + 15, 3, 0)
-    for i in cap:
-        if cap[i] > 0:
-            c += 1
-            num = sum(gen[i]) / el_tot
-            print_num([num], scen, len(gen) + len(OR_up) + len(inertia) + len(data["vPS_ESS_up"]) + 15 + c, 3, 0)
-
-    c = 0
-    print_num(["FLH"], scen, len(gen) + len(OR_up) + len(inertia) + len(data["vPS_ESS_up"]) + 15, 4, 0)
-    for i in cap:
-        if cap[i] > 0:
-            c += 1
-            num = real_FLH[i]
-            print_num([num], scen, len(gen) + len(OR_up) + len(inertia) + len(data["vPS_ESS_up"]) + 15 + c, 4, 0)
+    #print_gen2(scen, length + 4, 0, {
+    #    ("OR", "Cost"): data["OR_cost"].groupby(level=[0, 1]).sum()})
+    #print_gen2(scen, length + 5, 0, {("OR", "Supply"): data["OR_available"]})
+    #print_gen2(scen, length + 6, 0, {("OR", "Net import"): data["OR_net_import"]})
+    #print_gen2(scen, length + 7, 0, {("OR", "Demand f. wind"): data["OR_demand"]["wind"]})
+    #print_gen2(scen, length + 8, 0, {("OR", "Demand f. PV"): data["OR_demand"]["PV"]})
+    #print_gen2(scen, length + 9, 0, {("OR", "Demand f. other"): data["OR_demand"]["other"]})
+    #print_gen2(scen, length + 11, 0, {("Inertia supply", "Total"): data["inertia_available"]})
+    #print_gen2(scen, length + 12, 0, {("Inertia supply", "Thermals"): data["inertia_available_thermals"]})
+    print_gen(scen, scen_row, data["gen"], data["gamsTimestep"])
 
 
 todo_gdx = []
@@ -265,6 +300,7 @@ starttime = {"start": tm.time(), 0: 0}
 errors = 0
 isgdxdone = False
 row = 0
+scen_row = 1
 q_gdx = Queue(maxsize=0)
 q_excel = Queue(maxsize=0)
 for i, scen in enumerate(todo_gdx):
