@@ -67,17 +67,18 @@ def get_from_db(db, symbol_name):
 
 
 def which_set(iterable):
-    for i, set in enumerate([['UK2','UK3','IE','ES3','SE3','SE_S','PT','DE_N'],
-                             ['b','bat','W_CHP','WOFF','WONA4','PVA1','sync_cond'],
-                             ['d001a','d001','d060a','d005b', 'd006a', 'd006a', 'd007b', 'd008a','d360a'],
-                             ['1','2'],
-                             ['2025', '2030', '2035', '2040', '2045', '2050']]):
+    for i, set in enumerate([['UK2','UK3','IE','ES3', 'ES_N','SE3','SE_S','PT','DE_N','FI'],
+                             ['b','bat','W_CHP','WOFF','WONA4','PVA1','sync_cond','WONA2', 'WONA3', 'WONB5','H2store',],
+                             ['d001a','d001','d060a','d005b', 'd006a', 'd006a', 'd007b', 'd008a','d360a','d043', 'd057', 'd078'],
+                             ['1','2','5','6'],
+                             ['2025', '2030', '2035', '2040', '2045', '2050'],
+                             ['OHAC', 'SCDC']]):
         #print("checking set",set)
         for item in set:
             #print("checking item", item)
             if item in iterable:
-                return ["I_reg","tech","timestep","OR_period","year"][i]
-    print("found no match for",iterable)
+                return ["I_reg","tech","timestep","OR_period","year","tech_con"][i]
+    if len(iterable) > 0: ("found no match for",iterable)
     return ''
 
 

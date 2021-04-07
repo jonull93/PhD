@@ -47,7 +47,7 @@ def print_df(df, name, sheet, col=3, header=True, row_inc=1):
     alignment = copy(cell.alignment)
     alignment.wrapText = True
     cell.alignment = alignment
-    worksheet.merge_cells(f"A{scen_row+1}:A{scen_row + len(df.index)+header}")
+    if len(df.index) > 1: worksheet.merge_cells(f"A{scen_row+1}:A{scen_row + len(df.index)+header}")
     scen_row += len(df.index)+row_inc
 
 
@@ -153,10 +153,11 @@ def run_case(scen, data, gdxpath):
             VRE_share_total = gdx(f, "o_VRE_share_total")
             wind_share = gdx(f, "o_VRE_share")
             PV_share = gdx(f, "o_VRE_share")
-            cap = gdx(f, "v_newcap")
-            for reg in cap.index.unique(1):
+            tot_cap = gdx(f, "o_capacity")
+            new_cap = gdx(f, "v_newcap")
+            for reg in new_cap.index.unique(1):
                 if reg not in I_reg:
-                    cap.drop(reg, level="I_reg", inplace=True)
+                    new_cap.drop(reg, level="I_reg", inplace=True)
             gen = gdx(f, "o_generation")
             el_price = gdx(f, "o_el_cost")
             load_profile = gdx(f, "demandprofile_average")
@@ -200,12 +201,18 @@ def run_case(scen, data, gdxpath):
                 print("%ancillary_services% was not activated for", k, "because:")
                 print(format_exc())
 
-        flywheel = cap.loc[TECH.FLYWHEEL].level.sum()
-        sync_cond = cap.loc[TECH.SYNCHRONOUS_CONDENSER].level.sum()
-        FC = cap.loc[TECH.FUEL_CELL].level.sum()
-        H2store = cap.loc[TECH.H2_STORAGE].level.sum()
-        bat = cap.loc[TECH.BATTERY].level.sum().round(decimals=2).astype(str) + " / " \
-              + cap.loc[TECH.BATTERY_CAP].level.sum().round(decimals=2).astype(str)
+        try: flywheel = tot_cap.loc[TECH.FLYWHEEL].sum()
+        except KeyError: flywheel = 0
+
+        try: sync_cond = tot_cap.loc[TECH.SYNCHRONOUS_CONDENSER].sum()
+        except KeyError: sync_cond = 0
+        try: FC = tot_cap.loc[TECH.FUEL_CELL].sum()
+        except KeyError: FC = 0
+        try: H2store = tot_cap.loc[TECH.H2_STORAGE].sum()
+        except KeyError: H2store = 0
+        try: bat = tot_cap.loc[TECH.BATTERY].sum().round(decimals=2).astype(str) + " / " \
+              + tot_cap.loc[TECH.BATTERY_CAP].sum().round(decimals=2).astype(str)
+        except KeyError: bat = 0
 
         after = locals().keys()
         to_save = [i for i in after if i not in before]
@@ -223,7 +230,7 @@ def run_case(scen, data, gdxpath):
 
 
 def excel(scen, data, row):
-    cap = data["cap"].level.rename("Cap")
+    cap = data["tot_cap"].rename("Cap")
     cap = cap[cap!=0]
     FLH = data["FLH"].astype(int)
     share = data["gen_share"].round(decimals=3)
@@ -238,11 +245,7 @@ def excel(scen, data, row):
         ind_type = type(thing)
         if isinstance([], ind_type):
             print_num(thing, "Indicators", row + 1, c, 0)
-        elif isinstance(1., ind_type):
-            print_num([thing], "Indicators", row + 1, c, 0)
-        elif isinstance('', ind_type):
-            print_num([thing], "Indicators", row + 1, c, 0)
-        elif ind_type == np.float64:
+        elif ind_type in [type(1.), type(3), type(''), np.float64]:
             print_num([thing], "Indicators", row + 1, c, 0)
         elif ind_type == pd.core.series.Series:
             try: print_num([thing.sum()], "Indicators", row + 1, c, 0)

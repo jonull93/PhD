@@ -4,16 +4,20 @@ import os
 import random
 import threading
 import time as tm
-import previousInvestments
-import psutil
-from queue import Queue
 from itertools import product
+from queue import Queue
+import psutil
 from gams import *
+from glob import glob
+import previousInvestments
+from traceback import format_exc
 
 print("Script started at", dt.datetime.now().strftime('%H:%M:%S'))
 
 if "C18" in os.environ['COMPUTERNAME']:  # This allows you to change path depending on which computer you run script from
     path = "C:\\models\\multinode\\"  # where your main-file is located
+elif "PLIA" in os.environ['COMPUTERNAME']:
+    path = "C:\\git\\multinode\\"
 else:
     path = "D:\\Jonathan\\multinode\\"  # where your main-file is located
 ws = GamsWorkspace(path)
@@ -21,16 +25,18 @@ gmsfile = "MN_main.gms"  # name of your main-file [NEEDS TO BE EDITED WHEN SETTI
 starttime = {0: 0.}
 errors = 0
 
-# Create dictionary of scenario-code
-def combinations(parameters):
-    foo = [i for i in parameters]
-    return [p for p in product(*foo)]
 
-years = [2050]
-regions = ["nordic","brit","iberia"]  # ["SE2","HU","ES3","IE"]
-modes = ["flex_HB", "noFlex_HB"]
-timeResolution = 6
-HBresolutions = [1,8,52]
+def combinations(parameters):  # Create list of parameter combinations
+    return [p for p in product(*parameters)]
+
+
+years = [2030, 2040, 2050]
+regions = ["nordic", "brit", "iberia"]  # ["SE2","HU","ES3","IE"]
+modes = ["base"]
+timeResolution = 168
+HBresolutions = [52]
+cores_per_scenario = 3  # the 'cores' in gams refers to logical cores, not physical
+core_count = psutil.cpu_count()  # add logical=False to get physical cores
 
 # ["pre", "OR","OR_inertia", "inertia","inertia_noSyn"]
 # ["leanOR", "OR","OR+inertia","leanOR+inertia", "inertia","inertia_noSyn","inertia_2x","OR+inertia_noDoubleUse"]
@@ -39,12 +45,13 @@ scenarios = {}
 # looping through regions and modes in this way means that it will first run all "pre",
 # then all "OR" and so on, instead of first solving all modes for each region.
 # I create my scenario-code by using what is called an fstring.
-# This allows me to put variables and if-statements in my string-text. Very convenient :)
-for mode in modes:
-    for region in regions:
-        for HBres in HBresolutions:
-            for year in years:
-                scenarioname = f"{region}_{mode}{HBres if 'HB' in mode else ''}_{year}{'' if timeResolution == 1 else '_'+str(timeResolution)+'h'}"
+# This allows me to put variables and if-statements in my text using {}. Very convenient :)
+for year in years:
+    for mode in modes:
+        for region in regions:
+            for HBres in HBresolutions:
+                scenarioname = f"{region}_{mode}{HBres if 'HB' in mode else ''}_{year}" \
+                               f"{'' if timeResolution == 1 else '_' + str(timeResolution) + 'h'}"
                 scenarios[scenarioname] = \
                     f"""
 $setglobal scenario "{scenarioname}"
@@ -53,13 +60,13 @@ $setglobal heatBalance {'no' if 'noHB' in mode else 'yes'}
 $setglobal flexlim {'no' if 'noflex' in mode.lower() else 'yes'}
 $setglobal startup no
 $setglobal current_year {year}
-$setglobal first_iteration {'yes' if year==years[0] else 'no'} //if no -> will try to read previousInvestments.gdx
-$setglobal cores 5
+$setglobal first_iteration {'yes' if year == years[0] else 'no'} //if no -> will try to read previousInvestments.gdx
+$setglobal cores {cores_per_scenario}
 
-$setglobal ancillary_services no
+$setglobal ancillary_services yes
 $setglobal OR {"yes" if "OR" in mode else "no"}
-$setglobal lean {"yes" if "lean" in mode else "no"}
-$setglobal inertia {"yes" if "inertia" in mode else "no"}
+$setglobal lean {"yes" if "lean" in mode.lower() else "no"}
+$setglobal inertia {"yes" if "inertia" in mode.lower() else "no"}
 $setglobal synthetic_inertia {"no" if "noSyn" in mode else "yes"}
 $setglobal double_use {"no" if "noDoubleUse" in mode else "yes"}
 $setglobal SNSP no
@@ -69,7 +76,7 @@ $setglobal forecast_scaling 1
 $setglobal flywheel_price_scaling 1
 $setglobal sync_cond_price_scaling 1
 $setglobal onshore_storage "no"
-$setglobal H2demand 0 
+$setglobal H2demand 0.2
 
 $setglobal savepoint no
 $setglobal profiling yes
@@ -79,7 +86,7 @@ $setglobal heatBalancePeriods {HBres}
 $setglobal toExcel no
 $setglobal update_scenario no"""  # [NEEDS TO BE EDITED WHEN SETTING SCRIPT UP]
 
-num_threads = min(8, len(scenarios))
+num_threads = int(min(core_count/cores_per_scenario+1, len(scenarios)/len(years)))
 # The "optimal" number of threads depends on your hardware and model
 # but nr of cores /2 seems good unless you hit RAM limit
 
@@ -106,11 +113,9 @@ for i, scen in enumerate(scenarios):
 # Threaded function for queue processing.
 def crawl(q, ws, io_lock):
     thread_nr[threading.get_ident()] = len(thread_nr) + 1
-    free_capacity = False  # this is needed to stop Alla from making computers crash
-    while free_capacity is False:
+    while True:  # this loop halts new scenarios from being run while the computer is at near-max load
         if psutil.cpu_percent(2) < 90:  # if more than 90% cpu is used, wait 
-            free_capacity = True  # it's not a guarantee, but it will prevent complete catastrophe
-            break
+            break  # it's not a guarantee, but it may prevent complete catastrophe
         tm.wait(5)
     while not q.empty():
         scen = q.get()  # fetch new work from the Queue
@@ -120,7 +125,7 @@ def crawl(q, ws, io_lock):
             identifier = thread_nr[threading.get_ident()]
             global errors
             errors += 1
-            print("Error in crawler", identifier, "- scenario", scen[0], "exception:", e)
+            print("! Error in crawler", identifier, "- scenario", scen[0], "exception:", e, "\n")
         q.task_done()  # signal to the queue that task has been processed
     if q.empty(): print("--- Queue is now empty ---")
     return True
@@ -128,6 +133,25 @@ def crawl(q, ws, io_lock):
 
 # Function which gets called to actually run the model
 def run_scenario(workspace, io_lock, scen):
+    year = int([i for i in scen[1].replace('.', '_').split('_') if "20" in i][0])
+    if multipleYears and year > years[0]:
+        print(f"? Checking if {scen[1]} is ready to run in thread {thread_nr[threading.get_ident()]}")
+        previousRunIsRan = False
+        while not previousRunIsRan:
+            files = []
+            for file in glob(path+"\\*.gdx"):
+                files.append(file.split("\\")[-1])
+            if scen[1].replace(str(year),str(years[years.index(year)-1]))+".gdx" in files:
+                previousRunIsRan = True
+            else:
+                print(f"? Did not find {scen[1].replace(str(year),str(years[years.index(year)-1]))}.gdx")
+                tm.sleep(random.randrange(8, 32))  # to avoid several threads searching and starting at the same time
+        try:
+            previousInvestments.doItAll(path, scen[1])  # create previousInvestments.gdx
+            print(f"- Ran previousInvestments.py for {scen[1]}")
+        except Exception as e:
+            print(f"! Failed to run previousInvestments.py for {scen[1]}: \n {format_exc(e)}")
+
     starttime[scen[0]] = tm.time()
     job = workspace.add_job_from_file(gmsfile)
     # we create a scenario-specific options file to avoid reading the wrong options file
@@ -140,25 +164,22 @@ def run_scenario(workspace, io_lock, scen):
     os.remove(path + "options_" + str(randint) + ".txt")
     # give gams the variable 'scenarioname' with value scen[1] which is the string
     opt.defines["scenariofile"] = scen[1]
-    print(f" --- Starting scenario {scen[0]}: {scen[1]} in thread", thread_nr[threading.get_ident()], "at",
+    print(f"-- Starting scenario {scen[0]}: {scen[1]} in thread", thread_nr[threading.get_ident()], "at",
           dt.datetime.now().strftime('%H:%M:%S'), "---")
     job.run(opt, create_out_db=False)
     io_lock.acquire()  # we need to make the ouput a critical section to avoid messed up report information
-    print("Thread", thread_nr[threading.get_ident()], "finished scenario", scen[1], "(#" + str(scen[0]) + ") at",
+    print("-- Thread", thread_nr[threading.get_ident()], "finished scenario", scen[1], "(#" + str(scen[0]) + ") at",
           dt.datetime.now().strftime('%H:%M:%S'))
-    if multipleYears and [i for i in scen[1].replace('.', '_').split('_') if "20" in i][0] > years[0]:
-        previousInvestments.doItAll(path, scen[1])  # create previousInvestments.gdx
-
-    try:  # these things require job.run to NOT have create_out_db=False
-        if job.out_db["ms"][()].value <= 2 and job.out_db["ss"][()].value <= 2:
+    try:  # these things require job.run to have create_out_db=True (which creates duplicate gdx files)
+        if int(job.out_db["ms"][()].value) <= 2 and int(job.out_db["ss"][()].value) <= 2:
             print("  Model- and solvestatus OK!")
         else:
-            print("  OBS BAD STATUS! Modelstatus: " + str(job.out_db["ms"][()].value) + " and Solvestatus: " + str(
+            print(" ! OBS BAD STATUS! Modelstatus: " + str(job.out_db["ms"][()].value) + " and Solvestatus: " + str(
                 job.out_db["ss"][()].value), "(1s and 2s are good)")
-        print("  Obj: " + str(job.out_db["vtotcost"][()].level))
+        print("  Obj: " + str(job.out_db["v_totcost"][()].level))
     except:
         None
-    print("  Time to solve: ", str(round((tm.time() - starttime[scen[0]]) / 60, 1)), "min")
+    print("-- Time to solve: ", str(round((tm.time() - starttime[scen[0]]) / 60, 1)), "min")
     io_lock.release()
 
 
@@ -169,7 +190,7 @@ threads = {}
 thread_nr = {}
 # Starting worker threads on queue processing
 for i in range(num_threads):
-    print('Starting thread', i + 1)
+    print('- Starting thread', i + 1)
     worker = threading.Thread(target=crawl, args=(q, ws, io_lock))
     worker.setDaemon(True)  # setting threads as "daemon" allows main program to
     # exit eventually even if these dont finish
@@ -177,4 +198,4 @@ for i in range(num_threads):
     worker.start()
 # now we wait until the queue has been processed
 q.join()
-print('All tasks completed after', str(round((tm.time() - starttime[0]) / 60, 2)), 'minutes and with', str(errors), "errors.")
+print('- All tasks completed after', str(round((tm.time() - starttime[0]) / 60, 2)), 'minutes and with', str(errors), "errors.")
