@@ -31,11 +31,11 @@ def combinations(parameters):  # Create list of parameter combinations
 
 
 years = [2030, 2040, 2050]
-regions = ["nordic", "brit", "iberia"]  # ["SE2","HU","ES3","IE"]
+regions = ["brit", "brit", "iberia"]  # ["SE2","HU","ES3","IE"]
 modes = ["base"]
-timeResolution = 3
+timeResolution = 12
 HBresolutions = [52]
-cores_per_scenario = 5  # the 'cores' in gams refers to logical cores, not physical
+cores_per_scenario = 3  # the 'cores' in gams refers to logical cores, not physical
 core_count = psutil.cpu_count()  # add logical=False to get physical cores
 
 # ["pre", "OR","OR_inertia", "inertia","inertia_noSyn"]
@@ -78,6 +78,7 @@ $setglobal flywheel_price_scaling 1
 $setglobal sync_cond_price_scaling 1
 $setglobal onshore_storage "no"
 $setglobal H2demand 0.2
+$setglobal EV_AGG {'no' if 'noEV' in scenarioname else 'yes'}
 
 $setglobal savepoint no
 $setglobal profiling yes
@@ -110,7 +111,7 @@ for i, scen in enumerate(scenarios):
     if not multipleYears:
         q.put((i, scen))  # put (i, {scenarioname}) at the end of the queue
     else:
-        if years[0] in scen:
+        if str(years[0]) in scen:
             q.put((i, scen))
 
 
@@ -135,10 +136,11 @@ def crawl(q, ws, io_lock):
         # this makes it so that threads don't just sit and wait for some specific scenario to finish before being useful
         if multipleYears:
             year = [s for s in scen[1].split("_") if s.isdigit()][0]
-            if year < years[-1]:
+            if int(year) < years[-1]:
                 nextyear = years[years.index(int(year))+1]
                 nextscenario = scen[1].replace(year, str(nextyear))
                 if nextscenario in scenarios:
+                    print(f"Putting ({scen[0]+1}, {nextscenario}) in the queue")
                     q.put((scen[0]+1, nextscenario))
                 else:
                     print(f"! Did not find {nextscenario} in scenarios")
@@ -150,12 +152,11 @@ def crawl(q, ws, io_lock):
 def run_scenario(workspace, io_lock, scen):
     year = int([i for i in scen[1].replace('.', '_').split('_') if "20" in i][0])
     if multipleYears and year > years[0]:
-        print(f"? Checking if {scen[1]} is ready to run in thread {thread_nr[threading.get_ident()]}")
         previousRunIsRan = False
         while not previousRunIsRan:
             files = []
             for file in glob(path+"\\*.gdx"):
-                files.append(file.split("\\")[-1])
+                files.append(file.split("\\")[-1])  # building list of existing .gdx files
             if scen[1].replace(str(year),str(years[years.index(year)-1]))+".gdx" in files:
                 previousRunIsRan = True
             else:
@@ -163,7 +164,6 @@ def run_scenario(workspace, io_lock, scen):
                 tm.sleep(random.randrange(8, 32))  # to avoid several threads searching and starting at the same time
         try:
             previousInvestments.doItAll(path, scen[1])  # create previousInvestments.gdx
-            print(f"- Ran previousInvestments.py for {scen[1]}")
         except Exception as e:
             print(f"! Failed to run previousInvestments.py for {scen[1]}: \n {format_exc(e)}")
 
@@ -179,11 +179,12 @@ def run_scenario(workspace, io_lock, scen):
     os.remove(path + "options_" + str(randint) + ".txt")
     # give gams the variable 'scenarioname' with value scen[1] which is the string
     opt.defines["scenariofile"] = scen[1]
+    opt.output = scen[1]  # listing file name (files are called _gams_py_gjo#.lst without this)
     print(f"-- Starting scenario {scen[0]}: {scen[1]} in thread", thread_nr[threading.get_ident()], "at",
           dt.datetime.now().strftime('%H:%M:%S'), "---")
     job.run(opt, create_out_db=False)
     io_lock.acquire()  # we need to make the ouput a critical section to avoid messed up report information
-    print("-- Thread", thread_nr[threading.get_ident()], "finished scenario", scen[1], "(#" + str(scen[0]) + ") at",
+    print("-- Thread", thread_nr[threading.get_ident()], "finished", scen[1], "(#" + str(scen[0]) + ") at",
           dt.datetime.now().strftime('%H:%M:%S'))
     try:  # these things require job.run to have create_out_db=True (which creates duplicate gdx files)
         if int(job.out_db["ms"][()].value) <= 2 and int(job.out_db["ss"][()].value) <= 2:
