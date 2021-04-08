@@ -6,9 +6,9 @@ import xlsxwriter
 from my_utils import write_inc
 
 starttime = time.time()
-foo = open(r"C:\git\multinode\Include\load_profile_ref.INC", "r")
+foo = open(r"C:\models\multinode\Include\load_profile_ref.INC", "r")
 
-PS_path = 'C:\\git\\multinode\\Add-ons\\PS\\include\\'
+PS_path = 'C:\\models\\multinode\\Add-ons\\PS\\include\\'
 lines = foo.readlines()
 for i in lines:
     if "Austr" in i:  # skip lines until we're actually at the data, which starts with countries and includes Austria

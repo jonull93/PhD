@@ -21,7 +21,7 @@ PV = ['PVPA1', 'PVPB1', 'PVR1']
 WON_profiles = {reg: {tech: {} for tech in WON} for reg in regions}  # {reg: {tech: {timestep: value}}}
 WOFF_profiles = {reg: {tech: {} for tech in WOFF} for reg in regions}
 PV_profiles = {reg: {tech: {} for tech in PV} for reg in regions}  # {reg: {tech: {timestep: value}}}
-path = "C:\\git\\multinode\\Include\\"
+path = "C:\\models\\multinode\\Include\\"
 
 
 def read_file(filename, profiles):

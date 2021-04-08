@@ -33,7 +33,7 @@ def combinations(parameters):  # Create list of parameter combinations
 years = [2030, 2040, 2050]
 regions = ["nordic", "brit", "iberia"]  # ["SE2","HU","ES3","IE"]
 modes = ["base"]
-timeResolution = 168
+timeResolution = 12
 HBresolutions = [52]
 cores_per_scenario = 3  # the 'cores' in gams refers to logical cores, not physical
 core_count = psutil.cpu_count()  # add logical=False to get physical cores
@@ -77,6 +77,7 @@ $setglobal flywheel_price_scaling 1
 $setglobal sync_cond_price_scaling 1
 $setglobal onshore_storage "no"
 $setglobal H2demand 0.2
+$setglobal EV_AGG {'no' if 'noEV' in scenarioname else 'yes'}
 
 $setglobal savepoint no
 $setglobal profiling yes
@@ -163,7 +164,8 @@ def run_scenario(workspace, io_lock, scen):
     # then remove the scenario-specific options file since its not interesting
     os.remove(path + "options_" + str(randint) + ".txt")
     # give gams the variable 'scenarioname' with value scen[1] which is the string
-    opt.defines["scenariofile"] = scen[1]
+    opt.defines["scenariofile"] = scen[1]  # name of scenario file to include in gms code
+    opt.output = scen[1]  # listing file name (files are called _gams_py_gjo#.lst without this)
     print(f"-- Starting scenario {scen[0]}: {scen[1]} in thread", thread_nr[threading.get_ident()], "at",
           dt.datetime.now().strftime('%H:%M:%S'), "---")
     job.run(opt, create_out_db=False)
