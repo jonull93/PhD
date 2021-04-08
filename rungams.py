@@ -33,9 +33,9 @@ def combinations(parameters):  # Create list of parameter combinations
 years = [2030, 2040, 2050]
 regions = ["nordic", "brit", "iberia"]  # ["SE2","HU","ES3","IE"]
 modes = ["base"]
-timeResolution = 12
+timeResolution = 3
 HBresolutions = [52]
-cores_per_scenario = 3  # the 'cores' in gams refers to logical cores, not physical
+cores_per_scenario = 5  # the 'cores' in gams refers to logical cores, not physical
 core_count = psutil.cpu_count()  # add logical=False to get physical cores
 
 # ["pre", "OR","OR_inertia", "inertia","inertia_noSyn"]
@@ -46,10 +46,11 @@ scenarios = {}
 # then all "OR" and so on, instead of first solving all modes for each region.
 # I create my scenario-code by using what is called an fstring.
 # This allows me to put variables and if-statements in my text using {}. Very convenient :)
-for year in years:
-    for mode in modes:
-        for region in regions:
-            for HBres in HBresolutions:
+
+for mode in modes:
+    for region in regions:
+        for HBres in HBresolutions:
+            for year in years:
                 scenarioname = f"{region}_{mode}{HBres if 'HB' in mode else ''}_{year}" \
                                f"{'' if timeResolution == 1 else '_' + str(timeResolution) + 'h'}"
                 scenarios[scenarioname] = \
@@ -77,7 +78,6 @@ $setglobal flywheel_price_scaling 1
 $setglobal sync_cond_price_scaling 1
 $setglobal onshore_storage "no"
 $setglobal H2demand 0.2
-$setglobal EV_AGG {'no' if 'noEV' in scenarioname else 'yes'}
 
 $setglobal savepoint no
 $setglobal profiling yes
@@ -107,8 +107,11 @@ q = Queue(maxsize=0)  # infinite max-size
 
 # Populating Queue with tasks
 for i, scen in enumerate(scenarios):
-    # need the index and the scenarioname in each queue item.
-    q.put((i, scen))  # put (i, {scenarioname}) at the end of the queue
+    if not multipleYears:
+        q.put((i, scen))  # put (i, {scenarioname}) at the end of the queue
+    else:
+        if years[0] in scen:
+            q.put((i, scen))
 
 
 # Threaded function for queue processing.
@@ -128,6 +131,17 @@ def crawl(q, ws, io_lock):
             errors += 1
             print("! Error in crawler", identifier, "- scenario", scen[0], "exception:", e, "\n")
         q.task_done()  # signal to the queue that task has been processed
+        # since a 2040 run has to come after a 2030 run, lets only add 2040 to the queue after finishing 2030
+        # this makes it so that threads don't just sit and wait for some specific scenario to finish before being useful
+        if multipleYears:
+            year = [s for s in scen[1].split("_") if s.isdigit()][0]
+            if year < years[-1]:
+                nextyear = years[years.index(int(year))+1]
+                nextscenario = scen[1].replace(year, str(nextyear))
+                if nextscenario in scenarios:
+                    q.put((scen[0]+1, nextscenario))
+                else:
+                    print(f"! Did not find {nextscenario} in scenarios")
     if q.empty(): print("--- Queue is now empty ---")
     return True
 
@@ -164,8 +178,7 @@ def run_scenario(workspace, io_lock, scen):
     # then remove the scenario-specific options file since its not interesting
     os.remove(path + "options_" + str(randint) + ".txt")
     # give gams the variable 'scenarioname' with value scen[1] which is the string
-    opt.defines["scenariofile"] = scen[1]  # name of scenario file to include in gms code
-    opt.output = scen[1]  # listing file name (files are called _gams_py_gjo#.lst without this)
+    opt.defines["scenariofile"] = scen[1]
     print(f"-- Starting scenario {scen[0]}: {scen[1]} in thread", thread_nr[threading.get_ident()], "at",
           dt.datetime.now().strftime('%H:%M:%S'), "---")
     job.run(opt, create_out_db=False)
