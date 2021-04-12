@@ -18,6 +18,8 @@ if "C18" in os.environ['COMPUTERNAME']:  # This allows you to change path depend
     path = "C:\\models\\multinode\\"  # where your main-file is located
 elif "PLIA" in os.environ['COMPUTERNAME']:
     path = "C:\\git\\multinode\\"
+elif "M21024" in os.environ['COMPUTERNAME']: #.22
+    path = "C:\\Users\\Jonathan\\multinode\\"
 else:
     path = "D:\\Jonathan\\multinode\\"  # where your main-file is located
 ws = GamsWorkspace(path)
@@ -31,11 +33,11 @@ def combinations(parameters):  # Create list of parameter combinations
 
 
 years = [2030, 2040, 2050]
-regions = ["brit", "brit", "iberia"]  # ["SE2","HU","ES3","IE"]
-modes = ["base"]
-timeResolution = 12
-HBresolutions = [52]
-cores_per_scenario = 3  # the 'cores' in gams refers to logical cores, not physical
+regions = ["nordic", "brit", "iberia"]  # ["SE2","HU","ES3","IE"]
+modes = ["base_noEV", "base", "inertia", "OR", "inertia_OR"]
+timeResolution = 1
+HBresolutions = [26]
+cores_per_scenario = 7  # the 'cores' in gams refers to logical cores, not physical
 core_count = psutil.cpu_count()  # add logical=False to get physical cores
 
 # ["pre", "OR","OR_inertia", "inertia","inertia_noSyn"]
@@ -88,7 +90,7 @@ $setglobal heatBalancePeriods {HBres}
 $setglobal toExcel no
 $setglobal update_scenario no"""  # [NEEDS TO BE EDITED WHEN SETTING SCRIPT UP]
 
-num_threads = int(min(core_count/cores_per_scenario+1, len(scenarios)/len(years)))
+num_threads = int(min(core_count/(cores_per_scenario-1), len(scenarios)/len(years)))
 # The "optimal" number of threads depends on your hardware and model
 # but nr of cores /2 seems good unless you hit RAM limit
 
@@ -131,7 +133,6 @@ def crawl(q, ws, io_lock):
             global errors
             errors += 1
             print("! Error in crawler", identifier, "- scenario", scen[0], "exception:", e, "\n")
-        q.task_done()  # signal to the queue that task has been processed
         # since a 2040 run has to come after a 2030 run, lets only add 2040 to the queue after finishing 2030
         # this makes it so that threads don't just sit and wait for some specific scenario to finish before being useful
         if multipleYears:
@@ -144,6 +145,7 @@ def crawl(q, ws, io_lock):
                     q.put((scen[0]+1, nextscenario))
                 else:
                     print(f"! Did not find {nextscenario} in scenarios")
+        q.task_done()  # signal to the queue that task has been processed
     if q.empty(): print("--- Queue is now empty ---")
     return True
 

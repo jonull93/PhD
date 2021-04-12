@@ -2,6 +2,8 @@ import itertools
 import string
 from enum import Enum
 
+import pandas
+
 
 class TECH(str, Enum):
     ELECTROLYZER = 'efuel'
@@ -294,4 +296,26 @@ def write_inc(path, filename, var, flip=True):
             elif type(var[reg]) == list:
                 for i, value in enumerate(var[reg]):
                     writer.write(f"{reg} . {'h' + str(i + 1).zfill(4)}  {value}\n")
+    return None
+
+
+def write_inc_from_df_columns(path, filename, var: pandas.DataFrame):
+    """
+
+    Parameters
+    ----------
+    path
+    filename
+    var
+    flip
+
+    Returns
+    -------
+    nothing, but creates path/filename.inc containing a variable with 2 or 3 sets, e.g. tech + reg (+ opt. timestep)
+    """
+    with open(path + filename, "w") as writer:
+        dim = len(var.columns)
+        for ind, row in var.iterrows():
+            line = " . ".join(row[:-1])+f"  {row[-1]}\n"
+            writer.write(line)
     return None

@@ -1,5 +1,6 @@
 import gdxr
 import gdxpds
+from my_utils import write_inc_from_df_columns
 import pandas as pd
 from glob import glob
 from get_from_gams_db import gdx
@@ -7,7 +8,7 @@ from get_from_gams_db import gdx
 
 def doItAll(gdxpath, scenario):
     data, transInv, life = readResults(gdxpath, scenario)  # search for, and read, previously modelled years of the scenario
-    writeGdx(data, transInv, life, gdxpath, scenario)  # sum the capacities and write gdx-file for the next
+    writeInc(data, transInv, life, gdxpath, scenario)  # sum the capacities and write gdx-file for the next
     # model-iteration
     return data  # in case we want to pickle the data or something
 
@@ -58,7 +59,7 @@ def addToMean(entry, key, dictionary, addedWeight, oldWeight):
         dictionary[key] = entry
 
 
-def writeGdx(data, transInv, life, gdxpath, scenario):  # sum the capacities and write gdx-file for the next model-iteration
+def writeInc(data, transInv, life, gdxpath, scenario):  # sum the capacities and write gdx-file for the next model-iteration
     invToSave = {}
     etaToSave = {}
     transInvToSave = {}
@@ -81,12 +82,18 @@ def writeGdx(data, transInv, life, gdxpath, scenario):  # sum the capacities and
     df_eta.columns = ["tech", "region", "value"]
     df_trans = pd.Series(transInvToSave).reset_index()
     df_trans.columns = ["tech_con", "I_reg", "I_reg2", "value"]
-    gdxpds.to_gdx({"previousInvestments": df_inv,
-                     "previousInvestments_eta": df_eta,
-                     "previousTransmissionInvestments": df_trans},
-                    path=gdxpath + "\\Include\\previousInvestments\\" + f"previousInvestments_{scenario}.gdx")
+    write_inc_from_df_columns(gdxpath + "\\Include\\previousInvestments\\", f"{scenario}_inv.inc", df_inv)
+    write_inc_from_df_columns(gdxpath + "\\Include\\previousInvestments\\", f"{scenario}_eta.inc", df_eta)
+    write_inc_from_df_columns(gdxpath + "\\Include\\previousInvestments\\", f"{scenario}_trans.inc", df_trans)
+    #gdxpds.to_gdx({"previousInvestments": df_inv,
+    #                 "previousInvestments_eta": df_eta,
+    #                 "previousTransmissionInvestments": df_trans},
+    #                path=gdxpath + "\\Include\\previousInvestments\\" + f"previousInvestments_{scenario}.gdx")
+    return invToSave, df_inv
 
 #path = "C:\\models\\multinode\\"
-#file = "nordic_base_2040_168h"
+#path = "C:\\Users\\Jonathan\\multinode\\"
+#file = "brit_base_noEV_2040_24h"
 #data, transInv, life = readResults(path,file)
+#writeGdx(data,transInv,life,path,file)
 #writeGdx(data,transInv,life,path,file)
