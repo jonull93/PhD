@@ -1,16 +1,17 @@
 # Written by Jonathan Ullmark, please let me know if you found this useful
 import datetime as dt
-import os
+import os, sys
 import random
 import threading
 import time as tm
 from itertools import product
 from queue import Queue
 import psutil
-from gams import *
+import gams
 from glob import glob
 import previousInvestments
 from traceback import format_exc
+from my_utils import append_to_file
 
 print("Script started at", dt.datetime.now().strftime('%H:%M:%S'))
 
@@ -22,10 +23,8 @@ elif "M21024" in os.environ['COMPUTERNAME']: #.22
     path = "C:\\Users\\Jonathan\\multinode\\"
 else:
     path = "D:\\Jonathan\\multinode\\"  # where your main-file is located
-ws = GamsWorkspace(path)
+ws = gams.GamsWorkspace(path)
 gmsfile = "MN_main.gms"  # name of your main-file [NEEDS TO BE EDITED WHEN SETTING SCRIPT UP]
-starttime = {0: 0.}
-errors = 0
 
 
 def combinations(parameters):  # Create list of parameter combinations
@@ -34,10 +33,10 @@ def combinations(parameters):  # Create list of parameter combinations
 
 years = [2030, 2040, 2050]
 regions = ["nordic", "brit", "iberia"]  # ["SE2","HU","ES3","IE"]
-modes = ["base_noEV", "base", "inertia", "OR", "inertia_OR"]
-timeResolution = 1
+modes = ["base_noEV", "base", "inertia", "OR", "inertia_OR", "inertia_OR_noEV"]
+timeResolution = 3
 HBresolutions = [26]
-cores_per_scenario = 7  # the 'cores' in gams refers to logical cores, not physical
+cores_per_scenario = 5  # the 'cores' in gams refers to logical cores, not physical
 core_count = psutil.cpu_count()  # add logical=False to get physical cores
 
 # ["pre", "OR","OR_inertia", "inertia","inertia_noSyn"]
@@ -120,19 +119,30 @@ for i, scen in enumerate(scenarios):
 # Threaded function for queue processing.
 def crawl(q, ws, io_lock):
     thread_nr[threading.get_ident()] = len(thread_nr) + 1
+    tm.sleep(thread_nr[threading.get_ident()] / 5)
     while True:  # this loop halts new scenarios from being run while the computer is at near-max load
         if psutil.cpu_percent(2) < 90:  # if more than 90% cpu is used, wait 
             break  # it's not a guarantee, but it may prevent complete catastrophe
-        tm.wait(5)
+        tm.sleep(5)
     while not q.empty():
         scen = q.get()  # fetch new work from the Queue
+        global in_progress
         try:
+            in_progress.append(scen[1])
             run_scenario(ws, io_lock, scen)
+        except gams.workspace.GamsExceptionExecution as e:
+            print("!GAMS is complaining! If the error code is 3, it may just be a /0 problem in the output stuff:", repr(e))
         except Exception as e:
             identifier = thread_nr[threading.get_ident()]
             global errors
             errors += 1
             print("! Error in crawler", identifier, "- scenario", scen[0], "exception:", e, "\n")
+            exc_type, exc_obj, exc_tb = sys.exc_info()
+            fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+            print(exc_type, fname, exc_tb.tb_lineno)
+            print(format_exc(e))
+        finally:
+            in_progress.remove(scen[1])
         # since a 2040 run has to come after a 2030 run, lets only add 2040 to the queue after finishing 2030
         # this makes it so that threads don't just sit and wait for some specific scenario to finish before being useful
         if multipleYears:
@@ -146,7 +156,8 @@ def crawl(q, ws, io_lock):
                 else:
                     print(f"! Did not find {nextscenario} in scenarios")
         q.task_done()  # signal to the queue that task has been processed
-    if q.empty(): print("--- Queue is now empty ---")
+    if q.empty():
+        print(f"- Queue is now empty -\nIn progress: {', '.join(in_progress)}")
     return True
 
 
@@ -182,26 +193,25 @@ def run_scenario(workspace, io_lock, scen):
     # give gams the variable 'scenarioname' with value scen[1] which is the string
     opt.defines["scenariofile"] = scen[1]
     opt.output = scen[1]  # listing file name (files are called _gams_py_gjo#.lst without this)
+
     print(f"-- Starting scenario {scen[0]}: {scen[1]} in thread", thread_nr[threading.get_ident()], "at",
           dt.datetime.now().strftime('%H:%M:%S'), "---")
     job.run(opt, create_out_db=False)
     io_lock.acquire()  # we need to make the ouput a critical section to avoid messed up report information
     print("-- Thread", thread_nr[threading.get_ident()], "finished", scen[1], "(#" + str(scen[0]) + ") at",
           dt.datetime.now().strftime('%H:%M:%S'))
-    try:  # these things require job.run to have create_out_db=True (which creates duplicate gdx files)
-        if int(job.out_db["ms"][()].value) <= 2 and int(job.out_db["ss"][()].value) <= 2:
-            print("  Model- and solvestatus OK!")
-        else:
-            print(" ! OBS BAD STATUS! Modelstatus: " + str(job.out_db["ms"][()].value) + " and Solvestatus: " + str(
-                job.out_db["ss"][()].value), "(1s and 2s are good)")
-        print("  Obj: " + str(job.out_db["v_totcost"][()].level))
-    except:
-        None
+    to_add = f"{dt.datetime.now().strftime('%D - %H:%M:%S')} : {scen[1]:<40} : " \
+             f"{round((tm.time() - starttime[scen[0]]) / 60, 2)} min"
+    append_to_file("time_to_solve.txt", to_add)
     print("-- Time to solve: ", str(round((tm.time() - starttime[scen[0]]) / 60, 1)), "min")
     io_lock.release()
 
 
 # cp = ws.add_checkpoint()
+starttime = {0: 0.}
+in_progress = []
+errors = 0
+
 cp = ""
 io_lock = threading.Lock()
 threads = {}
@@ -211,8 +221,7 @@ for i in range(num_threads):
     print('- Starting thread', i + 1)
     worker = threading.Thread(target=crawl, args=(q, ws, io_lock))
     worker.setDaemon(True)  # setting threads as "daemon" allows main program to
-    # exit eventually even if these dont finish
-    # correctly.
+    # exit eventually even if these dont finish correctly.
     worker.start()
 # now we wait until the queue has been processed
 q.join()

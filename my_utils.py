@@ -1,6 +1,7 @@
 import itertools
 import string
 from enum import Enum
+import os
 
 import pandas
 
@@ -313,9 +314,21 @@ def write_inc_from_df_columns(path, filename, var: pandas.DataFrame):
     -------
     nothing, but creates path/filename.inc containing a variable with 2 or 3 sets, e.g. tech + reg (+ opt. timestep)
     """
+    try: os.mkdir(path)
+    except: None
+
     with open(path + filename, "w") as writer:
         dim = len(var.columns)
         for ind, row in var.iterrows():
             line = " . ".join(row[:-1])+f"  {row[-1]}\n"
             writer.write(line)
     return None
+
+
+def append_to_file(filename, to_add):
+    "adds 'to_add' to a new line at the top of originalfile"
+    if to_add[-1] != '\n':
+        to_add += '\n'
+    with open(filename, 'a') as f2:
+        f2.write(to_add)
+
