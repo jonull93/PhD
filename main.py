@@ -9,26 +9,27 @@ indicators = ["cost_tot",
               'sync_cond',
               'bat',
               'FC',
-              'H2store']
+              'H2store',
+              'EB', 'HP',
+              ]
 cases = []
-h = 168
+h = 3
 for reg in ["iberia", "brit", "nordic"]:
-    for mode in ["base"]:
+    for mode in ["base", "base_noEV","inertia_OR","inertia_OR_noEV"]:
         for year in [2030, 2040, 2050]:
             cases.append(f"{reg}_{mode}_{year}{'_'+str(h)+'h' if h>1 else ''}")
 
 # cases.append("OR_ES3_noSyn_noDoubleUse") exec(open("./seasons.py").read()) run_output = input("Enter 'r' to read
-# pickled data, 'w' to (over)write or 'rw' to add missing scenarios: ") #[todo: give option to overwrite specific
-#  scenarios]
-run_output = "w"
+# pickled data, 'w' to (over)write or 'rw' to add missing scenarios: ")
+run_output = "rw"
 # run_plots = input('Should we also plot results? Y/N: ')
 run_plots = "n"
 overwrite = []  # [reg+"_inertia_0.1x" for reg in ["ES3", "HU", "IE", "SE2"]]+[reg+"_inertia" for reg in ["ES3", "HU", "IE", "SE2"]]+[reg+"_inertia_noSyn" for reg in ["ES3", "HU", "IE", "SE2"]]
-name = "base_168h"  # this will be the name of the file: output_%NAME%.xlsx
-# path = "C:\\Users\\jonull\\Box\\python\\"
-path = "C:\\Users\\jonull\\Box\\python\\output\\"
-# gdxpath = path
-gdxpath = "C:\\models\\multinode\\"  # where to find gdx files
+name = f"results_{h}h"  # this will be the name of the file: output_%NAME%.xlsx
+path = "D:\\Jonathan\\python\\output\\"
+# path = "C:\\Users\\jonull\\Box\\python\\output\\"
+gdxpath = "D:\\Jonathan\\multinode\\"
+# gdxpath = "C:\\models\\multinode\\"  # where to find gdx files
 
 if run_output.lower() == "r" or run_output.lower() == "read":
     try:

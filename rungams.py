@@ -33,14 +33,12 @@ def combinations(parameters):  # Create list of parameter combinations
 
 years = [2030, 2040, 2050]
 regions = ["nordic", "brit", "iberia"]  # ["SE2","HU","ES3","IE"]
-modes = ["base_noEV", "base", "inertia", "OR", "inertia_OR", "inertia_OR_noEV"]
+systemFlex = ["lowFlex", "highFlex"]
+modes = ["noFC", "fullFC", "inertia", "OR", "FCnoPTH", "FCnoH2", "FCnoWind", "FCnoBat", "FCnoSynth"]
 timeResolution = 3
 HBresolutions = [26]
-cores_per_scenario = 5  # the 'cores' in gams refers to logical cores, not physical
+cores_per_scenario = 3  # the 'cores' in gams refers to logical cores, not physical
 core_count = psutil.cpu_count()  # add logical=False to get physical cores
-
-# ["pre", "OR","OR_inertia", "inertia","inertia_noSyn"]
-# ["leanOR", "OR","OR+inertia","leanOR+inertia", "inertia","inertia_noSyn","inertia_2x","OR+inertia_noDoubleUse"]
 
 scenarios = {}
 # looping through regions and modes in this way means that it will first run all "pre",
@@ -48,42 +46,47 @@ scenarios = {}
 # I create my scenario-code by using what is called an fstring.
 # This allows me to put variables and if-statements in my text using {}. Very convenient :)
 
-for mode in modes:
-    for region in regions:
-        for HBres in HBresolutions:
-            for year in years:
-                scenarioname = f"{region}_{mode}{HBres if 'HB' in mode else ''}_{year}" \
-                               f"{'' if timeResolution == 1 else '_' + str(timeResolution) + 'h'}"
-                scenarios[scenarioname] = \
-                    f"""
+for flex in systemFlex:
+    for mode in modes:
+        for region in regions:
+            for HBres in HBresolutions:
+                for year in years:
+                    scenarioname = f"{region}_{flex}_{mode}_{year}" \
+                                   f"{'' if timeResolution == 1 else '_' + str(timeResolution) + 'h'}"
+                    scenarios[scenarioname] = \
+                        f"""
+*--  Scenario settings
 $setglobal scenario "{scenarioname}"
-$setglobal region {region}
-$setglobal heatBalance {'no' if 'noHB' in mode else 'yes'}
-$setglobal flexlim {'no' if 'noflex' in mode.lower() else 'yes'}
-$setglobal startup no
 $setglobal current_year {year}
-$setglobal first_iteration {'yes' if year == years[0] else 'no'} //if no -> will try to read previousInvestments.gdx
-$setglobal cores {cores_per_scenario}
+$setglobal region {region}
+$setglobal OR {"yes" if "OR" in mode or "fullFC" in mode else "no"}
+$setglobal inertia {"yes" if "inertia" in mode.lower() or "fullFC" in mode else "no"}
+$setglobal synthetic_inertia {"no" if "FCnoSyn" in mode else "yes"}
+$setglobal PtH_FC {"no" if "FCnoPTH" in mode else "yes"}
+$setglobal electrolyser_FR {"no" if "FCnoH2" in mode else "yes"}
+$setglobal wind_FC {"no" if "FCnoWind" in mode else "yes"}
+$setglobal bat_FC {"no" if "FCnoBat" in mode else "yes"}
 
-$setglobal ancillary_services yes
-$setglobal OR {"yes" if "OR" in mode else "no"}
-$setglobal lean {"yes" if "lean" in mode.lower() else "no"}
-$setglobal inertia {"yes" if "inertia" in mode.lower() else "no"}
-$setglobal synthetic_inertia {"no" if "noSyn" in mode else "yes"}
-$setglobal double_use {"no" if "noDoubleUse" in mode else "yes"}
-$setglobal SNSP no
-
+*--  Sensitivity analysis settings
+$setglobal OR_energyReservation {"yes" if "energyRes" in mode else "no"} 
+$setglobal OR_energyDepletion {"yes" if "energyDep" in mode else "no"}
 $setglobal inertia_scaling {"2" if "2xInertia" in mode else "1"}
 $setglobal forecast_scaling 1
 $setglobal flywheel_price_scaling 1
 $setglobal sync_cond_price_scaling 1
 $setglobal onshore_storage "no"
 $setglobal H2demand 0.2
-$setglobal EV_AGG {'no' if 'noEV' in scenarioname else 'yes'}
 
-$setglobal savepoint no
-$setglobal profiling yes
-* Temporal resolution 1, 3 or 6 h
+*--  Other model settings
+$setglobal ancillary_services yes
+$setglobal flexlim {'no' if 'noflex' in mode.lower() else 'yes'}
+$setglobal startup no
+$setglobal first_iteration {'yes' if year == years[0] else 'no'}
+$setglobal cores {cores_per_scenario}
+$setglobal double_use {"no" if "noDoubleUse" in mode else "yes"}
+$setglobal SNSP no
+$setglobal EV_AGG {'no' if 'noEV' in scenarioname else 'yes'}
+$setglobal heatBalance {'no' if 'noHB' in scenarioname else 'yes'}
 $setglobal hour_resolution {timeResolution}
 $setglobal heatBalancePeriods {HBres}
 $setglobal toExcel no

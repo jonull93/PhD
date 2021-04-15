@@ -49,6 +49,8 @@ class TECH(str, Enum):
     FLYWHEEL = 'flywheel'
     SYNCHRONOUS_CONDENSER = 'sync_cond'
     H2_STORAGE = 'H2store'
+    ELECTRIC_BOILER = 'EB'
+    HEAT_PUMP = 'HP'
 
 
 thermals = [

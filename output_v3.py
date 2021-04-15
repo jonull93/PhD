@@ -16,12 +16,6 @@ from copy import copy
 from main import overwrite, path, indicators, old_data, run_output, cases, name, gdxpath
 from my_utils import TECH, order, order_map
 
-try:
-    _ = path  # this will work if file was run from main since path is defined there
-except:
-    exec(open("./main.py").read())  # if not, then run main first
-    exit()  # then do NOT run code again since main.py already executes this file once
-
 print("Excel-writing script started at", datetime.now().strftime('%H:%M:%S'))
 
 
@@ -89,7 +83,8 @@ def crawl_gdx(q_gdx, data, gdxpath):
             print(traceback.format_exc())
             if q_gdx.qsize() > 0:
                 print(q_gdx.qsize(), " gdx files left out of", len(todo_gdx))
-        q_gdx.task_done()  # signal to the queue that task has been processed
+        finally:
+            q_gdx.task_done()  # signal to the queue that task has been processed
 
     # print(f"gdx crawler {thread_nr[threading.get_ident()]} now unemployed due to lack of work")
     return True
@@ -126,6 +121,16 @@ def crawl_excel(path=path):
 
 
 def run_case(scen, data, gdxpath):
+    def get_from_cap(tech_name, round=False):
+        try:
+            if round:
+                foo = tot_cap.loc[tech_name].sum().round(decimals=round)
+            else:
+                foo = tot_cap.loc[tech_name].sum()
+        except KeyError:
+            foo = 0
+        return foo
+
     k = scen[1]
     global newdata
     if run_output.lower() == "w" or k not in data:
@@ -201,15 +206,12 @@ def run_case(scen, data, gdxpath):
                 print("%ancillary_services% was not activated for", k, "because:")
                 print(format_exc())
 
-        try: flywheel = tot_cap.loc[TECH.FLYWHEEL].sum()
-        except KeyError: flywheel = 0
-
-        try: sync_cond = tot_cap.loc[TECH.SYNCHRONOUS_CONDENSER].sum()
-        except KeyError: sync_cond = 0
-        try: FC = tot_cap.loc[TECH.FUEL_CELL].sum()
-        except KeyError: FC = 0
-        try: H2store = tot_cap.loc[TECH.H2_STORAGE].sum()
-        except KeyError: H2store = 0
+        flywheel = get_from_cap(TECH.FLYWHEEL)
+        sync_cond = get_from_cap(TECH.SYNCHRONOUS_CONDENSER)
+        FC = get_from_cap(TECH.FUEL_CELL)
+        H2store = get_from_cap(TECH.H2_STORAGE)
+        EB = get_from_cap(TECH.ELECTRIC_BOILER)
+        HP = get_from_cap(TECH.HEAT_PUMP)
         try: bat = tot_cap.loc[TECH.BATTERY].sum().round(decimals=2).astype(str) + " / " \
               + tot_cap.loc[TECH.BATTERY_CAP].sum().round(decimals=2).astype(str)
         except KeyError: bat = 0
@@ -230,18 +232,25 @@ def run_case(scen, data, gdxpath):
 
 
 def excel(scen, data, row):
-    cap = data["tot_cap"].rename("Cap")
+    global scen_row
+    scen_row = 0
+    cap = data["tot_cap"].rename("Cap").round(decimals=3)
     cap = cap[cap!=0]
+    new_cap = data["new_cap"].level.rename("New cap").round(decimals=3)
+    new_cap = new_cap[new_cap != 0]  # filter out technologies which aren't going to be the there for cap/share/FLH
     FLH = data["FLH"].astype(int)
     share = data["gen_share"].round(decimals=3)
+    gen = data["gen"]
+    if "electrolyser" in gen.index.unique("tech"):
+        gen = gen.drop("electrolyser", level="tech")
 
     print_num([scen], "Indicators", row + 1, 0, 0)
     c = 1
 
-    for i in indicators:
+    for indicator in indicators:
         # print(data[k][i])
-        print_num([i], "Indicators", 0, c, 0)
-        thing = data[i]
+        print_num([indicator], "Indicators", 0, c, 0)
+        thing = data[indicator]
         ind_type = type(thing)
         if isinstance([], ind_type):
             print_num(thing, "Indicators", row + 1, c, 0)
@@ -249,22 +258,21 @@ def excel(scen, data, row):
             print_num([thing], "Indicators", row + 1, c, 0)
         elif ind_type == pd.core.series.Series:
             try: print_num([thing.sum()], "Indicators", row + 1, c, 0)
-            except: print(f"Failed to print {i} to excel!")
+            except: print(f"Failed to print {indicator} to excel!")
         else:
-            print(f"some weird variable type ({str(i)}: {ind_type}) entered the excel-printing loop")
+            print(f"some weird variable type ({str(indicator)}: {ind_type}) entered the excel-printing loop")
             if isinstance({}, ind_type): print(thing.keys())
         c += 1
 
-    global scen_row
     cap_len = len(cap.index.get_level_values(0).unique())+1
     reg_len = len(cap.index.get_level_values(1).unique())+1
-    cappy = cap.to_frame(name="Cap").join(share).join(FLH)
+    cappy = cap.to_frame(name="Cap").join(new_cap).join(share).join(FLH)
     cappy["sort_by"] = cappy.index.get_level_values(0).map(order_map)
     cappy.sort_values("sort_by", inplace=True)
     cappy.drop(columns="sort_by", inplace=True)
     cappy = cappy.reorder_levels(["I_reg", "tech"]).sort_index(level=0, sort_remaining=False)
     for i, reg in enumerate(cappy.index.get_level_values(0).unique()):
-        cappy.filter(like=reg,axis=0).to_excel(writer, sheet_name=scen, startcol=1+5*i, startrow=1)
+        cappy.filter(like=reg,axis=0).to_excel(writer, sheet_name=scen, startcol=1+6*i, startrow=1)
     scen_row += cap_len+1
     print_df(data["curtailment_profile_total"].round(decimals=3), "Curtailment", scen)
     print_df(data["el_price"].round(decimals=3), "Elec. price", scen, row_inc=2)
@@ -280,16 +288,7 @@ def excel(scen, data, row):
     else:
         print("PS variables were not available for", scen)
 
-    #print_gen2(scen, length + 4, 0, {
-    #    ("OR", "Cost"): data["OR_cost"].groupby(level=[0, 1]).sum()})
-    #print_gen2(scen, length + 5, 0, {("OR", "Supply"): data["OR_available"]})
-    #print_gen2(scen, length + 6, 0, {("OR", "Net import"): data["OR_net_import"]})
-    #print_gen2(scen, length + 7, 0, {("OR", "Demand f. wind"): data["OR_demand"]["wind"]})
-    #print_gen2(scen, length + 8, 0, {("OR", "Demand f. PV"): data["OR_demand"]["PV"]})
-    #print_gen2(scen, length + 9, 0, {("OR", "Demand f. other"): data["OR_demand"]["other"]})
-    #print_gen2(scen, length + 11, 0, {("Inertia supply", "Total"): data["inertia_available"]})
-    #print_gen2(scen, length + 12, 0, {("Inertia supply", "Thermals"): data["inertia_available_thermals"]})
-    print_gen(scen, scen_row, data["gen"], data["gamsTimestep"])
+    print_gen(scen, scen_row, gen, data["gamsTimestep"])
 
 
 todo_gdx = []
@@ -317,7 +316,7 @@ newdata = {}
 threads = {}
 thread_nr = {}
 num_threads = min(max(cpu_count() - 1, 6), len(todo_gdx))
-writer = pd.ExcelWriter(path + "output_" + name + ".xlsx", engine="openpyxl")
+writer = pd.ExcelWriter(path + name + ".xlsx", engine="openpyxl")
 opened_file = False
 try:
     f = open(path + "output_" + name + ".xlsx", "r+")
