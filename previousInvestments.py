@@ -8,7 +8,7 @@ from get_from_gams_db import gdx
 
 def doItAll(gdxpath, scenario):
     data, transInv, life = readResults(gdxpath, scenario)  # search for, and read, previously modelled years of the scenario
-    writeInc(data, transInv, life, gdxpath, scenario)  # sum the capacities and write gdx-file for the next
+    writePreviousInvestmentsInc(data, transInv, life, gdxpath, scenario)  # sum the capacities and write gdx-file for the next
     # model-iteration
     return data  # in case we want to pickle the data or something
 
@@ -59,7 +59,7 @@ def addToMean(entry, key, dictionary, addedWeight, oldWeight):
         dictionary[key] = entry
 
 
-def writeInc(data, transInv, life, gdxpath, scenario):  # sum the capacities and write gdx-file for the next model-iteration
+def writePreviousInvestmentsInc(data, transInv, life, gdxpath, scenario):  # sum the capacities and write gdx-file for the next model-iteration
     invToSave = {}
     etaToSave = {}
     transInvToSave = {}

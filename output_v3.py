@@ -67,7 +67,7 @@ def crawl_gdx(q_gdx, data, gdxpath):
             q_gdx.task_done()
             continue
         try:
-            print(f"Starting {scen[1]} on thread {thread_nr[threading.get_ident()]}")
+            print(f"- Starting {scen[1]} on thread {thread_nr[threading.get_ident()]}")
             starttime[scen[0]] = tm.time()
             success = run_case(scen, data, gdxpath)
             print("Finished " + scen[1].ljust(20) + " after " + str(round(tm.time() - starttime[scen[0]],
@@ -75,14 +75,16 @@ def crawl_gdx(q_gdx, data, gdxpath):
             if success:
                 q_excel.put((scen[1], True))
                 print(f'q_excel appended and is now : {q_excel.qsize()} items long')
+        except FileNotFoundError:
+            print("! Could not find file for", scen[1])
         except:
             identifier = thread_nr[threading.get_ident()]
             global errors
             errors += 1
-            print(f"Error in crawler {identifier}, scenario {scen[1]}. Exception:")
+            print(f"! Error in crawler {identifier}, scenario {scen[1]}. Exception:")
             print(traceback.format_exc())
             if q_gdx.qsize() > 0:
-                print(q_gdx.qsize(), " gdx files left out of", len(todo_gdx))
+                print(q_gdx.qsize(), " gdx files left out of", len(todo_gdx),"\n")
         finally:
             q_gdx.task_done()  # signal to the queue that task has been processed
 
@@ -241,9 +243,11 @@ def excel(scen, data, row):
     FLH = data["FLH"].astype(int)
     share = data["gen_share"].round(decimals=3)
     gen = data["gen"]
-    if "electrolyser" in gen.index.unique("tech"):
-        gen = gen.drop("electrolyser", level="tech")
-
+    try:
+        if "electrolyser" in gen.index.unique(level="tech"):
+            gen = gen.drop("electrolyser", level="tech")
+    except KeyError:
+        print(f"! Could not find tech in gen.index, {scen} probably failed the gams run.")
     print_num([scen], "Indicators", row + 1, 0, 0)
     c = 1
 
@@ -271,6 +275,7 @@ def excel(scen, data, row):
     cappy.sort_values("sort_by", inplace=True)
     cappy.drop(columns="sort_by", inplace=True)
     cappy = cappy.reorder_levels(["I_reg", "tech"]).sort_index(level=0, sort_remaining=False)
+    print(cappy)
     for i, reg in enumerate(cappy.index.get_level_values(0).unique()):
         cappy.filter(like=reg,axis=0).to_excel(writer, sheet_name=scen, startcol=1+6*i, startrow=1)
     scen_row += cap_len+1

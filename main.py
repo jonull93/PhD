@@ -14,10 +14,13 @@ indicators = ["cost_tot",
               ]
 cases = []
 h = 3
+systemFlex = ["lowFlex", "highFlex"]
+modes = ["noFC", "fullFC"]  #, "inertia", "OR", "FCnoPTH", "FCnoH2", "FCnoWind", "FCnoBat", "FCnoSynth"]
 for reg in ["iberia", "brit", "nordic"]:
-    for mode in ["base", "base_noEV","inertia_OR","inertia_OR_noEV"]:
-        for year in [2030, 2040, 2050]:
-            cases.append(f"{reg}_{mode}_{year}{'_'+str(h)+'h' if h>1 else ''}")
+    for flex in systemFlex:
+        for mode in modes:
+            for year in [2030, 2040, 2050]:
+                cases.append(f"{reg}_{flex}_{mode}_{year}{'_'+str(h)+'h' if h>1 else ''}")
 
 # cases.append("OR_ES3_noSyn_noDoubleUse") exec(open("./seasons.py").read()) run_output = input("Enter 'r' to read
 # pickled data, 'w' to (over)write or 'rw' to add missing scenarios: ")

@@ -1,5 +1,6 @@
 import itertools
 import string
+import datetime as dt
 from enum import Enum
 import os
 
@@ -327,10 +328,10 @@ def write_inc_from_df_columns(path, filename, var: pandas.DataFrame):
     return None
 
 
-def append_to_file(filename, to_add):
+def append_to_file(filename, scenario, time_to_solve):
     "adds 'to_add' to a new line at the top of originalfile"
-    if to_add[-1] != '\n':
-        to_add += '\n'
-    with open(filename, 'a') as f2:
+    to_add = f"{dt.datetime.now().strftime('%D - %H:%M:%S')} : {scenario:<40} : " \
+             f"{time_to_solve} min\n"
+    with open(filename+".txt", 'a') as f2:
         f2.write(to_add)
 

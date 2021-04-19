@@ -61,6 +61,7 @@ $setglobal current_year {year}
 $setglobal region {region}
 $setglobal OR {"yes" if "OR" in mode or "fullFC" in mode else "no"}
 $setglobal inertia {"yes" if "inertia" in mode.lower() or "fullFC" in mode else "no"}
+$setglobal systemFlex {'yes' if "highflex" in scenarioname.lower() or "fullflex" in scenarioname.lower() else 'no'}
 $setglobal synthetic_inertia {"no" if "FCnoSyn" in mode else "yes"}
 $setglobal PtH_FC {"no" if "FCnoPTH" in mode else "yes"}
 $setglobal electrolyser_FR {"no" if "FCnoH2" in mode else "yes"}
@@ -98,7 +99,7 @@ num_threads = int(min(core_count/(cores_per_scenario-1), len(scenarios)/len(year
 
 print("Number of scenarios:", len(scenarios))
 multipleYears = len(years) > 1
-if multipleYears: print("  Multiple years detected, will run previousInvestments.py in-between runs")
+if multipleYears: print(" Multiple years detected, will run previousInvestments.py in-between runs")
 
 # create .inc file for each scenario
 for scen in scenarios:
@@ -123,10 +124,12 @@ for i, scen in enumerate(scenarios):
 def crawl(q, ws, io_lock):
     thread_nr[threading.get_ident()] = len(thread_nr) + 1
     tm.sleep(thread_nr[threading.get_ident()] / 5)
+    identifier = thread_nr[threading.get_ident()]
     while True:  # this loop halts new scenarios from being run while the computer is at near-max load
-        if psutil.cpu_percent(2) < 90:  # if more than 90% cpu is used, wait 
+        if psutil.cpu_percent(2) < 90 and psutil.virtual_memory().percent < 90-80/(num_threads+1):
             break  # it's not a guarantee, but it may prevent complete catastrophe
-        tm.sleep(5)
+        print(f"Thread {identifier} waiting for resources")
+        tm.sleep(random.randrange(1,5)*60)
     while not q.empty():
         scen = q.get()  # fetch new work from the Queue
         global in_progress
@@ -136,7 +139,6 @@ def crawl(q, ws, io_lock):
         except gams.workspace.GamsExceptionExecution as e:
             print("!GAMS is complaining! If the error code is 3, it may just be a /0 problem in the output stuff:", repr(e))
         except Exception as e:
-            identifier = thread_nr[threading.get_ident()]
             global errors
             errors += 1
             print("! Error in crawler", identifier, "- scenario", scen[0], "exception:", e, "\n")
@@ -168,16 +170,13 @@ def crawl(q, ws, io_lock):
 def run_scenario(workspace, io_lock, scen):
     year = int([i for i in scen[1].replace('.', '_').split('_') if "20" in i][0])
     if multipleYears and year > years[0]:
-        previousRunIsRan = False
-        while not previousRunIsRan:
-            files = []
-            for file in glob(path+"\\*.gdx"):
-                files.append(file.split("\\")[-1])  # building list of existing .gdx files
-            if scen[1].replace(str(year),str(years[years.index(year)-1]))+".gdx" in files:
-                previousRunIsRan = True
-            else:
-                print(f"? Did not find {scen[1].replace(str(year),str(years[years.index(year)-1]))}.gdx")
-                tm.sleep(random.randrange(8, 32))  # to avoid several threads searching and starting at the same time
+        files = []
+        for file in glob(path+"\\*.gdx"):
+            files.append(file.split("\\")[-1])  # building list of existing .gdx files
+        if scen[1].replace(str(year),str(years[years.index(year)-1]))+".gdx" not in files:
+            print(f"! Did not find {scen[1].replace(str(year),str(years[years.index(year)-1]))}.gdx")
+            print(f"! Skipping {scen[1]}")
+            return
         try:
             previousInvestments.doItAll(path, scen[1])  # create previousInvestments.gdx
         except Exception as e:
@@ -203,9 +202,7 @@ def run_scenario(workspace, io_lock, scen):
     io_lock.acquire()  # we need to make the ouput a critical section to avoid messed up report information
     print("-- Thread", thread_nr[threading.get_ident()], "finished", scen[1], "(#" + str(scen[0]) + ") at",
           dt.datetime.now().strftime('%H:%M:%S'))
-    to_add = f"{dt.datetime.now().strftime('%D - %H:%M:%S')} : {scen[1]:<40} : " \
-             f"{round((tm.time() - starttime[scen[0]]) / 60, 2)} min"
-    append_to_file("time_to_solve.txt", to_add)
+    append_to_file("time_to_solve", scen[1], round((tm.time() - starttime[scen[0]]) / 60, 2))
     print("-- Time to solve: ", str(round((tm.time() - starttime[scen[0]]) / 60, 1)), "min")
     io_lock.release()
 
@@ -221,11 +218,11 @@ threads = {}
 thread_nr = {}
 # Starting worker threads on queue processing
 for i in range(num_threads):
-    print('- Starting thread', i + 1)
     worker = threading.Thread(target=crawl, args=(q, ws, io_lock))
     worker.setDaemon(True)  # setting threads as "daemon" allows main program to
     # exit eventually even if these dont finish correctly.
     worker.start()
+print(f'- {num_threads} threads started')
 # now we wait until the queue has been processed
 q.join()
 print('- All tasks completed after', str(round((tm.time() - starttime[0]) / 60, 2)), 'minutes and with', str(errors), "errors.")
