@@ -34,7 +34,7 @@ def combinations(parameters):  # Create list of parameter combinations
 years = [2030, 2040, 2050]
 regions = ["nordic", "brit", "iberia"]  # ["SE2","HU","ES3","IE"]
 systemFlex = ["lowFlex", "highFlex"]
-modes = ["noFC", "fullFC"]#, "inertia", "OR", "FCnoPTH", "FCnoH2", "FCnoWind", "FCnoBat", "FCnoSynth"]
+modes = ["noFC"]#, "fullFC", "inertia", "OR", "FCnoPTH", "FCnoH2", "FCnoWind", "FCnoBat", "FCnoSynth"]
 timeResolution = 6
 HBresolutions = [26]
 cores_per_scenario = 3  # the 'cores' in gams refers to logical cores, not physical
@@ -54,7 +54,7 @@ for flex in systemFlex:
             for HBres in HBresolutions:
                 for year in years:
                     scenarioname = f"{region}_{flex}_{mode}_{year}" \
-                                   f"{'' if timeResolution == 1 else '_' + str(timeResolution) + 'h'}"
+                                   f"{'' if timeResolution == 1 else '_' + str(timeResolution) + 'h'}_noLateG_CO2cap2050"
                     scenarios[scenarioname] = \
                         f"""
 *--  Scenario settings
@@ -197,6 +197,7 @@ def run_scenario(workspace, io_lock, scen):
     # give gams the variable 'scenarioname' with value scen[1] which is the string
     opt.defines["scenariofile"] = scen[1]
     opt.output = scen[1]  # listing file name (files are called _gams_py_gjo#.lst without this)
+
     print(f"-- Starting scenario {scen[0]}: {scen[1]} in thread", thread_nr[threading.get_ident()], "at",
           dt.datetime.now().strftime('%H:%M:%S'), "---")
     job.run(opt, create_out_db=False)

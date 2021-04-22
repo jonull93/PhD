@@ -1,11 +1,13 @@
 # %%
 # from gams import *
 import pickle  # for dumping and loading variable to/from file
+import os
 
 indicators = ["cost_tot",
               "VRE_share_total",
               'curtailment',
               #              'flywheel',
+              "G",
               'sync_cond',
               'bat',
               'FC',
@@ -15,12 +17,12 @@ indicators = ["cost_tot",
 cases = []
 h = 6
 systemFlex = ["lowFlex", "highFlex"]
-modes = ["noFC", "fullFC"]  #, "inertia", "OR", "FCnoPTH", "FCnoH2", "FCnoWind", "FCnoBat", "FCnoSynth"]
+modes = ["noFC"]#, "fullFC"]  #, "inertia", "OR", "FCnoPTH", "FCnoH2", "FCnoWind", "FCnoBat", "FCnoSynth"]
 for reg in ["iberia", "brit", "nordic"]:
     for flex in systemFlex:
         for mode in modes:
             for year in [2030, 2040, 2050]:
-                cases.append(f"{reg}_{flex}_{mode}_{year}{'_'+str(h)+'h' if h>1 else ''}")
+                cases.append(f"{reg}_{flex}_{mode}_{year}{'_'+str(h)+'h' if h>1 else ''}_noLateG_CO2cap2050")
 
 # cases.append("OR_ES3_noSyn_noDoubleUse") exec(open("./seasons.py").read()) run_output = input("Enter 'r' to read
 # pickled data, 'w' to (over)write or 'rw' to add missing scenarios: ")
@@ -28,10 +30,15 @@ run_output = "w"
 # run_plots = input('Should we also plot results? Y/N: ')
 run_plots = "n"
 overwrite = []  # [reg+"_inertia_0.1x" for reg in ["ES3", "HU", "IE", "SE2"]]+[reg+"_inertia" for reg in ["ES3", "HU", "IE", "SE2"]]+[reg+"_inertia_noSyn" for reg in ["ES3", "HU", "IE", "SE2"]]
-name = f"results_{h}h"  # this will be the name of the file: output_%NAME%.xlsx
-path = "D:\\Jonathan\\python\\output\\"
+name = f"results_{h}h_noLateG_CO2cap2050"  # this will be the name of the file: output_%NAME%.xlsx
+if "PLIA" in os.environ['COMPUTERNAME']:
+    path = "C:\\Users\\Jonathan\\Box\\python\\output\\"
+    gdxpath = "C:\\git\\multinode\\"  # where to find gdx files
+else:
+    path = "D:\\Jonathan\\python\\output\\"
+    gdxpath = "D:\\Jonathan\\multinode\\"
+
 # path = "C:\\Users\\jonull\\Box\\python\\output\\"
-gdxpath = "D:\\Jonathan\\multinode\\"
 # gdxpath = "C:\\models\\multinode\\"  # where to find gdx files
 
 if run_output.lower() == "r" or run_output.lower() == "read":
@@ -51,7 +58,9 @@ elif run_output.lower() == "w" or run_output.lower() == "write":
     excel = True
     exec(open("./output_v3.py").read())
 elif run_output.lower() == "rw":
-    old_data = pickle.load(open("PickleJar\\data_" + name + ".pickle", "rb"))
+    try: old_data = pickle.load(open("PickleJar\\data_" + name + ".pickle", "rb"))
+    except FileNotFoundError:
+        old_data = {}
     excel = True
     exec(open("./output_v3.py").read())
 else:
