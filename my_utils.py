@@ -183,7 +183,7 @@ order = [
          'PTES_M_EB',
          'TTES_HX_EB',
          'TTES_EB']
-order_map = {j:i for i,j in enumerate(order)}
+order_map = {j: i for i, j in enumerate(order)}
 tech_names = {'RO': 'Hydro', 'U': 'Nuclear', 'CHP_wa': 'Waste CHP', 'CHP_bio': 'Woodchip CHP', 'CHP_WG_L': 'Biogas CHP',
               "bat_discharge": "Battery (dis)charge",
               'GWGCCS': 'Gas-mix CCS', 'WG': 'Biogas CCGT', 'WG_peak': 'Biogas GT', 'wind_offshore': 'Offshore wind',
@@ -311,19 +311,20 @@ def write_inc_from_df_columns(path, filename, var: pandas.DataFrame):
     path
     filename
     var
-    flip
 
     Returns
     -------
     nothing, but creates path/filename.inc containing a variable with 2 or 3 sets, e.g. tech + reg (+ opt. timestep)
     """
-    try: os.mkdir(path)
-    except: None
+    try:
+        os.mkdir(path)
+    except:
+        None
 
     with open(path + filename, "w") as writer:
         dim = len(var.columns)
         for ind, row in var.iterrows():
-            line = " . ".join(row[:-1])+f"  {row[-1]}\n"
+            line = " . ".join(row[:-1]) + f"  {row[-1]}\n"
             writer.write(line)
     return None
 
@@ -332,6 +333,5 @@ def append_to_file(filename, scenario, time_to_solve):
     "adds 'to_add' to a new line at the top of originalfile"
     to_add = f"{dt.datetime.now().strftime('%D - %H:%M:%S')} : {scenario:<40} : " \
              f"{time_to_solve} min\n"
-    with open(filename+".txt", 'a') as f2:
+    with open(filename + ".txt", 'a') as f2:
         f2.write(to_add)
-

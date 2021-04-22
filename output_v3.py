@@ -275,7 +275,6 @@ def excel(scen, data, row):
     cappy.sort_values("sort_by", inplace=True)
     cappy.drop(columns="sort_by", inplace=True)
     cappy = cappy.reorder_levels(["I_reg", "tech"]).sort_index(level=0, sort_remaining=False)
-    print(cappy)
     for i, reg in enumerate(cappy.index.get_level_values(0).unique()):
         cappy.filter(like=reg,axis=0).to_excel(writer, sheet_name=scen, startcol=1+6*i, startrow=1)
     scen_row += cap_len+1

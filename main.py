@@ -13,7 +13,7 @@ indicators = ["cost_tot",
               'EB', 'HP',
               ]
 cases = []
-h = 3
+h = 6
 systemFlex = ["lowFlex", "highFlex"]
 modes = ["noFC", "fullFC"]  #, "inertia", "OR", "FCnoPTH", "FCnoH2", "FCnoWind", "FCnoBat", "FCnoSynth"]
 for reg in ["iberia", "brit", "nordic"]:
@@ -24,7 +24,7 @@ for reg in ["iberia", "brit", "nordic"]:
 
 # cases.append("OR_ES3_noSyn_noDoubleUse") exec(open("./seasons.py").read()) run_output = input("Enter 'r' to read
 # pickled data, 'w' to (over)write or 'rw' to add missing scenarios: ")
-run_output = "rw"
+run_output = "w"
 # run_plots = input('Should we also plot results? Y/N: ')
 run_plots = "n"
 overwrite = []  # [reg+"_inertia_0.1x" for reg in ["ES3", "HU", "IE", "SE2"]]+[reg+"_inertia" for reg in ["ES3", "HU", "IE", "SE2"]]+[reg+"_inertia_noSyn" for reg in ["ES3", "HU", "IE", "SE2"]]

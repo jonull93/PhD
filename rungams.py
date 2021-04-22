@@ -34,8 +34,8 @@ def combinations(parameters):  # Create list of parameter combinations
 years = [2030, 2040, 2050]
 regions = ["nordic", "brit", "iberia"]  # ["SE2","HU","ES3","IE"]
 systemFlex = ["lowFlex", "highFlex"]
-modes = ["noFC", "fullFC", "inertia", "OR", "FCnoPTH", "FCnoH2", "FCnoWind", "FCnoBat", "FCnoSynth"]
-timeResolution = 3
+modes = ["noFC", "fullFC"]#, "inertia", "OR", "FCnoPTH", "FCnoH2", "FCnoWind", "FCnoBat", "FCnoSynth"]
+timeResolution = 6
 HBresolutions = [26]
 cores_per_scenario = 3  # the 'cores' in gams refers to logical cores, not physical
 core_count = psutil.cpu_count()  # add logical=False to get physical cores
@@ -48,6 +48,8 @@ scenarios = {}
 
 for flex in systemFlex:
     for mode in modes:
+        if "low" in flex.lower() and "noH2" in mode:
+            continue  # lowFlex means no H2storage, so FC from electrolysers seems less reasonable
         for region in regions:
             for HBres in HBresolutions:
                 for year in years:
@@ -93,7 +95,7 @@ $setglobal heatBalancePeriods {HBres}
 $setglobal toExcel no
 $setglobal update_scenario no"""  # [NEEDS TO BE EDITED WHEN SETTING SCRIPT UP]
 
-num_threads = int(min(core_count/(cores_per_scenario-1), len(scenarios)/len(years)))
+num_threads = int(min(core_count/(cores_per_scenario-0.5), len(scenarios)/len(years)))
 # The "optimal" number of threads depends on your hardware and model
 # but nr of cores /2 seems good unless you hit RAM limit
 
@@ -125,12 +127,12 @@ def crawl(q, ws, io_lock):
     thread_nr[threading.get_ident()] = len(thread_nr) + 1
     tm.sleep(thread_nr[threading.get_ident()] / 5)
     identifier = thread_nr[threading.get_ident()]
-    while True:  # this loop halts new scenarios from being run while the computer is at near-max load
-        if psutil.cpu_percent(2) < 90 and psutil.virtual_memory().percent < 90-80/(num_threads+1):
-            break  # it's not a guarantee, but it may prevent complete catastrophe
-        print(f"Thread {identifier} waiting for resources")
-        tm.sleep(random.randrange(1,5)*60)
     while not q.empty():
+        while True:  # this loop halts new scenarios from being run while the computer is at near-max load
+            if psutil.cpu_percent(2) < 85 and psutil.virtual_memory().percent < 80 - 80 / (num_threads + 1):
+                break  # it's not a guarantee, but it may prevent complete catastrophe
+            print(f"Thread {identifier} waiting for resources")
+            tm.sleep(random.randrange(1, 7) * 60)
         scen = q.get()  # fetch new work from the Queue
         global in_progress
         try:
@@ -195,14 +197,13 @@ def run_scenario(workspace, io_lock, scen):
     # give gams the variable 'scenarioname' with value scen[1] which is the string
     opt.defines["scenariofile"] = scen[1]
     opt.output = scen[1]  # listing file name (files are called _gams_py_gjo#.lst without this)
-
     print(f"-- Starting scenario {scen[0]}: {scen[1]} in thread", thread_nr[threading.get_ident()], "at",
           dt.datetime.now().strftime('%H:%M:%S'), "---")
     job.run(opt, create_out_db=False)
     io_lock.acquire()  # we need to make the ouput a critical section to avoid messed up report information
     print("-- Thread", thread_nr[threading.get_ident()], "finished", scen[1], "(#" + str(scen[0]) + ") at",
           dt.datetime.now().strftime('%H:%M:%S'))
-    append_to_file("time_to_solve", scen[1], round((tm.time() - starttime[scen[0]]) / 60, 2))
+    append_to_file("time_to_solve", scen[1], round((tm.time() - starttime[scen[0]]) / 60, 1))
     print("-- Time to solve: ", str(round((tm.time() - starttime[scen[0]]) / 60, 1)), "min")
     io_lock.release()
 
