@@ -214,6 +214,7 @@ def run_case(scen, data, gdxpath):
         H2store = get_from_cap(TECH.H2_STORAGE)
         EB = get_from_cap(TECH.ELECTRIC_BOILER)
         HP = get_from_cap(TECH.HEAT_PUMP)
+        G = get_from_cap(TECH.GAS)
         try: bat = tot_cap.loc[TECH.BATTERY].sum().round(decimals=2).astype(str) + " / " \
               + tot_cap.loc[TECH.BATTERY_CAP].sum().round(decimals=2).astype(str)
         except KeyError: bat = 0
@@ -248,6 +249,7 @@ def excel(scen, data, row):
             gen = gen.drop("electrolyser", level="tech")
     except KeyError:
         print(f"! Could not find tech in gen.index, {scen} probably failed the gams run.")
+        return
     print_num([scen], "Indicators", row + 1, 0, 0)
     c = 1
 
@@ -270,12 +272,12 @@ def excel(scen, data, row):
 
     cap_len = len(cap.index.get_level_values(0).unique())+1
     reg_len = len(cap.index.get_level_values(1).unique())+1
-    cappy = cap.to_frame(name="Cap").join(new_cap).join(share).join(FLH)
+    try: cappy = cap.to_frame(name="Cap").join(new_cap).join(share).join(FLH)
+    except: print(cap,new_cap,share,FLH)
     cappy["sort_by"] = cappy.index.get_level_values(0).map(order_map)
     cappy.sort_values("sort_by", inplace=True)
     cappy.drop(columns="sort_by", inplace=True)
     cappy = cappy.reorder_levels(["I_reg", "tech"]).sort_index(level=0, sort_remaining=False)
-    print(cappy)
     for i, reg in enumerate(cappy.index.get_level_values(0).unique()):
         cappy.filter(like=reg,axis=0).to_excel(writer, sheet_name=scen, startcol=1+6*i, startrow=1)
     scen_row += cap_len+1

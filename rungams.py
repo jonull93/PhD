@@ -34,10 +34,10 @@ def combinations(parameters):  # Create list of parameter combinations
 years = [2030, 2040, 2050]
 regions = ["nordic", "brit", "iberia"]  # ["SE2","HU","ES3","IE"]
 systemFlex = ["lowFlex", "highFlex"]
-modes = ["noFC", "fullFC", "inertia", "OR", "FCnoPTH", "FCnoH2", "FCnoWind", "FCnoBat", "FCnoSynth"]
-timeResolution = 3
+modes = ["noFC"]#, "fullFC", "inertia", "OR", "FCnoPTH", "FCnoH2", "FCnoWind", "FCnoBat", "FCnoSynth"]
+timeResolution = 6
 HBresolutions = [26]
-cores_per_scenario = 3  # the 'cores' in gams refers to logical cores, not physical
+cores_per_scenario = 2  # the 'cores' in gams refers to logical cores, not physical
 core_count = psutil.cpu_count()  # add logical=False to get physical cores
 
 scenarios = {}
@@ -52,7 +52,7 @@ for flex in systemFlex:
             for HBres in HBresolutions:
                 for year in years:
                     scenarioname = f"{region}_{flex}_{mode}_{year}" \
-                                   f"{'' if timeResolution == 1 else '_' + str(timeResolution) + 'h'}"
+                                   f"{'' if timeResolution == 1 else '_' + str(timeResolution) + 'h'}_noLateG_CO2cap2050"
                     scenarios[scenarioname] = \
                         f"""
 *--  Scenario settings
