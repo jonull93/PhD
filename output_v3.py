@@ -278,9 +278,10 @@ def excel(scen, data, row):
     cappy.sort_values("sort_by", inplace=True)
     cappy.drop(columns="sort_by", inplace=True)
     cappy = cappy.reorder_levels(["I_reg", "tech"]).sort_index(level=0, sort_remaining=False)
+    cappy.groupby(level=[1]).sum().to_excel(writer, sheet_name=scen, startcol=1, startrow=1)
     for i, reg in enumerate(cappy.index.get_level_values(0).unique()):
-        cappy.filter(like=reg,axis=0).to_excel(writer, sheet_name=scen, startcol=1+6*i, startrow=1)
-    scen_row += cap_len+1
+        cappy.filter(like=reg,axis=0).to_excel(writer, sheet_name=scen, startcol=7+6*i, startrow=1)
+    scen_row += cap_len+2
     print_df(data["curtailment_profile_total"].round(decimals=3), "Curtailment", scen)
     print_df(data["el_price"].round(decimals=3), "Elec. price", scen, row_inc=2)
     if data["PS"]:
