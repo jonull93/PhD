@@ -19,8 +19,8 @@ if "C18" in os.environ['COMPUTERNAME']:  # This allows you to change path depend
     path = "C:\\models\\multinode\\"  # where your main-file is located
 elif "PLIA" in os.environ['COMPUTERNAME']:
     path = "C:\\git\\multinode\\"
-elif "M21024" in os.environ['COMPUTERNAME']: #.22
-    path = "C:\\Users\\Jonathan\\multinode\\"
+elif "QGTORT8" in os.environ['COMPUTERNAME']:  # .22
+    path = "C:\\Users\\Jonathan\\git\\multinode\\"
 else:
     path = "D:\\Jonathan\\multinode\\"  # where your main-file is located
 ws = gams.GamsWorkspace(path)
@@ -31,11 +31,14 @@ def combinations(parameters):  # Create list of parameter combinations
     return [p for p in product(*parameters)]
 
 
+followUp_run = True  # if True and len(years)<1, will look for previous years for the given year
 years = [2030, 2040, 2050]
+# set followUp_run to False if we are running first year and forgot to change followUp_run to false manually
+if followUp_run: followUp_run = 2030 not in years
 regions = ["nordic", "brit", "iberia"]  # ["SE2","HU","ES3","IE"]
 systemFlex = ["lowFlex", "highFlex"]
-modes = ["noFC"]#, "fullFC", "inertia", "OR", "FCnoPTH", "FCnoH2", "FCnoWind", "FCnoBat", "FCnoSynth"]
-timeResolution = 6
+modes = ["noFC", "fullFC", "inertia", "OR"]#, "FCnoPTH", "FCnoH2", "FCnoWind", "FCnoBat", "FCnoSynth"]
+timeResolution = 3
 HBresolutions = [26]
 cores_per_scenario = 3  # the 'cores' in gams refers to logical cores, not physical
 core_count = psutil.cpu_count()  # add logical=False to get physical cores
@@ -54,7 +57,7 @@ for flex in systemFlex:
             for HBres in HBresolutions:
                 for year in years:
                     scenarioname = f"{region}_{flex}_{mode}_{year}" \
-                                   f"{'' if timeResolution == 1 else '_' + str(timeResolution) + 'h'}_noLateG_CO2cap2050"
+                                   f"{'' if timeResolution == 1 else '_' + str(timeResolution) + 'h'}"
                     scenarios[scenarioname] = \
                         f"""
 *--  Scenario settings
@@ -83,8 +86,8 @@ $setglobal H2demand 0.2
 *--  Other model settings
 $setglobal ancillary_services yes
 $setglobal flexlim {'no' if 'noflex' in mode.lower() else 'yes'}
-$setglobal startup no
-$setglobal first_iteration {'yes' if year == years[0] else 'no'}
+$setglobal startup no //start-up time equations are not updated!
+$setglobal first_iteration {'yes' if year == years[0] and not followUp_run else 'no'}
 $setglobal cores {cores_per_scenario}
 $setglobal double_use {"no" if "noDoubleUse" in mode else "yes"}
 $setglobal SNSP no
@@ -171,16 +174,17 @@ def crawl(q, ws, io_lock):
 # Function which gets called to actually run the model
 def run_scenario(workspace, io_lock, scen):
     year = int([i for i in scen[1].replace('.', '_').split('_') if "20" in i][0])
-    if multipleYears and year > years[0]:
+    if followUp_run or (multipleYears and year > years[0]):
         files = []
         for file in glob(path+"\\*.gdx"):
             files.append(file.split("\\")[-1])  # building list of existing .gdx files
-        if scen[1].replace(str(year),str(years[years.index(year)-1]))+".gdx" not in files:
+        if scen[1].replace(f"_{year}",f"_{years[years.index(year)-1]}")+".gdx" not in files:
             print(f"! Did not find {scen[1].replace(str(year),str(years[years.index(year)-1]))}.gdx")
             print(f"! Skipping {scen[1]}")
             return
         try:
-            previousInvestments.doItAll(path, scen[1])  # create previousInvestments.gdx
+            print(f"- Running previousInvestments for {scen[1]}")
+            previousInvestments.doItAll(path, scen[1])  # create previousInvestments_***.inc
         except Exception as e:
             print(f"! Failed to run previousInvestments.py for {scen[1]}: \n {format_exc(e)}")
 

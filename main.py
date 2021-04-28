@@ -15,9 +15,9 @@ indicators = ["cost_tot",
               'EB', 'HP',
               ]
 cases = []
-h = 6
+h = 3
 systemFlex = ["lowFlex", "highFlex"]
-modes = ["noFC"]#, "fullFC"]  #, "inertia", "OR", "FCnoPTH", "FCnoH2", "FCnoWind", "FCnoBat", "FCnoSynth"]
+modes = ["noFC", "fullFC", "inertia", "OR"]#, "FCnoPTH", "FCnoH2", "FCnoWind", "FCnoBat", "FCnoSynth"]
 for reg in ["iberia", "brit", "nordic"]:
     for flex in systemFlex:
         for mode in modes:
