@@ -16,7 +16,7 @@ def doItAll(gdxpath, scenario):
 def readResults(gdxpath, scenario):  # search for, and read, previously modelled years of the scenario
     # ws = gams.GamsWorkspace(gdxpath)
     # assume that the year part of the scenario name is surrounded by __ (or _.)
-    year = [i for i in scenario.replace('.', '_').split('_') if "20" in i][0]  # so that this returns an int
+    year = [i for i in scenario.replace('.', '_').split('_') if "20" in i and len(i) is 4][0]  # so that this returns an int
     inv = {}  # investments
     eta = {}  # fuel-to-elec efficiency
     transInv = {}  # transmission capacity investments
