@@ -1,10 +1,13 @@
-import itertools
-import string
 import datetime as dt
-from enum import Enum
+import itertools
 import os
+import string
+from enum import Enum
 
 import pandas
+
+from order_cap import order_cap
+from order_gen import order_gen
 
 
 class TECH(str, Enum):
@@ -76,135 +79,40 @@ thermals = [
     "WA_CHP"
 ]
 
-order = [
-            'bat_discharge',
-            'bat_cap',
-            'efuel',
-            'electrolyser',
-            'EB',
-            'PTES_L',
-            'PTES_L_HX',
-            'TTES',
-            'PTES_M',
-            'PTES_M_HX',
-            'TTES_HX',
-            'BTES',
-            'U',
-            'B',
-            'H',
-            'W',
-            'WA_CHP',
-            'B_CHP',
-            'W_CHP',
-            'H_CHP',
-            'G_CHP',
-            'BCCS',
-            'HCCS',
-            'GCCS',
-            'BWCCS',
-            'BECCS',
-            'HWCCS',
-            'HCCS_flex',
-            'HWCCS_flex',
-            'HWCCS_flex_PS',
-            'WGCCS',
-            'GWGCCS',
-            'GWGCCS_PS',
-            'WG_CHP',
-            'G',
-            'WG',
-            'WG_PS',
-            'WG_peak',
-            'WG_peak_PS',
-            'G_peak',
-            'FC',
-            'RO',
-            'RO_imp',
-            'wind_offshore',
-            'WOFF',
-            'wind_onshore',
-            'WON12', 'WON11', 'WON10', 'WON9', 'WON8', 'WON7', 'WON6', 'WON5', 'WON4', 'WON3', 'WON2', 'WON1'] + \
-        ["WON" + ab + str(dig) for ab in ["A", "B"] for dig in range(5, 0, -1)] + \
-        ["PVPA1",
-         "PVPB1",
-         "PVR1",
-         'RR',
-         'PS',
-         'PV',
-         'PV_cSiOPT',
-         'PV_cSiTWO',
-         'Small_hydro',
-         'backstop',
-         'bat',
-         'bat_PS',
-         'bat_cap_PS',
-         'flywheel',
-         'sync_cond',
-         'curtailment',
-         # 'bat_LiIon',
-         # 'bat_LiIon_PS',
-         # 'bat_flow',
-         # 'bat_flow_PS',
-         # 'bat_flow_cap',
-         # 'bat_flow_cap_PS',
-         'dsm',
-         'H2store',
-         'H2tank',
-         'H2LRC',
-         'RO_imp',
-         'TTES_HP',
-         'PTES_M_HP',
-         'PTES_L_HP',
-         'BTES_HP',
-         'HP',
-         'HP_S',
-         'HP_M',
-         'HP_L',
-         'EB',
-         'HOB_wa_L',
-         'HOB_wa_M',
-         'HOB_bio',
-         'HOB_bio_S',
-         'HOB_bio_M',
-         'HOB_bio_L',
-         'HOB_H_S',
-         'HOB_H_M',
-         'HOB_H_L',
-         'HOB_G',
-         'HOB_WG',
-         'HOB_oil',
-         'GF',
-         'GF_H2',
-         'GF_el',
-         'GF_H2el',
-         'H2heat',
-         'solarheat',
-         'PTES_L_EB',
-         'PTES_M_EB',
-         'TTES_HX_EB',
-         'TTES_EB']
-order_map = {j: i for i, j in enumerate(order)}
-tech_names = {'RO': 'Hydro', 'U': 'Nuclear', 'CHP_wa': 'Waste CHP', 'CHP_bio': 'Woodchip CHP', 'CHP_WG_L': 'Biogas CHP',
+order_map_cap = {j: i for i, j in enumerate(order_cap)}
+order_map_gen = {j: i for i, j in enumerate(order_gen)}
+tech_names = {'RO': 'Hydro', 'U': 'Nuclear',
+              'CHP_wa': 'Waste CHP', 'CHP_bio': 'Woodchip CHP', "G_CHP": "N. Gas CHP", "W_CHP": "Biomass CHP",
+              "WA_CHP": "Waste CHP", "B_CHP": "Lignite CCS", "H_CHP": "Coal CHP", "WG_CHP": "Biogas CHP",
+              'GWGCCS': 'Gas-mix CCS', "BCCS": "Lignite CCS", "HCCS": "Coal CCS", "GCCS": "N. Gas CCS",
+              "BWCCS": "Lignite-biomass mix CCS", "BECCS": "Biomass CCS", "HWCCS": "Coal-biomass mix CCS",
+              "WGCCS": "Biogas CCS",
               "bat_discharge": "Battery (dis)charge", 'WOFF': 'Offshore wind', 'WON': 'Onshore wind',
-              'GWGCCS': 'Gas-mix CCS', 'WG': 'Biogas CCGT', 'WG_peak': 'Biogas GT', 'wind_offshore': 'Offshore wind',
+              'WG': 'Biogas CCGT', 'WG_peak': 'Biogas GT', 'wind_offshore': 'Offshore wind',
               "flywheel": "Flywheel", "bat": "Battery", "sync_cond": "Sync. Cond.",
               'wind_onshore': 'Onshore wind', 'PV_cSiOPT': 'Solar PV', 'EB': 'EB', 'HP': 'HP', 'HOB_WG': 'Biogas HOB',
               'HOB_bio': 'Woodchip HOB', 'solarheat': 'Solar heating', "curtailment": "Curtailment",
-              'Load': 'Load', 'bat_PS': "Battery (PS)", 'bat_cap_PS': "Battery cap (PS)"}
+              'Load': 'Load', 'bat_PS': "Battery (PS)", 'bat_cap_PS': "Battery cap (PS)", 'bat_cap': "Battery cap",
+              "electrolyser": "Electrolyser", "H": "Coal ST", "W": "Biomass ST",
+              "G": "N. Gas CCGT", "G_peak": "N. Gas GT", "PV": "Solar PV", "FC": "Fuel cell",
+              "H2store": "H2 storage",
+              }
 scen_names = {"_pre": "Base case", "_leanOR": "Lean OR", "_OR": "OR", "_OR_fixed": "OR", "_OR_inertia": "OR + Inertia",
               "_OR+inertia_fixed": "OR + Inertia", "_inertia": "Inertia", "_inertia_2x": "2x Inertia",
               "_inertia_noSyn": "Inertia (noSyn)", "_OR_inertia_3xCost": "OR + Inertia (3x)",
               "_inertia_3xCost": "Inertia (3x)", "_inertia_noSyn_3xCost": "Inertia (noSyn) (3x)"}
 color_dict = {'wind_onshore': '#B9B9B9', 'wind_offshore': '#DADADA', 'RO': 'xkcd:ocean blue', 'U': 'xkcd:grape',
               'GWGCCS': 'xkcd:dark peach', 'CHP_wa': 'xkcd:deep lavender', 'CHP_bio': 'xkcd:tree green',
-              'WG': 'xkcd:pea', 'WG_peak': 'xkcd:red', 'PV_cSiOPT': 'xkcd:mustard', 'CHP_WG_L': 'xkcd:mid green',
+              'WG': '#a4be20', 'WG_peak': '#b6cb4d', 'PV_cSiOPT': 'xkcd:mustard', 'CHP_WG_L': 'xkcd:mid green',
               'HP': (255 / 255, 192 / 255, 0), 'EB': (91 / 255, 155 / 255, 213 / 255),
               'CHP_WG': (0, 176 / 255, 80 / 255),
               'HOB_WG': (128 / 255, 128 / 255, 0), 'solarheat': (204 / 255, 51 / 255, 0), 'HOB_bio': 'green',
-              'Load': 'Black', "bat_discharge": "xkcd:amber", 'bat': "xkcd:deep lavender",
-              'bat_PS': "xkcd:deep lavender",
+              'Load': 'Black', "bat_discharge": "xkcd:amber", 'bat': "#714b92",
+              'bat_cap': "#8d5eb7", 'bat_PS': "xkcd:deep lavender",
               'bat_cap_PS': "xkcd:deep lavender", "sync_cond": 'xkcd:aqua', "curtailment": "xkcd:slate",
-              'WOFF': '#DADADA','WON': '#B9B9B9',}
+              'WOFF': '#DADADA', 'WON': '#B9B9B9', "H": "#172226", "W": "#014421",
+              "W_CHP": "#016421", "G": "#5B90F6", "G_peak": "#7B90F6", "G_CHP": "#5BB0F6", "PV": "#FDC12A",
+              "FC": "#c61e66", "H2store": "#ad054d", "electrolyser": "#c00555", }
 
 EPODreg_to_country = {  # dictionary for going between EPODreg to country
     'AT': 'Austria', 'BE': 'Belgium', 'BO': 'Bosnia', 'BG': 'Bulgaria', 'CR': 'Croatia', 'CY': 'Cyprus',
@@ -336,3 +244,16 @@ def append_to_file(filename, scenario, time_to_solve):
              f"{time_to_solve} min\n"
     with open(filename + ".txt", 'a') as f2:
         f2.write(to_add)
+
+
+def add_in_dict(d, key, val, group_vre=False):
+    if group_vre:  # group WONA1, WONA2, ... to "WON"
+        if "WON" in key:
+            key = "WON"
+        elif "PV" in key:
+            key = "PV"
+
+    if key in d:
+        d[key] += val
+    else:
+        d[key] = val
