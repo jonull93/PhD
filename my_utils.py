@@ -100,7 +100,8 @@ tech_names = {'RO': 'Hydro', 'U': 'Nuclear',
 scen_names = {"_pre": "Base case", "_leanOR": "Lean OR", "_OR": "OR", "_OR_fixed": "OR", "_OR_inertia": "OR + Inertia",
               "_OR+inertia_fixed": "OR + Inertia", "_inertia": "Inertia", "_inertia_2x": "2x Inertia",
               "_inertia_noSyn": "Inertia (noSyn)", "_OR_inertia_3xCost": "OR + Inertia (3x)",
-              "_inertia_3xCost": "Inertia (3x)", "_inertia_noSyn_3xCost": "Inertia (noSyn) (3x)"}
+              "_inertia_3xCost": "Inertia (3x)", "_inertia_noSyn_3xCost": "Inertia (noSyn) (3x)", "noFC": "Base",
+              "fullFC": "Inertia+FR", "OR": "FR", "inertia": "Inertia"}
 color_dict = {'wind_onshore': '#B9B9B9', 'wind_offshore': '#DADADA', 'RO': 'xkcd:ocean blue', 'U': 'xkcd:grape',
               'GWGCCS': 'xkcd:dark peach', 'CHP_wa': 'xkcd:deep lavender', 'CHP_bio': 'xkcd:tree green',
               'WG': '#a4be20', 'WG_peak': '#b6cb4d', 'PV_cSiOPT': 'xkcd:mustard', 'CHP_WG_L': 'xkcd:mid green',
@@ -112,7 +113,7 @@ color_dict = {'wind_onshore': '#B9B9B9', 'wind_offshore': '#DADADA', 'RO': 'xkcd
               'bat_cap_PS': "xkcd:deep lavender", "sync_cond": 'xkcd:aqua', "curtailment": "xkcd:slate",
               'WOFF': '#DADADA', 'WON': '#B9B9B9', "H": "#172226", "W": "#014421",
               "W_CHP": "#016421", "G": "#5B90F6", "G_peak": "#7B90F6", "G_CHP": "#5BB0F6", "PV": "#FDC12A",
-              "FC": "#c61e66", "H2store": "#ad054d", "electrolyser": "#c00555", }
+              "FC": "#c61e66", "H2store": "#ad054d", "electrolyser": "#c00555", "BECCS": "#5b9aa0"}
 
 EPODreg_to_country = {  # dictionary for going between EPODreg to country
     'AT': 'Austria', 'BE': 'Belgium', 'BO': 'Bosnia', 'BG': 'Bulgaria', 'CR': 'Croatia', 'CY': 'Cyprus',
@@ -246,12 +247,21 @@ def append_to_file(filename, scenario, time_to_solve):
         f2.write(to_add)
 
 
-def add_in_dict(d, key, val, group_vre=False):
+def add_in_dict(d, key, val, group_vre=False, tech_position=0):
+    is_touple = type(key) == tuple
+    if is_touple:
+        tech = key[tech_position]
+    else:
+        tech = key
     if group_vre:  # group WONA1, WONA2, ... to "WON"
-        if "WON" in key:
-            key = "WON"
-        elif "PV" in key:
-            key = "PV"
+        if "WON" in tech:
+            tech = "WON"
+        elif "PV" in tech:
+            tech = "PV"
+        if is_touple:
+            key = (tech, key[1])
+        else:
+            key = tech
 
     if key in d:
         d[key] += val
