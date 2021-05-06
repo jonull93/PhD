@@ -1,5 +1,4 @@
 import gdxr
-import gdxpds
 from my_utils import write_inc_from_df_columns
 import pandas as pd
 from glob import glob
@@ -7,6 +6,7 @@ from get_from_gams_db import gdx
 
 
 def doItAll(gdxpath, scenario):
+    if gdxpath[-1] != "\\": gdxpath += "\\"
     data, transInv, life = readResults(gdxpath, scenario)  # search for, and read, previously modelled years of the scenario
     writePreviousInvestmentsInc(data, transInv, life, gdxpath, scenario)  # sum the capacities and write gdx-file for the next
     # model-iteration
@@ -25,7 +25,7 @@ def readResults(gdxpath, scenario):  # search for, and read, previously modelled
     for file in glob(gdxpath + "*.gdx"):
         files.append(file.split("\\")[-1])
     for y in range(int(year) - 1, 2019, -1):  # looping through possibly modelled previous years
-        possible_scen = scenario.replace(str(year), str(y))  # replace scenario year with previous possible year
+        possible_scen = scenario.replace(f"_{year}", f"_{y}")  # replace scenario year with previous possible year
         if possible_scen+".gdx" in files:
             with gdxr.GdxFile(gdxpath+possible_scen+".gdx") as f:
                 life = gdx(f,"techprop").loc[:,"life"]
