@@ -219,6 +219,8 @@ EPODreg_to_country = {  # dictionary for going between EPODreg to country
 }
 EPODs = EPODreg_to_country.keys()
 
+scenario_shortening = {"iberia": "IB", "brit": "BR", "nordic": "NE",
+                       "CO2price": "CO2p", "fullFC": "FC", }
 
 def country_to_reg(dictionary, country):
     """

@@ -15,14 +15,16 @@ indicators = ["cost_tot",
               'EB', 'HP',
               ]
 cases = []
-h = 3
+h = 6
+suffix = "CO2"  # Optional suffix for the run, e.g. "test" or "highBioCost"
+suffix = '_'+suffix if len(suffix)>0 else ''
 systemFlex = ["lowFlex", "highFlex"]
-modes = ["noFC", "fullFC", "inertia", "OR"]#, "FCnoPTH", "FCnoH2", "FCnoWind", "FCnoBat", "FCnoSynth"]
+modes = ["noFC", "fullFC","noFC_CO2price05", "fullFC_CO2price05"]  # , "fullFC", "inertia", "OR"]#
 for reg in ["iberia", "brit", "nordic"]:
     for flex in systemFlex:
         for mode in modes:
-            for year in [2030, 2040, 2050]:
-                cases.append(f"{reg}_{flex}_{mode}_{year}{'_'+str(h)+'h' if h>1 else ''}_noLateG_CO2cap2050")
+            for year in [2030]:
+                cases.append(f"{reg}_{flex}_{mode}_{year}{'_'+str(h)+'h' if h>1 else ''}")
 
 # cases.append("OR_ES3_noSyn_noDoubleUse") exec(open("./seasons.py").read()) run_output = input("Enter 'r' to read
 # pickled data, 'w' to (over)write or 'rw' to add missing scenarios: ")
@@ -30,10 +32,14 @@ run_output = "w"
 # run_plots = input('Should we also plot results? Y/N: ')
 run_plots = "n"
 overwrite = []  # [reg+"_inertia_0.1x" for reg in ["ES3", "HU", "IE", "SE2"]]+[reg+"_inertia" for reg in ["ES3", "HU", "IE", "SE2"]]+[reg+"_inertia_noSyn" for reg in ["ES3", "HU", "IE", "SE2"]]
-name = f"results_{h}h_noLateG_CO2cap2050"  # this will be the name of the file: output_%NAME%.xlsx
-if "PLIA" in os.environ['COMPUTERNAME']:
+name = f"results_{h}h{suffix}"  # this will be the name of the file: output_%NAME%.xlsx
+comp_name = os.environ['COMPUTERNAME']
+if "PLIA" in comp_name:
     path = "C:\\Users\\Jonathan\\Box\\python\\output\\"
     gdxpath = "C:\\git\\multinode\\"  # where to find gdx files
+elif "QGTORT8" in comp_name:
+    path = "C:\\Users\\Jonathan\\git\\python\\output\\"
+    gdxpath = "C:\\Users\\Jonathan\\git\\multinode\\"  # where to find gdx files
 else:
     path = "D:\\Jonathan\\python\\output\\"
     gdxpath = "D:\\Jonathan\\multinode\\"

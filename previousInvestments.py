@@ -33,6 +33,9 @@ def readResults(gdxpath, scenario):  # search for, and read, previously modelled
                 inv[y] = gdx(f,"v_newcap").level  # (tech,region):level
                 inv[y] = inv[y][inv[y].index.isin(I_reg,level=1)]  # filter out regions not in I_reg
                 inv[y] = inv[y][inv[y]!=0].to_dict()  # filter out entries with 0 capacity
+                if gdx(f,"v_totcost").level <= 0.01:
+                    print(f"! {possible_scen} seems to have failed as totcost={gdx(f,'v_totcost').level} and inv = {inv[y]}\n! Will now throw error to stop this thread :(")
+                    raise ValueError
                 eta[y] = gdx(f,"eta_el").loc[:,:,str(y)].to_dict()  # (tech,region):value
                 transInv[y] = gdx(f,"v_newcon").level.to_dict()  # (tech_con,region,region):level
                 data[y] = {"inv": {key: inv[y][key] for key in inv[y]}, "eta": {key: eta[y][key] for key in inv[y]}}
@@ -77,7 +80,9 @@ def writePreviousInvestmentsInc(data, transInv, life, gdxpath, scenario):  # sum
                 addEntry(transInv[investmentYear][key], key, transInvToSave)
 
     df_inv = pd.Series(invToSave).reset_index()
-    df_inv.columns = ["tech", "region", "value"]
+    try: df_inv.columns = ["tech", "region", "value"]
+    except ValueError:
+        print("! Caught error in trying to give df_inv 3 columns. Here's what df_inv looked like:", df_inv)
     df_eta = pd.Series(etaToSave).reset_index()
     df_eta.columns = ["tech", "region", "value"]
     df_trans = pd.Series(transInvToSave).reset_index()

@@ -1,19 +1,14 @@
 # Written by Jonathan Ullmark, please let me know if you found this useful
-import datetime as dt
-import os, sys
-import random
-import threading
-import time as tm
+import os, sys, random, threading, psutil, gams
+import datetime as dt, time as tm
 from itertools import product
 from queue import Queue
-import psutil
-import gams
 from glob import glob
-import previousInvestments
 from traceback import format_exc
 from my_utils import append_to_file
+import previousInvestments
 
-print("Script started at", dt.datetime.now().strftime('%H:%M:%S'))
+print("Script started at", dt.datetime.now().strftime('%m/%d/%Y, %H:%M:%S'))
 
 if "C18" in os.environ['COMPUTERNAME']:  # This allows you to change path depending on which computer you run script from
     path = "C:\\models\\multinode\\"  # where your main-file is located
@@ -32,15 +27,18 @@ def combinations(parameters):  # Create list of parameter combinations
 
 
 followUp_run = True  # if True and len(years)<1, will look for previous years for the given year
-years = [2030, 2040, 2050]
+years = [2030]#[2020, 2030, 2040, 2050]
 # set followUp_run to False if we are running first year and forgot to change followUp_run to false manually
 if followUp_run: followUp_run = 2030 not in years
-regions = ["nordic", "brit", "iberia"]  # ["SE2","HU","ES3","IE"]
+regions = ["nordic", "brit", "iberia"]
 systemFlex = ["lowFlex", "highFlex"]
-modes = ["noFC", "fullFC", "inertia", "OR"]#, "FCnoPTH", "FCnoH2", "FCnoWind", "FCnoBat", "FCnoSynth"]
-timeResolution = 3
+modes = ["noFC"]#, "fullFC_energyRes", "fullFCnoSynth", "OR", "inertia", "fullFCnoWind", "fullFCnoBat", "fullFCnoPTH", "fullFCnoH2", "fullFCnoBEV", "fullFCnoTrans"]
+timeResolution = 6
 HBresolutions = [26]
-cores_per_scenario = 3  # the 'cores' in gams refers to logical cores, not physical
+CO2price = 1
+if CO2price != 1: modes = [mode+f"_CO2price{CO2price}".replace(".", "") for mode in modes]
+
+cores_per_scenario = 4  # the 'cores' in gams refers to logical cores, not physical
 core_count = psutil.cpu_count()  # add logical=False to get physical cores
 
 scenarios = {}
@@ -51,11 +49,15 @@ scenarios = {}
 
 for flex in systemFlex:
     for mode in modes:
-        if "low" in flex.lower() and "noH2" in mode:
-            continue  # lowFlex means no H2storage, so FC from electrolysers seems less reasonable
+        if "low" in flex.lower():
+            if "noH2" in mode:
+                continue  # lowFlex means no H2storage, so FC from electrolysers seems less reasonable
+            elif "noBEV" in mode:
+                continue  # there is no BEV FC in lowFlex anyway
         for region in regions:
             for HBres in HBresolutions:
                 for year in years:
+                    if "high" in flex.lower() and year == 2020: continue  # skip - no such coupling today
                     scenarioname = f"{region}_{flex}_{mode}_{year}" \
                                    f"{'' if timeResolution == 1 else '_' + str(timeResolution) + 'h'}"
                     scenarios[scenarioname] = \
@@ -64,14 +66,16 @@ for flex in systemFlex:
 $setglobal scenario "{scenarioname}"
 $setglobal current_year {year}
 $setglobal region {region}
-$setglobal OR {"yes" if "OR" in mode or "fullFC" in mode else "no"}
 $setglobal inertia {"yes" if "inertia" in mode.lower() or "fullFC" in mode else "no"}
+$setglobal OR {"yes" if "OR" in mode or "fullFC" in mode else "no"}
 $setglobal systemFlex {'yes' if "highflex" in scenarioname.lower() or "fullflex" in scenarioname.lower() else 'no'}
-$setglobal synthetic_inertia {"no" if "FCnoSyn" in mode else "yes"}
+$setglobal synthetic_inertia {"no" if "FCnoSynth" in mode else "yes"}
 $setglobal PtH_FC {"no" if "FCnoPTH" in mode else "yes"}
 $setglobal electrolyser_FR {"no" if "FCnoH2" in mode else "yes"}
 $setglobal wind_FC {"no" if "FCnoWind" in mode else "yes"}
 $setglobal bat_FC {"no" if "FCnoBat" in mode else "yes"}
+$setglobal BEV_FC {"no" if "FCnoBEV" in mode else "yes"}
+$setglobal trans_FR {"no" if "FCnoTrans" in mode else "yes"}
 
 *--  Sensitivity analysis settings
 $setglobal OR_energyReservation {"yes" if "energyRes" in mode else "no"} 
@@ -80,8 +84,9 @@ $setglobal inertia_scaling {"2" if "2xInertia" in mode else "1"}
 $setglobal forecast_scaling 1
 $setglobal flywheel_price_scaling 1
 $setglobal sync_cond_price_scaling 1
+$setglobal CO2_price_scaling {CO2price}
 $setglobal onshore_storage "no"
-$setglobal H2demand 0.2
+$setglobal H2demand 0
 
 *--  Other model settings
 $setglobal ancillary_services yes
@@ -91,7 +96,9 @@ $setglobal first_iteration {'yes' if year == years[0] and not followUp_run else 
 $setglobal cores {cores_per_scenario}
 $setglobal double_use {"no" if "noDoubleUse" in mode else "yes"}
 $setglobal SNSP no
-$setglobal EV_AGG {'no' if 'noEV' in scenarioname else 'yes'}
+$setglobal EV_AGG {'no' if 'noTransport' in scenarioname else 'yes'}
+$setglobal TES no
+$setglobal H2heat no
 $setglobal heatBalance {'no' if 'noHB' in scenarioname else 'yes'}
 $setglobal hour_resolution {timeResolution}
 $setglobal heatBalancePeriods {HBres}
@@ -102,9 +109,12 @@ num_threads = int(min(core_count/(cores_per_scenario-0.5), len(scenarios)/len(ye
 # The "optimal" number of threads depends on your hardware and model
 # but nr of cores /2 seems good unless you hit RAM limit
 
-print("Number of scenarios:", len(scenarios))
 multipleYears = len(years) > 1
 if multipleYears: print(" Multiple years detected, will run previousInvestments.py in-between runs")
+
+print(" ~ Number of scenarios:", len(scenarios), "~")
+print(f"Heat-balance periods = {HBresolutions} (once every {[52/i for i in HBresolutions]} weeks)")
+print(f"CO2-scaling = {CO2price} \n..")
 
 # create .inc file for each scenario
 for scen in scenarios:
@@ -167,7 +177,7 @@ def crawl(q, ws, io_lock):
                     print(f"! Did not find {nextscenario} in scenarios")
         q.task_done()  # signal to the queue that task has been processed
     if q.empty():
-        print(f"- Queue is now empty -\nIn progress: {', '.join(in_progress)}")
+        print(f"- Queue is now empty, but these are still running: {', '.join(in_progress)}")
     return True
 
 
@@ -207,9 +217,8 @@ def run_scenario(workspace, io_lock, scen):
     job.run(opt, create_out_db=False)
     io_lock.acquire()  # we need to make the ouput a critical section to avoid messed up report information
     print("-- Thread", thread_nr[threading.get_ident()], "finished", scen[1], "(#" + str(scen[0]) + ") at",
-          dt.datetime.now().strftime('%H:%M:%S'))
+          dt.datetime.now().strftime('%H:%M:%S'), "after", str(round((tm.time() - starttime[scen[0]]) / 60, 1)), "min")
     append_to_file("time_to_solve", scen[1], round((tm.time() - starttime[scen[0]]) / 60, 1))
-    print("-- Time to solve: ", str(round((tm.time() - starttime[scen[0]]) / 60, 1)), "min")
     io_lock.release()
 
 
