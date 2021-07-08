@@ -56,7 +56,7 @@ for reg, reg_gdp in gdp.items():
 techs = ["WON" + ab + str(dig) for dig in range(5, 0, -1) for ab in ["A", "B"]]
 WON_pot = {reg: {tech: 0 for tech in techs} for reg in gdp}
 WOFF_pot = {reg: {'WOFF': 0} for reg in gdp}
-cap_density_WON = 0.1  # almost completely arbitrary numbers ¯\_(ツ)_/¯
+cap_density_WON = 0.1  # area utility factor, almost completely arbitrary numbers ¯\_(ツ)_/¯
 cap_density_WOFF = 0.33
 
 with open(inc_path+"capacity_Windonshore.inc") as reader:
@@ -95,27 +95,29 @@ def filler(amount, destinations, weights, limits):
     in a country while taking gdp into account for subregions
     """
     regs = list(limits.keys())
-    print(f"Starting to fill {regs}")
+    print(f"Starting to allocate {amount} in {regs}")
+    old_cap = sum(x for counter in destinations.values() for x in counter.values())
+    to_fill = amount
     techs = list(limits[regs[0]].keys())
     spareRoomTech = {reg: {tech: limits[reg][tech] for tech in techs} for reg in regs}
-    while amount > 0:  # while there still is amount left to allocate
+    while to_fill > 0:  # while there still is to_fill left to allocate
         for tech in techs:  # first, prioritize filling the first tech in each region before moving on to next tech
-            if amount <= 0: continue  # no need to do anything if we've already used up 'amount' in previous tech
+            if to_fill <= 0: continue  # no need to do anything if we've already used up 'to_fill' in previous tech
             loopRegs = regs
             print(
-                f"-- Starting to fill {tech} with {amount} and spare room {round(sum([spareRoomTech[reg][tech] for reg in loopRegs]), ndigits=3)}")
-            while sum([spareRoomTech[reg][tech] for reg in loopRegs]) > 0 and amount > 0:
+                f"-- Starting to fill {tech} with {to_fill} and spare room {round(sum([spareRoomTech[reg][tech] for reg in loopRegs]), ndigits=3)}")
+            while sum([spareRoomTech[reg][tech] for reg in loopRegs]) > 0 and to_fill > 0:
                 # we use another while-loop since we allocate according to gdp ratios (weights)
                 # this may result in some regs hitting their lim while others didnt
-                # so we loop until all regs are full for this tech, or we used all the amount to allocate
+                # so we loop until all regs are full for this tech, or we used all the to_fill to allocate
                 filled = 0
                 loopRegs = [reg for reg in regs if spareRoomTech[reg][tech] > 0]
                 loopWeights = newWeights({reg: weights[reg] for reg in loopRegs})
-                # print(f"Amount left: {amount}, with weights: {loopWeights}")
+                # print(f"to_fill left: {to_fill}, with weights: {loopWeights}")
                 # print(f"Spare room: {spareRoomTech}")
                 for reg in loopRegs:
                     lim = spareRoomTech[reg][tech]
-                    regFill = amount * loopWeights[reg]
+                    regFill = to_fill * loopWeights[reg]
                     # print(f"At {reg} with {lim} room left and {regFill} to put in it")
                     if regFill < lim:
                         destinations[reg][tech] = regFill
@@ -125,7 +127,12 @@ def filler(amount, destinations, weights, limits):
                         destinations[reg][tech] = lim
                         filled += lim
                         spareRoomTech[reg][tech] = 0
-                amount -= filled
+                to_fill -= filled
+    diff = round(sum(x for counter in destinations.values() for x in counter.values()) - old_cap,4)
+    error = diff-amount > 0.01
+    if error:
+        print(old_cap,sum(x for counter in destinations.values() for x in counter.values()),amount)
+        raise ArithmeticError
     print(f"Finished {regs}")
     return destinations
 
