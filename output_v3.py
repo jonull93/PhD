@@ -14,22 +14,20 @@ import numpy as np
 from get_from_gams_db import gdx
 from copy import copy
 from main import overwrite, path, indicators, old_data, run_output, cases, name, gdxpath
-from my_utils import TECH, order, order_map, scenario_shortening
-
-if "todo_gdx" in locals():
-    raise SystemExit
+from my_utils import TECH, order_map_cap
 
 print("Excel-writing script started at", datetime.now().strftime('%H:%M:%S'))
+if "todo_gdx" in locals():
+    exit()  # for some reason this script gets run twice sometimes so this stops that
 
-
-def print_gen(sheet, df, gamsTimestep, row_inc=1):
+def print_gen(sheet, df, gamsTimestep):
     global scen_row
-    df["sort_by"] = df.index.get_level_values(0).map(order_map)
+    df["sort_by"] = df.index.get_level_values(0).map(order_map_cap)
     df.sort_values("sort_by", inplace=True)
     df.drop(columns="sort_by", inplace= True)
     df = df.reorder_levels(["I_reg", "tech"]).sort_index(level=0, sort_remaining=False)
     df.to_excel(writer, sheet_name=sheet, freeze_panes=(0, 2), startrow=scen_row, startcol=1)
-    scen_row += len(df.index) + row_inc
+    scen_row += len(df.index)+1
 
 
 def print_df(df, name, sheet, col=3, header=True, row_inc=1):
@@ -184,7 +182,7 @@ def run_case(scen, data, gdxpath):
             allstorage = gdx(f, "allwind")
             withdrawal_rate = gdx(f, "withdrawal_rate")
             FLH = gdx(f, "o_full_load_hours").rename("FLH")
-            FLH_regional = gdx(f, "o_full_load_hours_regional").rename("FLH")
+            FLH_regional = gdx(f, "o_full_load_hours_regional").rename("FLH_regional")
             PV_FLH = gdx(f, "o_full_load_PV")
             wind_FLH = gdx(f, "o_full_load_wind")
             el_price = gdx(f, "o_el_cost")
@@ -196,14 +194,14 @@ def run_case(scen, data, gdxpath):
                 ESS_available = gdx(f, "o_PS_ESS_available")
                 inertia_available = gdx(f, "o_PS_inertia_available")
                 inertia_available_thermals = gdx(f, "o_PS_inertia_thermal")
-                inertia_available_PtH = gdx(f, "o_PS_inertia_PtH")
-                inertia_available_BEV = gdx(f, "o_PS_inertia_BEV")
                 inertia_available_wind = gdx(f, "o_PS_inertia_wind")
-                inertia_available_ESS = gdx(f, "o_PS_inertia_ESS")
+                inertia_available_PTH = gdx(f, "o_PS_inertia_PTH")
+                inertia_available_BEV = gdx(f, "o_PS_inertia_BEV")
                 inertia_demand = gdx(f, "PS_Nminus1")
                 OR_demand_VRE = gdx(f, "o_PS_OR_demand_VRE")
                 OR_demand_other = gdx(f, "PS_OR_min")
                 OR_available = gdx(f, "o_PS_OR_available")
+                OR_deficiency = gdx(f, "v_PS_OR_deficiency").level
                 OR_available_thermal = gdx(f, "o_PS_OR_available_thermal")
                 OR_net_import = gdx(f, "o_PS_OR_net_import")
                 OR_cost = gdx(f, "o_PS_OR_cost")
@@ -244,10 +242,8 @@ def run_case(scen, data, gdxpath):
         return True
 
 
-def excel(scen, data, row):
+def excel(scen:str, data, row):
     global scen_row
-    for key, val in scenario_shortening.items():
-        scen.replace(key,val)
     scen_row = 0
     cap = data["tot_cap"].rename("Cap").round(decimals=3)
     cap = cap[cap!=0]
@@ -263,8 +259,9 @@ def excel(scen, data, row):
     except KeyError:
         print(f"! Could not find tech in gen.index, {scen} probably failed the gams run.")
         return
-    print_num([scen], "Indicators", row + 1, 0, 0)
-    c = 1
+    for i, scen_part in enumerate(scen.split('_')):  # split up the scenario name on _s
+        print_num([scen_part], "Indicators", row + 1, i, 0)
+    c = i+1
 
     for indicator in indicators:
         # print(data[k][i])
@@ -283,13 +280,11 @@ def excel(scen, data, row):
             if isinstance({}, ind_type): print(thing.keys())
         c += 1
 
-    scen = scen.replace("_3h", "").replace("_6h", "").replace("_12h", "")  # we don't need _3h in sheet names
     cap_len = len(cap.index.get_level_values(0).unique())+1
     reg_len = len(cap.index.get_level_values(1).unique())+1
-    try:
-        cappy = cap.to_frame(name="Cap").join(new_cap).join(share).join(FLH_regional)
-    except Exception as e: print(e,new_cap,share,FLH)
-    cappy["sort_by"] = cappy.index.get_level_values(0).map(order_map)
+    try: cappy = cap.to_frame(name="Cap").join(new_cap).join(share).join(FLH_regional)
+    except: print(cap,new_cap,share,FLH_regional)
+    cappy["sort_by"] = cappy.index.get_level_values(0).map(order_map_cap)
     cappy.sort_values("sort_by", inplace=True)
     cappy.drop(columns="sort_by", inplace=True)
     cappy = cappy.reorder_levels(["I_reg", "tech"]).sort_index(level=0, sort_remaining=False)
@@ -299,9 +294,12 @@ def excel(scen, data, row):
     scen_row += cap_len+2
     print_df(data["curtailment_profile_total"].round(decimals=3), "Curtailment", scen)
     print_df(data["el_price"].round(decimals=3), "Elec. price", scen, row_inc=2)
-    print_gen(scen, gen, data["gamsTimestep"], row_inc=2)
+
+    print_gen(scen, gen, data["gamsTimestep"])
+
     if data["PS"]:
         print_df(data["OR_available"].round(decimals=3), "OR: Available", scen, row_inc=2)
+        print_df(data["OR_deficiency"].round(decimals=2), "OR: Deficiency", scen, header=False)
         print_df(data["OR_net_import"].round(decimals=3), "OR: Net-import", scen, header=False)
         print_df(data["OR_demand"]["wind"].round(decimals=3), "OR demand: Wind", scen, header=True)
         print_df(data["OR_demand"]["PV"].round(decimals=3), "OR demand: PV", scen, header=True)
@@ -311,6 +309,7 @@ def excel(scen, data, row):
         print_df(data["inertia_available_thermals"].round(decimals=3), "Inertia: Thermals", scen, header=True, row_inc=2)
     else:
         print("PS variables were not available for", scen)
+
 
 
 
@@ -378,7 +377,7 @@ for scen in todo_gdx:
 pickle.dump(old_data, open("PickleJar\\data_" + name + ".pickle", "wb"))
 # for scen in file_list: run_case([0,scen], data, path, io_lock, True)
 
-print("Finished the queue after", str(round((tm.time() - starttime["start"]) / 60, 2)),
+print("Finished the queue after ", str(round((tm.time() - starttime["start"]) / 60, 2)),
       "minutes - now saving excel file!")
 worksheet = writer.sheets["Indicators"]
 worksheet.column_dimensions["A"].width = 20

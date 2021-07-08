@@ -15,15 +15,15 @@ indicators = ["cost_tot",
               'EB', 'HP',
               ]
 cases = []
-h = 6
-suffix = "CO2"  # Optional suffix for the run, e.g. "test" or "highBioCost"
+h = 3
+suffix = ""  # Optional suffix for the run, e.g. "test" or "highBioCost"
 suffix = '_'+suffix if len(suffix)>0 else ''
 systemFlex = ["lowFlex", "highFlex"]
-modes = ["noFC", "fullFC","noFC_CO2price05", "fullFC_CO2price05"]  # , "fullFC", "inertia", "OR"]#
+modes = ["noFC", "fullFC"]  # , "fullFC", "inertia", "OR"]#
 for reg in ["iberia", "brit", "nordic"]:
     for flex in systemFlex:
         for mode in modes:
-            for year in [2030]:
+            for year in [2020,2030,2040]:
                 cases.append(f"{reg}_{flex}_{mode}_{year}{'_'+str(h)+'h' if h>1 else ''}")
 
 # cases.append("OR_ES3_noSyn_noDoubleUse") exec(open("./seasons.py").read()) run_output = input("Enter 'r' to read
