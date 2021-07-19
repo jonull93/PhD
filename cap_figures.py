@@ -1,123 +1,294 @@
-import pickle  # for dumping and loading variable to/from file
-
+import pickle
 import matplotlib.pyplot as plt
-from my_utils import order as tech_order, tech_names, color_dict
-# try: type(folder)
-# except: folder = "figures/"
-try:
-    _ = data.keys()  # if we ran this file from elsewhere with data already loaded, then this will work
-except:
-    data = pickle.load(open("PickleJar\\data_PS_base.pickle", "rb"))  # and then this wont run
-# tech_order = pickle.load(open("tech_order.pickle","rb")) #creates order list
+import pandas as pd
+from matplotlib.colors import to_rgb
+from matplotlib.patches import Patch
+import matplotlib.gridspec as gridspec
+import os
 
-cases = []
-reg_names = {"ES3": "Solar", "HU": "Inland", "IE": "Wind", "SE2": "Hydro+wind"}
-for reg in ["ES3", "HU", "SE2", "IE"]:
-    scenarios = []
-    folder = "figures\\" + reg + "_curves\\"
-    name = "cap_" + reg + ""
-    for scen in ["reg_pre", "reg_OR", "reg_OR_inertia", "reg_inertia", "reg_inertia_noSyn"]:  # ["reg_pre","reg_leanOR",
-        # "reg_OR", "reg_OR+inertia","reg_inertia","reg_inertia_noSyn","reg_inertia_2x"]
-        scenarios.append(scen.replace("reg", reg))
-    scenario_names = ["Base case", "OR", "OR + Inertia", "Inertia",
-                      "Inertia (noSyn)"]  # , "SNSP limit (65%)"]#, "SE_pre", "SE_DR", "SE_VT", "SE_DR+VT"]
-    variants = [""]
-    file_list = []
-    for i in scenarios:
-        for j in variants:
-            file_list.append(i + j)
+#os.chdir(r"C:\Users\Jonathan\Box\python")  # not needed unless running line-by-line in a console
+path_to_this_script = os.path.abspath(os.getcwd()) #instead of hardcoding C:\Users\Jonathan\Box\python
 
-    tech = []  # list of all technologies used in all scenarios OBS: not sorted according to tech_order
-    patterns = ['/', '\\', '|', '-', '+', 'x', '.', '//', '||', '--', 'o', '.', 'x'] * 2
-    # exclude_tech = ["efuel", "H2LRC","GF"] + allwind + CHP_wa + CHP_bio + HP + HOB_bio + TES
-    for i in file_list:
-        allwind = data[i]['allwind']
-        exclude_tech = ["efuel", "H2LRC", "H2tank", "GF", "GF_H2", "GF_el", "GF_H2el", "RO_imp", "RO", "bat_flow", "bat_flow_cap",
-                        "bat_LiIon", "bat", "bat_cap"] + allwind
-        cap = data[i]['cap']  # dictionary with all capacities in scenario i
-        for j in cap:
-            if (j not in tech) and (j not in exclude_tech) and (cap[j] > 0):
-                tech.append(j)
-        if "wind_offshore" not in tech and cap["WOFF"] > 0:
-            tech.append('wind_offshore')
-            print("found offshore wind in", reg)
+from my_utils import color_dict, order_cap, add_in_dict, tech_names, scen_names
 
-    tech.append('wind_onshore')
+pickleJar = ""
+data = pickle.load(open(path_to_this_script+r"\PickleJar\data_results_6h.pickle", "rb"))
 
-    w = 0.65
-    c = 0
-    uniques1 = []
-    line1 = []
-    # fig1 = plt.figure(1)
-    # ax1 = plt.subplot(111)
-    fig1, ax1 = plt.subplots(ncols=1, nrows=1, figsize=(6, 7.5))
-    plt.title(f"Cost-optimal capacities: $\it{reg_names[reg]}$", fontsize=14)
-    # label_axes(fig1,loc=(-0.17,0.5)) #THIS PART ADDS LABELS TO SUBPLOTS: a), b) etc
-    for k in file_list:
-        # print("working on "+k+" with a total cost of "+str(data[k]['cost_tot'][0]))
-        allwind = data[k]['allwind']
-        onwind = [i for i in allwind if "OFF" not in i]
-        cap = {x: data[k]['cap'][x] for x in data[k]['cap'] if data[k]['cap'][x] > 0 and x not in exclude_tech}  # dictionary[
-    # tech] = FLOAT
-        cap['wind_onshore'] = sum([data[k]['cap'][y] for y in onwind])
-        cap['wind_offshore'] = data[k]['cap']['WOFF']
-        if data[k]['cap']['RO'] + data[k]['cap']['RO_imp'] > 0:
-            cap["RO"] = data[k]['cap']['RO'] + data[k]['cap']['RO_imp']
-        cap["bat"] = data[k]['cap']['bat_cap']  # + data[k]['cap']['bat_flow_cap']
-        if "flywheel" in cap: cap["flywheel"] = cap["flywheel"] * 6
+H2 = ['electrolyser', 'H2store', 'FC']
+bat = ['bat', 'bat_cap']
+VMS = [tech_names[i] for i in H2 + bat] + [i for i in H2 + bat]
+"""
+noFlex = data["iberia_lowFlex_noFC_2030_6h"]
+highFlex = data["iberia_highFlex_noFC_2030_6h"]
+base_cases = [noFlex, highFlex]
+cap_noFlex = noFlex["new_cap"].level[noFlex["new_cap"].level != 0]  # from v_newcap, pick the level and drop all 0-rows
+cap_highFlex = highFlex["new_cap"].level[highFlex["new_cap"].level != 0]
+cap_cases = [cap_noFlex, cap_highFlex]
+cap_dict = {"noFlex": {}, "highFlex": {}}
+for cap, case in zip(cap_cases, ["noFlex", "highFlex"]):
+    cap.index.set_names(["Tech", "Region"], inplace=True)
+    cap = cap.swaplevel(i=0, j=1)
+    cap = cap.sum(level=1)
+    for tech in order_cap:
+        if tech in cap.index:
+            val = cap[tech]
+            add_in_dict(cap_dict[case], tech, val, group_vre=True)
 
-        c += 1
-        bar1 = []  # originally non-TES and TES, but these two vectors can still be useful for comparing the capacities with or without an implementation
-        bar2 = []
-        # print('-- ',k)
-        cruched = 0
-        for i in [j for j in tech_order if j in cap and cap[j] > 0]:
-            if cap[i] > 50 or (cap[i] > 25 and ("IE" in k or "HU" in k)):
-                bar1.append(cap[i] / 10)
-                crunched = i
-            else:
-                bar1.append(cap[i])
-                crunched = 0
+techs = []
+pretty_techs = []
+for tech in order_cap:
+    if tech in cap_dict["noFlex"] or tech in cap_dict["highFlex"]:
+        techs.append(tech)
+        pretty_techs.append(tech_names[tech])
 
-            if i not in uniques1:  # this makes sure we add all unique entries to a list ("line") so that we can make a legend with only unique entries
-                uniques1.append(i)
-                line1.append(ax1.bar(c, bar1[-1], width=w - 0.008, align='center', color=color_dict[i], bottom=sum(bar1) - bar1[
-                    -1]))
-            else:
-                ax1.bar(c, bar1[-1], width=w - 0.008, align='center', color=color_dict[i], bottom=sum(bar1) - bar1[-1])
-            if round(bar1[-1], 2) > 0.1 or (reg == "HU" and round(bar1[-1], 2) > 0.05):
-                if i in ['wind_onshore', 'wind_offshore', 'PV_cSiOPT', 'WG', 'GWGCCS', 'WG_peak', 'FC', 'flywheel', 'sync_cond']:
-                    txt = ax1.text(c, sum(bar1) - bar1[-1] / 2, round(bar1[-1], 2), ha="center", va="center", color="black",
-                                   fontsize=10)
-                elif i == 'bat':
-                    txt = ax1.text(c, sum(bar1) - bar1[-1] / 2, f"{round(bar1[-1], 2)}\n({round(data[k]['cap']['bat'], 1)})",
-                                   ha="center", va="center", color="black", fontsize=10)
-                elif i == crunched:
-                    txt = ax1.text(c, sum(bar1) - bar1[-1] / 2, round(bar1[-1] * 10, 1), ha="center", va="center", color="white",
-                                   fontsize=10)
+print(techs, "\n", pretty_techs)
+colors = [[color_dict[tech] for tech in dic] for dic in cap_dict.values()]
+for case, dic in cap_dict.items():
+    for tech in dic.copy():
+        dic[tech_names[tech]] = dic.pop(tech)
+
+allcolors = [to_rgb(color_dict[tech]) for tech in techs]
+s_noFlex = pd.Series(cap_dict["noFlex"])
+s_highFlex = pd.Series(cap_dict["highFlex"])
+fig, (ax_noFlex, ax_highFlex) = plt.subplots(nrows=2, ncols=2, figsize=(9, 6))
+ax_noFlex[0].set_box_aspect(2)
+ax_highFlex[0].set_box_aspect(2)
+df_noFlex = s_noFlex.to_frame(name="Gen")
+df_highFlex = s_highFlex.to_frame(name="Gen")
+df_VMS_noFlex = s_noFlex.to_frame(name="VMS").drop(labels=[i for i in s_noFlex.index if i not in VMS], errors="ignore")
+df_VMS_highFlex = s_highFlex.to_frame(name="VMS").drop(labels=[i for i in s_highFlex.index if i not in VMS], errors="ignore")
+for df in [df_noFlex, df_highFlex]:
+    for tech in df.index:
+        if tech in VMS:
+            df.loc[tech] = 0
+df1 = df_noFlex.join(df_VMS_noFlex)
+a = df1.T.plot(kind="bar", stacked=True, color=colors[0], ax=ax_noFlex[0], legend=False, width=0.9, rot=0)
+a.set_ylabel("Installed capacity [GW(h)]")
+df2 = df_highFlex.join(df_VMS_highFlex)
+b = df2.T.plot(kind="bar", stacked=True, color=colors[1], ax=ax_highFlex[0], legend=False, width=0.9, rot=0)
+b.set_ylabel("Installed capacity [GW(h)]")
+plt.show()
+fig.savefig("figures/testcap.png", bbox_inches="tight")
+"""
+
+position = 0
+
+
+def add_fig_line(fig, orientation="horizontal"):
+    if orientation.lower() in ["horizontal", "h"]:
+        x = [0.05, 0.95]
+        y = [0.5, 0.5]
+    elif orientation.lower() in ["vertical", "v"]:
+        x = [0.33, 0.33]
+        y = [0.95, 0.05]
+
+    # rearrange the axes for no overlap
+    fig.tight_layout()
+
+    # Draw a horizontal lines at those coordinates
+    line = plt.Line2D(x, y, transform=fig.transFigure, color="black", linewidth=1, linestyle="--")
+    fig.add_artist(line)
+
+
+def plot_cap_singleyear(ax, data, scen, new=False):
+    global position
+    if new:
+        cap = data[scen]["new_cap"].level
+        cap = cap[cap != 0]
+    else:
+        cap = data[scen]["tot_cap"]
+
+    cap = cap.swaplevel(i=0, j=1).sum(level=1)
+    cap_dict = {}
+    for tech in order_cap:
+        if tech in cap.index:
+            val = cap[tech]
+            add_in_dict(cap_dict, tech, val, group_vre=True)
+    cap = pd.Series(cap_dict, name="Cap")
+    colors = [color_dict[tech] for tech in cap.index]
+    df_gen = cap.to_frame(name="Gen")
+    for tech in [t for t in df_gen.index if t in VMS]:  # doing this instead of .drop maintains tech order and colors
+        df_gen.loc[tech] = 0
+    df_VMS = cap.to_frame(name="VMS").drop(labels=[i for i in cap.index if i not in VMS], errors="ignore")
+    df = df_gen.join(df_VMS)
+    plot = df.T.plot(kind="bar", stacked=True, color=colors, legend=False, width=0.9, rot=0, ax=ax)
+    return plot, list(df.index)
+
+
+# noinspection DuplicatedCode
+def plot_cap_multipleyears(ax, data, scenario, years=None, new=True, patterns=None,
+                           comparison_data=pd.Series({(None, None): None}), ylabel=False, y2label=False):
+    """
+
+    Parameters
+    ----------
+    ax          - Axes to plot on
+    data        - dictionary with data for scenarios
+    scenario    - scenario to plot for (formatted with 'YEAR' instead of the actual year)
+    years       - will be [2030, 2040, 2050] if none are given
+    new         - if True, will plot newcap instead of totalcap for base case
+    patterns
+    comparison_data
+    ylabel (bool for "Capacity diff. [GW]", or string for custom ylabel)
+    y2label
+
+    Returns
+    -------
+    plotted technologies and dataframe with all capacities to use for diff-plot
+
+    """
+    if years is None:
+        years = [2030, 2040, 2050]
+    if patterns is None:
+        patterns = ['X', '/', '']
+    if ylabel == True:
+        ylabel = "Capacity diff. [GW]"
+    if y2label == True:
+        y2label = "Capacity diff. [GW(h)]"
+        # doing it this round-about way ensures that changing the patterns/years for one function-call won't linger
+        # in the next function call (google "Default arguments value is mutable")
+
+    comparison = len(comparison_data) > 1  # True if comparison_data is longer than 0
+
+    cap = {}
+    for y in years:
+        scen = scenario.replace("YEAR", str(y))
+        if scen not in data:
+            years.remove(y)
+            print(f"! Did not find {scen.replace('YEAR', str(y))} in the data")
+        elif new:
+            foo = data[scen]["new_cap"].level
+            cap[y] = foo[foo != 0].swaplevel(i=0, j=1).sum(level=1)
+        else:
+            cap[y] = data[scen]["tot_cap"].swaplevel(i=0, j=1).sum(level=1)  # summed over regions
+    cap_summed = {}
+    for tech in order_cap:
+        for year in years:
+            if tech in cap[year].index or (tech,year) in comparison_data.index:
+                if tech not in cap[year].index:
+                    val = 0
                 else:
-                    txt = ax1.text(c, sum(bar1) - bar1[-1] / 2, round(bar1[-1], 2), ha="center", va="center", color="white",
-                                   fontsize=10)
+                    val = cap[year][tech]
+                if (tech, year) not in comparison_data.index:
+                    val2 = 0  # this will always happen if comparison_data is not given, so the val-val2=val
+                else:
+                    val2 = comparison_data.loc[(tech,year)].sum()
+                to_add = val-val2 if abs(val-val2)>0.01 else 0.
+                if abs(to_add) < 0.01 and to_add != 0: print(tech, year, to_add)
+                add_in_dict(cap_summed, (tech, year), to_add, group_vre=True)
+    cap_series = pd.Series(cap_summed, name="Cap")
+    cap_series[cap_series < 0.01] = 0
+    df = cap_series.to_frame(name="tot")
+    df_gen = cap_series.to_frame(name="Gen")
+    techs = df_gen.index.levels[0]
+    df_gen.drop(labels=VMS, errors="ignore", level=0, inplace=True)
+    gen_colors = [color_dict[tech] for tech in df_gen.index.get_level_values(0)]
+    df_gen_pos = df_gen[df_gen > 0]["Gen"]
+    df_gen_neg = df_gen[df_gen < 0]["Gen"]
+    bottoms_gen_pos = [sum(df_gen_pos.iloc[:i].fillna(0)) for i in range(len(df_gen_pos))]
+    bottoms_gen_neg = [sum(df_gen_neg.iloc[:i].fillna(0)) for i in range(len(df_gen_neg))]
+    ax.bar(0, df_gen_pos, color=gen_colors, width=0.8, bottom=bottoms_gen_pos, edgecolor="black", linewidth=0.25)
+    ax.bar(0, df_gen_neg, color=gen_colors, width=0.8, bottom=bottoms_gen_neg, edgecolor="black", linewidth=0.25)
+    #ax.set_ylim(bottom=sum(df_gen_neg.fillna(0))*1.1, top=sum(df_gen_pos.fillna(0))*1.1)
+    ax.set_xlim(left=-0.5, right=1.5)
+    #ax.set_ylabel("Gen. capacity [GW]")
+    fig.add_subplot(ax)
 
-    plt.sca(ax1)
-    plt.xticks([i for i in range(1, len(scenarios) + 1)], scenario_names, fontsize=14, rotation=25, ha="center")
-    # for i in range(1,len(scenarios)+1):
-    #    ax1.text(i-w/1.9,-1.4,'No TES', ha="center", fontsize=9, rotation=14)
-    # ax1.text(i+w/1.9,-1.4,'All TES', ha="center", fontsize=9, rotation=14)
-    # ax1.xaxis.set_tick_params(pad=16)
-    ax1.set_ylabel('Power capacity [GW]', fontsize=14, )
-    # ax1.legend()
+    ax2 = ax.twinx()
+    df_VMS = cap_series.to_frame(name="VMS").drop(labels=[i for i in techs if i not in VMS], errors="ignore", level=0)
+    df_VMS_pos = df_VMS[df_VMS > 0]["VMS"]
+    df_VMS_neg = df_VMS[df_VMS < 0]["VMS"]
+    bottoms_VMS_pos = [sum(df_VMS_pos.iloc[:i].fillna(0)) for i in range(len(df_VMS_pos))]
+    bottoms_VMS_neg = [sum(df_VMS_neg.iloc[:i].fillna(0)) for i in range(len(df_VMS_neg))]
+    VMS_colors = [color_dict[tech] for tech in df_VMS.index.get_level_values(0)]
+    ax2.bar(1, df_VMS_pos, color=VMS_colors, width=0.8, bottom=bottoms_VMS_pos, edgecolor="black", linewidth=0.25)
+    ax2.bar(1, df_VMS_neg, color=VMS_colors, width=0.8, bottom=bottoms_VMS_neg, edgecolor="black", linewidth=0.25)
+    #ax2.set_ylim(bottom=sum(df_VMS_neg.fillna(0)) * 1.05, top=sum(df_VMS_pos.fillna(0)) * 1.05)
+    #ax2.set_ylabel("VMS capacity [GW(h)]")
+    fig.add_subplot(ax2)
+    if comparison:
+        ax.plot([-0.5,0.5],[0,0],"k-",linewidth=1)
+        ax2.plot([0.5, 1.5], [0, 0], "k-", linewidth=1)
+        if sum(df_gen["Gen"].fillna(0)) == 0:
+            ax.set_yticks([0])
+        elif sum(df_gen["Gen"].fillna(0).abs()) < 0.25:
+            ax.set_ylim()
+        if sum(df_VMS["VMS"].fillna(0)) == 0:
+            ax2.set_yticks([0])
 
-    sorted_uniques1 = []
-    sorted_line1 = []
-    # sorted_uniques = [i for i in tech_order if i in uniques]
-    for i in [j for j in tech_order]:
-        if i in uniques1:
-            sorted_uniques1.append(i)
-            sorted_line1.append(line1[uniques1.index(i)])
-    tech_names["bat"] = "Battery"
-    plt.legend(sorted_line1[::-1], [tech_names[i] for i in sorted_uniques1][::-1], bbox_to_anchor=(1, 1),
-                      fontsize=14)  # uniques,loc=9, bbox_to_anchor=(0.5, -0.07), ncol=4
+    def set_hatches(df, ax):
+        bars = ax.patches
+        year_list = [df.index[i][1] for i in range(len(df))]
+        year_per_bar = []
+        for i, bar in enumerate(bars):
+            year = year_list[i%len(year_list)]  # len(bars)=2*len(df) because even the zero/NaN values gets a bar
+            j = years.index(year)
+            year_per_bar.append((year, j))
+            bar.set_hatch(patterns[j])
 
-    plt.savefig(folder + name + ".png", bbox_inches="tight", dpi=600)
-    plt.savefig(folder + name + ".svg", bbox_inches="tight")
+    set_hatches(df_gen, ax)
+    set_hatches(df_VMS, ax2)
+    ax.set_xticks([0,1])
+    ax.set_xticklabels(["Gen", "VMS"])
+    if ylabel != False:
+        ax.set_ylabel(ylabel)
+    if y2label != False:
+        ax2.set_ylabel(y2label)
+    return list(df_gen.index.levels[0]), df
+
+# -- All modelled cases
+cases = []
+h = 6
+systemFlex = ["lowFlex", "highFlex"]
+modes = ["noFC", "inertia", "OR", "fullFC",]  # , "FCnoPTH", "FCnoH2", "FCnoWind", "FCnoBat", "FCnoSynth"]
+nr_comparisons = len(modes)-1
+
+# -- Building figure axes
+fig = plt.figure(figsize=(9, 6))  # (width, height) in inches
+outer = gridspec.GridSpec(2, 2, wspace=0.45, hspace=0.3, width_ratios=[1, nr_comparisons+1])  # an outer 2x2, inner 1x1 to the left and 1x3 to the right
+r_ax = []  # will contain upper and lower right containers, each with one ax for each non-base scenario
+axes = [[plt.Subplot(fig, outer[0])], [plt.Subplot(fig, outer[2])]]  # all axes, [[all upper], [all lower]]
+for i in range(2):
+    r_ax.append(gridspec.GridSpecFromSubplotSpec(1, nr_comparisons, subplot_spec=outer[i*2+1], wspace=0.75))
+    for j in range(nr_comparisons):
+        axes[i].append(plt.Subplot(fig, r_ax[i][j]))
+
+# -- Filling axes with the data
+tech_collections = []
+patterns = ['XX', '..', '']
+years = [2030, 2040, 2050]
+reg = "nordic"
+for i_f, flex in enumerate(["lowFlex", "highFlex"]):
+    t, df = plot_cap_multipleyears(axes[i_f][0], data, f"{reg}_{flex}_noFC_YEAR_6h", patterns=patterns, years=years,
+                                   ylabel="Added capacity [GW]", y2label="Added capacity [GW(h)]")
+    axes[i_f][0].set_title(scen_names["noFC"])
+    tech_collections.append(t)
+
+    for i_m, mode in enumerate(modes[1:]):
+        t, _ = plot_cap_multipleyears(axes[i_f][1+i_m], data, f"{reg}_{flex}_{mode}_YEAR_6h", comparison_data=df,
+                                            patterns=patterns, years=years, ylabel=i_m==0, y2label=i_m==2)
+        #if i_m == 0:
+        #    plot.set_ylabel("Difference from $\it{Base}$ [GW(h)]")
+        axes[i_f][i_m+1].set_title(scen_names[mode])
+        tech_collections.append(t)
+
+techs = []
+for tech in order_cap:
+    for collection in tech_collections:
+        if tech in collection:
+            techs.append(tech)
+            break
+handles = [Patch(color=color_dict[tech], label=tech_names[tech]) for tech in techs[::-1]]+\
+          [Patch(facecolor="#FFF", hatch=patterns[i]*2, label=years[i]) for i in range(3)]
+axes[0][0].text(-0.6, 0.5, "Low\nFlex:", transform=axes[0][0].transAxes, ha='right', ma='center', fontsize=14)
+axes[1][0].text(-0.6, 0.5, "High\nFlex:", transform=axes[1][0].transAxes, ha='right', ma='center', fontsize=14)
+fig.suptitle(reg.capitalize(), fontsize=16)
+add_fig_line(fig)
+add_fig_line(fig, orientation="vertical")
+fig.legend(handles=handles, loc="center left", bbox_to_anchor=(0.97, 0.5), )
+fig.show()
+fig.savefig(f"figures/cap_{reg}_test.png",bbox_inches="tight", dpi=600)
+# plot_cap(data,first_case)
+# plt.show()
+# cap.unstack().plot(kind="bar",stacked=True)
+data = False  # purge the 600+ MB data variable from memory
