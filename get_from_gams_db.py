@@ -68,11 +68,12 @@ def get_from_db(db, symbol_name):
 
 def which_set(iterable):
     for i, set in enumerate([['UK2','UK3','IE','ES3', 'ES_N','SE3','SE_S','PT','DE_N','FI'],
-                             ['b','bat','W_CHP','WOFF','WONA4','PVA1','sync_cond','WONA2', 'WONA3', 'WONB5','H2store',],
+                             ['b','bat','W_CHP','WOFF','WONA4','PVA1','sync_cond','WONA2', 'WONA3', 'WONB5','H2store',
+                              'HP', 'W_HOB'],
                              ['d001a', 'd001c','d001','d060a','d005b', 'd005c', 'd006a', 'd006a', 'd007b', 'd008a',
                               'd360a','d043', 'd057', 'd078'],
                              ['1','2','5','6'],
-                             ['2025', '2030', '2035', '2040', '2045', '2050'],
+                             ['2020','2025', '2030', '2035', '2040', '2045', '2050'],
                              ['OHAC', 'SCDC']]):
         #print("checking set",set)
         for item in set:
