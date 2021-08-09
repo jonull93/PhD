@@ -10,7 +10,7 @@ order_gen = [
             'TTES_HX',
             'BTES',
             'U',
-            'B',
+            'B', 'b',
             'H',
             'W',
             'WA_CHP',
