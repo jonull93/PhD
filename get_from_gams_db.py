@@ -72,9 +72,9 @@ def which_set(iterable):
                              ['b','bat','W_CHP','WOFF','WONA4','PVA1','sync_cond','WONA2', 'WONA3', 'WONB5','H2store',
                               'HP', 'W_HOB'],
                              ['d001a', 'd001c','d001','d060a','d005b', 'd005c', 'd006a', 'd006a', 'd007b', 'd008a',
-                              'd360a','d043', 'd057', 'd078'],
-                             ['1','2','5','6'],
-                             ['2020','2025', '2030', '2035', '2040', '2045', '2050'],
+                              'd360a','d043', 'd057', 'd078', 'd109e'],
+                             [str(i) for i in range(1, 9)],
+                             ['2020', '2025', '2030', '2035', '2040', '2045', '2050'],
                              ['OHAC', 'SCDC']]):
         # print("checking set",set)
         for item in set:

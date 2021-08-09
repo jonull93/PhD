@@ -1,5 +1,6 @@
 import pickle  # for dumping and loading variable to/from file
 import threading
+import time
 import time as tm
 import traceback
 from datetime import datetime
@@ -13,16 +14,14 @@ import numpy as np
 
 from get_from_gams_db import gdx
 from copy import copy
-from main import overwrite, path, indicators, old_data, run_output, cases, name, gdxpath
-from my_utils import TECH, order_map_cap
+from my_utils import TECH, order_map_cap, order_map_gen
+if "path" not in locals(): from main import overwrite, path, indicators, old_data, run_output, cases, name, gdxpath
 
 print("Excel-writing script started at", datetime.now().strftime('%H:%M:%S'))
-if "todo_gdx" in locals():
-    exit()  # for some reason this script gets run twice sometimes so this stops that
 
 def print_gen(sheet, df, gamsTimestep):
     global scen_row
-    df["sort_by"] = df.index.get_level_values(0).map(order_map_cap)
+    df["sort_by"] = df.index.get_level_values(0).map(order_map_gen)
     df.sort_values("sort_by", inplace=True)
     df.drop(columns="sort_by", inplace= True)
     df = df.reorder_levels(["I_reg", "tech"]).sort_index(level=0, sort_remaining=False)
@@ -298,7 +297,9 @@ def excel(scen:str, data, row):
     print_gen(scen, gen, data["gamsTimestep"])
 
     if data["PS"]:
-        print_df(data["OR_available"].round(decimals=3), "OR: Available", scen, row_inc=2)
+        try: print_df(data["OR_cost"].round(decimals=3), "OR: Cost", scen, row_inc=2)
+        except IndexError: print(scen, data["OR_cost"])
+        print_df(data["OR_available"].round(decimals=3), "OR: Available", scen, header=False)
         print_df(data["OR_deficiency"].round(decimals=2), "OR: Deficiency", scen, header=False)
         print_df(data["OR_net_import"].round(decimals=3), "OR: Net-import", scen, header=False)
         print_df(data["OR_demand"]["wind"].round(decimals=3), "OR demand: Wind", scen, header=True)
@@ -338,10 +339,11 @@ newdata = {}
 threads = {}
 thread_nr = {}
 num_threads = min(max(cpu_count() - 1, 6), len(todo_gdx))
-writer = pd.ExcelWriter(path + name + ".xlsx", engine="openpyxl")
+excel_name = path + name + ".xlsx"
+writer = pd.ExcelWriter(excel_name, engine="openpyxl")
 opened_file = False
 try:
-    f = open(path + "output_" + name + ".xlsx", "r+")
+    f = open(excel_name, "r+")
     f.close()
 except Exception as e:
     if "No such" in str(e):
@@ -360,7 +362,7 @@ for i in range(num_threads):
                               daemon=False)
     # setting threads as "daemon" allows main program to exit eventually even if these dont finish correctly
     worker.start()
-    tm.sleep(0.1)
+    tm.sleep(3)  # staggering gdx threads shouldnt matter as long as the excel process has something to work on
 # now we wait until the queue has been processed
 q_gdx.join()  # first we make sure there are no gdx files waiting to get processed
 isgdxdone = True
@@ -371,14 +373,32 @@ q_excel.join()  # and then we make sure the excel queue is also empty
 for scen in todo_gdx:
     try:
         old_data[scen] = newdata[scen]
-    except:
-        print("Could not add", scen, "to the pickle jar")
+    except KeyError:
+        print("! Could not add", scen, "to the pickle jar because",scen,"was not found in newdata")
+    except Exception as e:
+        print("! Could not add", scen, "to the pickle jar because",)
 
 pickle.dump(old_data, open("PickleJar\\data_" + name + ".pickle", "wb"))
 # for scen in file_list: run_case([0,scen], data, path, io_lock, True)
 
 print("Finished the queue after ", str(round((tm.time() - starttime["start"]) / 60, 2)),
       "minutes - now saving excel file!")
+try:
+    f = open(excel_name, "r+")
+    f.close()
+except PermissionError:
+    opened_file = True
+    print("OBS: EXCEL FILE IS OPEN - PLEASE CLOSE IT TO RESUME SCRIPT")
+    while opened_file:
+        try:
+            f = open(excel_name, "r+")
+            f.close()
+            opened_file = False
+        except PermissionError:
+            time.sleep(5)
+except Exception as e:
+    print("!! Unknown error when opening Excel file:",str(e))
+
 worksheet = writer.sheets["Indicators"]
 worksheet.column_dimensions["A"].width = 20
 worksheet.column_dimensions["B"].width = 10
