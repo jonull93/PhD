@@ -104,7 +104,8 @@ scen_names = {"_pre": "Base case", "_leanOR": "Lean OR", "_OR": "OR", "_OR_fixed
               "fullFC": "Inertia+FR", "OR": "FR", "inertia": "Inertia"}
 color_dict = {'wind_onshore': '#B9B9B9', 'wind_offshore': '#DADADA', 'RO': 'xkcd:ocean blue', 'U': 'xkcd:grape',
               'GWGCCS': 'xkcd:dark peach', 'CHP_wa': 'xkcd:deep lavender', 'CHP_bio': 'xkcd:tree green',
-              'WG': '#a4be20', 'WG_peak': '#b6cb4d', 'PV_cSiOPT': 'xkcd:mustard', 'CHP_WG_L': 'xkcd:mid green',
+              'WG': '#a4be20', 'WG_peak': '#b6cb4d', "WG_CHP": "#83981a",
+              'PV_cSiOPT': 'xkcd:mustard', 'CHP_WG_L': 'xkcd:mid green',
               'HP': (255 / 255, 192 / 255, 0), 'EB': (91 / 255, 155 / 255, 213 / 255),
               'CHP_WG': (0, 176 / 255, 80 / 255),
               'HOB_WG': (128 / 255, 128 / 255, 0), 'solarheat': (204 / 255, 51 / 255, 0), 'HOB_bio': 'green',
@@ -113,7 +114,7 @@ color_dict = {'wind_onshore': '#B9B9B9', 'wind_offshore': '#DADADA', 'RO': 'xkcd
               'bat_cap_PS': "xkcd:deep lavender", "sync_cond": 'xkcd:aqua', "curtailment": "xkcd:slate",
               'WOFF': '#DADADA', 'WON': '#B9B9B9', "H": "#172226", "W": "#014421",
               "W_CHP": "#016421", "G": "#5B90F6", "G_peak": "#7B90F6", "G_CHP": "#5BB0F6", "PV": "#FDC12A",
-              "FC": "#c61e66", "H2store": "#ad054d", "electrolyser": "#c00555", "BECCS": "#5b9aa0"}
+              "FC": "#c65082", "H2store": "#ad054d", "electrolyser": "#68032e", "BECCS": "#5b9aa0"}
 
 EPODreg_to_country = {  # dictionary for going between EPODreg to country
     'AT': 'Austria', 'BE': 'Belgium', 'BO': 'Bosnia', 'BG': 'Bulgaria', 'CR': 'Croatia', 'CY': 'Cyprus',
@@ -239,14 +240,6 @@ def write_inc_from_df_columns(path, filename, var: pandas.DataFrame):
             line = " . ".join(row[:-1]) + f"  {row[-1]}\n"
             writer.write(line)
     return None
-
-
-def append_to_file(filename, scenario, time_to_solve):
-    "adds 'to_add' to a new line at the top of originalfile"
-    to_add = f"{dt.datetime.now().strftime('%D - %H:%M:%S')} : {scenario:<40} : " \
-             f"{time_to_solve} min\n"
-    with open(filename + ".txt", 'a') as f2:
-        f2.write(to_add)
 
 
 def add_in_dict(d, key, val, group_vre=False, tech_position=0):

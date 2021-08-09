@@ -1,8 +1,7 @@
 import pickle
 import time
-
 import gdxpds
-#gdxpds.load_gdxcc('C:\\GAMS\\34\\')
+#gdxpds.load_gdxcc('C:\\GAMS\\win64\\31.1\\')
 import numpy as np
 import pandas as pd
 from openpyxl import load_workbook
@@ -45,7 +44,9 @@ units_df = pd.read_excel(excap_path,
 units_df["nuts2"] = units_df["nutsnumber"].map(number_to_nuts)
 units_df.fillna(0)  # make missing values into 0
 units_df.drop(units_df[units_df.capacity_el == 0].index, inplace=True)  # remove units with no elec cap
+# if there is no "real" decommission date, use the one based on normal lifespans:
 units_df["decom_db"] = np.where(units_df["decom_db"] == 0, units_df["decommission"], units_df["decom_db"])
+
 foo = {1: "b", 2: "H", 3: "G", 4: "O", 5: "P", 6: "W", 7: "WA", 8: "U", 17: "HW", 18: "BW", 19: "GWG", 30: "WG"}
 fuel_no = {i: j for i, j in foo.items()}
 for i, j in foo.items():
@@ -59,15 +60,15 @@ EPODagg = pd.DataFrame(
     index=pd.MultiIndex.from_tuples([(i, j) for i in np.unique(list(nuts2_to_EPOD.values())) for j in plant_types]),
     columns=["capacity_el", "capacity_heat", "eta_el", "eta_tot"])
 
-y1 = 2025
+y1 = 2015
 y2 = 2050
-dy = 5  # can be set to 1 for hard cutoffs instead of smoothed end-of-life capacities
+dy = 1  # can be set to 1 for hard cutoffs instead of smoothed end-of-life capacities
 # if smoothed, each year will represent an interval
 # e.g. 2030 = (2028 -> 2032), 2035 = (2033 -> 2037)
 # and plants which expire inside an interval get averaged out according to time spent in the interval
 # e.g. a plant expiring 2029 would count for 2 out of 5 years in the 2030 example above and thus give 0.4 of its capacity
 years = [i for i in
-         range(y1, y2 + dy, dy)]  # this can be set independently of dy, but dy should not be larger than y(i)-y(i-1)
+         range(y1, y2 + 1, 5)]  # this can be set independently of dy, but dy should not be larger than y(i)-y(i-1)
 agg = {i: EPODagg.copy() for i in years}
 
 
@@ -81,8 +82,11 @@ def punish_fun(df, y1, y2):  #
 
 def adjusted_cap(df, y1, y2, col):
     foo = np.where(df["decom_db"] > y2, df[col], 0)
-    bar = np.where((df["decom_db"] <= y2) & (df["decom_db"] >= y1),
+    if y2 > y1:  # to avoid dividing by zero (or: The Story of the Missing Data - June 2021)
+        bar = np.where((df["decom_db"] <= y2) & (df["decom_db"] >= y1),
                    df[col] * (df[(df["decom_db"] <= y2) & (df["decom_db"] >= y1)]["decom_db"] - y1) / (y2 - y1), foo)
+    else:
+        bar = foo
     # out = sum(bar)
     # print(df,"\n",out,f"{y1}->{y2}")
     return bar
@@ -101,23 +105,24 @@ def combined_agg_data(df, y1, y2, CHP):
     el = adjusted_cap(df, y1, y2, "capacity_el")
     if len(el) > 0:
         try:
-            eta_el = np.average(df[df["eta_el"] != 0]["eta_el"], weights=el[df["eta_el"] != 0])
+            eta_el = np.average(df[df["eta_el"] > 0]["eta_el"], weights=el[df["eta_el"] > 0])
         except:
-            if sum(el) > 0: print("== OBS: CAPACITY WITHOUT ELEC EFFICIENCY in ==\n", df["nuts2"])
             eta_el = 0
+        # if eta_el == 0 and sum(el) > 0: print("== OBS: CAPACITY WITHOUT ELEC EFFICIENCY in ==\n",df[["fuel_no", "nuts2", "capacity_el"]])
         try:
             eta_tot = np.average(df[df["eta_tot"] != 0]["eta_tot"], weights=el[df["eta_tot"] != 0])
         except:
-            if sum(el) > 0: print("== OBS: CAPACITY WITHOUT TOTAL EFFICIENCY in ==\n", df["nuts2"])
+            # if sum(el) > 0: print("== OBS: CAPACITY WITHOUT TOTAL EFFICIENCY in ==\n", df[["fuel_no", "nuts2"]])
             eta_tot = 0
     else:
         eta_el = 0
         eta_tot = 0
-    if CHP == False:
+    if not CHP:
         heat = [0]
     else:
         heat = adjusted_cap(df, y1, y2, "capacity_heat")
-
+    el = np.where(np.isnan(el), 0, el)
+    heat = np.where(np.isnan(heat), 0, heat)
     return sum(el), sum(heat), eta_el, eta_tot
 
 
@@ -132,14 +137,20 @@ for row in EPODagg.itertuples():
 
     df = units_df[(correct_nut) & (units_df["plant_type_db"].isin(plant_type)) & (
             units_df["fuel_no"] == fuel_no[plant.replace("_CHP", "")]) & (
-                          units_df["capacity_heat"] / units_df["capacity_el"] < 3) & (
+                          units_df["capacity_heat"] / units_df["capacity_el"] < 4) & (
                           ((0 < units_df["eta_tot"]) & (units_df["eta_tot"] < 0.41)) == ("peak" in plant or "U" in plant)
                   )]
-    if plant == "U": print(f"At U in {EPOD}: {df}")
+    if "UK1" in EPOD and "G" in plant:
+        print(f"Here's the df of {plant} in UK1:\n", df[["commission","capacity_el","eta_el"]])
+        print(f"its summed capacity is {df['capacity_el'].sum()} ")
     for i in years:
         y1 = np.ceil(i - (dy - 1) / 2)
         y2 = np.ceil(i + (dy - 1) / 2)
         el, heat, eta_el, eta_tot = combined_agg_data(df, y1, y2, "CHP" in plant)
+        if EPOD == "UK1" and "G" in plant and df['capacity_el'].sum()>0: print(f"! year {i}: {el}, {eta_el}")
+
+        #try: int(el)
+        #except ValueError: print("found nan in i",EPOD,plant,i)
         if plant == "G_peak":
             agg[i].at[(EPOD, plant), "capacity_el"] = agg[i].at[(EPOD, "G"), "capacity_el"] * ratio_OCGT_over_CCGT
             agg[i].at[(EPOD, plant), "capacity_heat"] = 0
@@ -188,6 +199,7 @@ except:
     None
 # EPODagg.to_excel(writer,sheet_name="by_EPOD")
 for y in agg:
+    agg[y].fillna(0, inplace=True)
     agg[y].to_excel(writer, sheet_name=f"{y}_d{dy}")
 
 # CHP_units.drop(columns=["location_no",'capacity_boiler','latitude', 'longitude', 'nutsnumber']).to_excel(writer,sheet_name="CHP")

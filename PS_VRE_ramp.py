@@ -18,10 +18,13 @@ regions = ['AT', 'BE', 'BO', 'BG', 'CR', 'CY', 'CZ', 'DE1', 'DE2', 'DE3', 'DE4',
 WON = ['WONA1', 'WONA2', 'WONA3', 'WONA4', 'WONA5', 'WONB1', 'WONB2', 'WONB3', 'WONB4', 'WONB5']
 WOFF = ["WOFF"]
 PV = ['PVPA1', 'PVPB1', 'PVR1']
-WON_profiles = {reg: {tech: {} for tech in WON} for reg in regions}  # {reg: {tech: {timestep: value}}}
-WOFF_profiles = {reg: {tech: {} for tech in WOFF} for reg in regions}
-PV_profiles = {reg: {tech: {} for tech in PV} for reg in regions}  # {reg: {tech: {timestep: value}}}
-path = "C:\\models\\multinode\\Include\\"
+allhours = [f"h{str(i).rjust(4,'0')}" for i in range(1, 8785)]
+WON_profiles = {reg: {tech: {hour: 0 for hour in allhours} for tech in WON} for reg in regions}
+WOFF_profiles = {reg: {tech: {hour: 0 for hour in allhours} for tech in WOFF} for reg in regions}
+PV_profiles = {reg: {tech: {hour: 0 for hour in allhours} for tech in PV} for reg in regions}
+# {reg: {tech: {timestep: value}}}
+path = "C:\\git\\multinode\\Include\\"
+out_path = "C:\\git\\multinode\\Add-ons\\PS\\include\\"
 
 
 def read_file(filename, profiles):
@@ -40,6 +43,11 @@ def read_file(filename, profiles):
 
 
 def build_ramp(profiles):
+    # This function now considers the coming hour when profile decreases, and the previous hour when profile increases
+    # Furthermore, the reserve demand from ramping VRE is limited to the hourly VRE prod (i.e. no expected prod means no
+    # reserve demand)
+    # This means that incoming VRE next hour will NOT trigger a reserve demand this hour, to avoid reserve demand before
+    # the VRE is actually thought to "arrive"
     ramp = {}
     for reg in profiles:
         ramp[reg] = {}
@@ -48,14 +56,16 @@ def build_ramp(profiles):
             timesteps = list(data.keys())
             for nr, timestep in enumerate(timesteps):
                 if nr < len(timesteps) - 1:
-                    forward = abs(data[timesteps[nr]] - data[timesteps[nr + 1]])
+
+                    downwards = max(0, data[timesteps[nr]] - data[timesteps[nr + 1]])
                 else:
-                    forward = 0
+                    downwards = 0
                 if nr == 0:
-                    backward = 0
+                    upwards = 0
                 else:
-                    backward = abs(data[timesteps[nr]] - data[timesteps[nr - 1]])
-                ramp[reg][tech][timestep] = np.round(max(forward, backward), decimals=5)
+                    upwards = abs(data[timesteps[nr]] - data[timesteps[nr - 1]])
+                limited_by_prod = min(data[timesteps[nr]], max(downwards, upwards))
+                ramp[reg][tech][timestep] = np.round(limited_by_prod, decimals=5)
     return ramp
 
 
@@ -81,5 +91,5 @@ for reg in regions:
         VRE_ramp[reg][tech] = PV_ramp[reg][tech]
 
 print("-- Combined ramps --")
-write_inc(path, "VRE_ramp.inc", VRE_ramp)
+write_inc(out_path, "VRE_ramp.inc", VRE_ramp)
 print("-- Wrote ramps to .inc file --")

@@ -1,4 +1,6 @@
 order_gen = [
+            'Bat. In',
+            'bat_charge',
             'efuel',
             'electrolyser',
             'EB',
@@ -11,6 +13,7 @@ order_gen = [
             'BTES',
             'U',
             'B',
+            'b',
             'H',
             'W',
             'WA_CHP',
@@ -37,6 +40,7 @@ order_gen = [
             'FC',
             'RO',
             'RO_imp',
+            'RR',
             'WOFF',
             'WON',
             'wind_onshore',
@@ -46,7 +50,6 @@ order_gen = [
         ["PVPA1",
          "PVPB1",
          "PVR1",
-         'RR',
          'PS',
          'PV',
          'backstop',
@@ -60,4 +63,5 @@ order_gen = [
          'RO_imp',
          'bat_discharge',
          'bat_cap',
+         'Bat. Out'
          ]

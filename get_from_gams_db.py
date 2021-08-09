@@ -2,6 +2,7 @@ import gams
 import numpy
 import pandas
 
+
 class GamsSymbol(object):
     def __init__(self, symbol):
         self.dimensions = symbol.domains_as_strings
@@ -54,7 +55,7 @@ JD = {
     gams.database.GamsEquation: GamsEquation,
     gams.database.GamsParameter: GamsParameter,
     gams.database.GamsVariable: GamsVariable,
-      }
+}
 
 
 def get_from_db(db, symbol_name):
@@ -75,12 +76,12 @@ def which_set(iterable):
                              ['1','2','5','6'],
                              ['2020','2025', '2030', '2035', '2040', '2045', '2050'],
                              ['OHAC', 'SCDC']]):
-        #print("checking set",set)
+        # print("checking set",set)
         for item in set:
-            #print("checking item", item)
+            # print("checking item", item)
             if item in iterable:
-                return ["I_reg","tech","timestep","OR_period","year","tech_con"][i]
-    if len(iterable) > 0: ("found no match for",iterable)
+                return ["I_reg", "tech", "timestep", "OR_period", "year", "tech_con"][i]
+    if len(iterable) > 0: ("found no match for", iterable)
     return ''
 
 
@@ -93,8 +94,9 @@ def gdx(f, symbol_name):
         levels = [symbol.index.get_level_values(i).astype(str) for i in range(symbol.index.nlevels)]
         symbol.index = pandas.MultiIndex.from_arrays(levels, names=index_names)
         if "timestep" in index_names:
-            symbol = symbol.unstack(level="timestep",fill_value=0)
+            symbol = symbol.unstack(level="timestep", fill_value=0)
         return symbol
+
     if symbol_type == numpy.ndarray:
         return symbol.astype(str)
     elif symbol_type == pandas.core.frame.DataFrame:
