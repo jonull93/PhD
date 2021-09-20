@@ -97,6 +97,9 @@ def run_case(scen_name, data, gdxpath, indicators):
         for reg in new_cap.index.unique(1):
             if reg not in I_reg:
                 new_cap.drop(reg, level="I_reg", inplace=True)
+        for index, vals in new_cap.iterrows():
+            if 0 < vals.upper == vals.level:
+                print(" ! ! Found capped investment at",index)
         gen = gdx(f, "o_generation")
         el_price = gdx(f, "o_el_cost")
         load_profile = gdx(f, "demandprofile_average")
