@@ -176,6 +176,7 @@ def run_case(scen_name, data, gdxpath, indicators):
 
 def excel(scen:str, data, row, writer, indicators):
     global scen_row
+    stripped_scen = "_".join(scen.split("_")[:5])  # stripping unnecessary name components, like "6h"
     scen_row = 0
     cap = data["tot_cap"].rename("Cap").round(decimals=3)
     cap = cap[cap!=0]
@@ -191,8 +192,8 @@ def excel(scen:str, data, row, writer, indicators):
     except KeyError:
         print(f"! Could not find tech in gen.index, {scen} probably failed the gams run.")
         return
-    for i, scen_part in enumerate(scen.split('_')):  # split up the scenario name on _s
-        print_num(writer, [scen_part], "Indicators", row + 1, i, 0)
+    for i, scen_part in enumerate(stripped_scen.split('_')):  # split up the scenario name on _
+        print_num(writer, [scen_part], "Indicators", row + 1, i, 0)  # print the (split) scenario name in Indicators
     c = i+1
 
     for indicator in indicators:
@@ -220,26 +221,26 @@ def excel(scen:str, data, row, writer, indicators):
     cappy.sort_values("sort_by", inplace=True)
     cappy.drop(columns="sort_by", inplace=True)
     cappy = cappy.reorder_levels(["I_reg", "tech"]).sort_index(level=0, sort_remaining=False)
-    cappy.groupby(level=[1]).sum().to_excel(writer, sheet_name=scen, startcol=1, startrow=1)
+    cappy.groupby(level=[1]).sum().to_excel(writer, sheet_name=stripped_scen, startcol=1, startrow=1)
     for i, reg in enumerate(cappy.index.get_level_values(0).unique()):
-        cappy.filter(like=reg,axis=0).to_excel(writer, sheet_name=scen, startcol=7+6*i, startrow=1)
+        cappy.filter(like=reg,axis=0).to_excel(writer, sheet_name=stripped_scen, startcol=7+6*i, startrow=1)
     scen_row += cap_len+2
-    print_df(writer, data["curtailment_profile_total"].round(decimals=3), "Curtailment", scen)
-    print_df(writer, data["el_price"].round(decimals=3), "Elec. price", scen, row_inc=2)
+    print_df(writer, data["curtailment_profile_total"].round(decimals=3), "Curtailment", stripped_scen)
+    print_df(writer, data["el_price"].round(decimals=3), "Elec. price", stripped_scen, row_inc=2)
 
-    print_gen(writer, scen, gen, data["gamsTimestep"])
+    print_gen(writer, stripped_scen, gen, data["gamsTimestep"])
 
     if data["PS"]:
-        try: print_df(writer, data["OR_cost"].round(decimals=3), "OR: Cost", scen, row_inc=2)
-        except IndexError: print(scen, data["OR_cost"])
-        print_df(writer, data["OR_available"].round(decimals=3), "OR: Available", scen, header=False)
-        print_df(writer, data["OR_deficiency"].round(decimals=2), "OR: Deficiency", scen, header=False)
-        print_df(writer, data["OR_net_import"].round(decimals=3), "OR: Net-import", scen, header=False)
-        print_df(writer, data["OR_demand"]["wind"].round(decimals=3), "OR demand: Wind", scen, header=True)
-        print_df(writer, data["OR_demand"]["PV"].round(decimals=3), "OR demand: PV", scen, header=True)
-        print_df(writer, data["OR_demand"]["other"].round(decimals=3), "OR demand: Other", scen, header=True)
-        print_df(writer, data["OR_demand"]["total"].round(decimals=3), "OR demand: Total", scen, header=True, row_inc=2)
-        print_df(writer, data["inertia_available"].round(decimals=3), "Inertia: Available", scen, header=True)
-        print_df(writer, data["inertia_available_thermals"].round(decimals=3), "Inertia: Thermals", scen, header=True, row_inc=2)
+        try: print_df(writer, data["OR_cost"].round(decimals=3), "OR: Cost", stripped_scen, row_inc=2)
+        except IndexError: print(stripped_scen, data["OR_cost"])
+        print_df(writer, data["OR_available"].round(decimals=3), "OR: Available", stripped_scen, header=False)
+        print_df(writer, data["OR_deficiency"].round(decimals=2), "OR: Deficiency", stripped_scen, header=False)
+        print_df(writer, data["OR_net_import"].round(decimals=3), "OR: Net-import", stripped_scen, header=False)
+        print_df(writer, data["OR_demand"]["wind"].round(decimals=3), "OR demand: Wind", stripped_scen, header=True)
+        print_df(writer, data["OR_demand"]["PV"].round(decimals=3), "OR demand: PV", stripped_scen, header=True)
+        print_df(writer, data["OR_demand"]["other"].round(decimals=3), "OR demand: Other", stripped_scen, header=True)
+        print_df(writer, data["OR_demand"]["total"].round(decimals=3), "OR demand: Total", stripped_scen, header=True, row_inc=2)
+        print_df(writer, data["inertia_available"].round(decimals=3), "Inertia: Available", stripped_scen, header=True)
+        print_df(writer, data["inertia_available_thermals"].round(decimals=3), "Inertia: Thermals", stripped_scen, header=True, row_inc=2)
     else:
         print("PS variables were not available for", scen)

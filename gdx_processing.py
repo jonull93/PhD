@@ -25,7 +25,7 @@ overwrite = []  # names of scenarios to overwrite regardless of existence in pic
 #            [reg+"_inertia" for reg in ["ES3", "HU", "IE", "SE2"]]+\
 #            [reg+"_inertia_noSyn" for reg in ["ES3", "HU", "IE", "SE2"]]
 h = 3  # time resolution
-suffix = "testing"  # Optional suffix for the run, e.g. "test" or "highBioCost"
+suffix = ""  # Optional suffix for the run, e.g. "test" or "highBioCost"
 suffix = '_'+suffix if len(suffix) > 0 else ''
 name = f"results_{h}h{suffix}"  # this will be the name of the output excel file
 
@@ -34,7 +34,7 @@ name = f"results_{h}h{suffix}"  # this will be the name of the output excel file
 indicators = ["cost_tot",
               "VRE_share_total",
               'curtailment',
-              #              'flywheel',
+              # 'flywheel',
               "G",
               'sync_cond',
               'bat',
@@ -49,20 +49,20 @@ modes = ["noFC", "fullFC"]  # , "fullFC", "inertia", "OR"]#
 for reg in ["iberia", "brit", "nordic"]:
     for flex in systemFlex:
         for mode in modes:
-            for year in [2020,2030,2040]:
-                cases.append(f"{reg}_{flex}_{mode}_{year}{'_'+str(h)+'h' if h>1 else ''}")
+            for year in [2020,2025,2030,2040]:
+                cases.append(f"{reg}_{flex}_{mode}{suffix}_{year}{'_'+str(h)+'h' if h>1 else ''}")
 
 
 comp_name = os.environ['COMPUTERNAME']
 if "PLIA" in comp_name:
     path = "C:\\Users\\Jonathan\\Box\\python\\output\\"
-    gdxpath = "C:\\git\\multinode\\"  # where to find gdx files
+    gdxpath = "C:\\git\\multinode\\results\\"  # where to find gdx files
 elif "QGTORT8" in comp_name:
     path = "C:\\Users\\Jonathan\\git\\python\\output\\"
-    gdxpath = "C:\\Users\\Jonathan\\git\\multinode\\"  # where to find gdx files
+    gdxpath = "C:\\Users\\Jonathan\\git\\multinode\\results\\"  # where to find gdx files
 else:
-    path = "D:\\Jonathan\\python\\output\\"
-    gdxpath = "D:\\Jonathan\\multinode\\"
+    path = "D:\\Jonathan\\QoL scripts\\output\\"
+    gdxpath = "D:\\Jonathan\\multinode\\results\\"
 
 
 if run_output.lower() == "w" or run_output.lower() == "write":
@@ -215,11 +215,14 @@ except PermissionError:
         try:
             f = open(excel_name, "r+")
             f.close()
+            print("thank you for closing the file :)")
             opened_file = False
         except PermissionError:
             time.sleep(5)
+except FileNotFoundError:
+    None
 except Exception as e:
-    print("!! Unknown error when opening Excel file:",str(e))
+    print("!! Unknown error when opening Excel file:", type(e), str(e))
 
 worksheet = writer.sheets["Indicators"]
 worksheet.column_dimensions["A"].width = 20
