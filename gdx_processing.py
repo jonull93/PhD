@@ -19,12 +19,12 @@ start_time_script = tm.time()
 print("Excel-writing script started at", datetime.now().strftime('%H:%M:%S'))
 
 excel = True  # will only make a .pickle if excel == False
-run_output = "rw"  # 'w' to (over)write or 'rw' to only add missing scenarios
+run_output = "w"  # 'w' to (over)write or 'rw' to only add missing scenarios
 overwrite = []  # names of scenarios to overwrite regardless of existence in pickled data
 #overwrite = [reg+"_inertia_0.1x" for reg in ["ES3", "HU", "IE", "SE2"]]+\
 #            [reg+"_inertia" for reg in ["ES3", "HU", "IE", "SE2"]]+\
 #            [reg+"_inertia_noSyn" for reg in ["ES3", "HU", "IE", "SE2"]]
-h = 3  # time resolution
+h = 6  # time resolution
 suffix = ""  # Optional suffix for the run, e.g. "test" or "highBioCost"
 suffix = '_'+suffix if len(suffix) > 0 else ''
 name = f"results_{h}h{suffix}"  # this will be the name of the output excel file
@@ -35,6 +35,10 @@ indicators = ["cost_tot",
               "VRE_share_total",
               'curtailment',
               # 'flywheel',
+              "OR_value_share_thermal",
+              "OR_value_share_VRE",
+              "OR_value_share_ESS",
+              "OR_value_share_BEV",
               "G",
               'sync_cond',
               'bat',

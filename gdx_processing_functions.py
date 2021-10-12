@@ -66,6 +66,20 @@ def run_case(scen_name, data, gdxpath, indicators):
             foo = 0
         return foo
 
+    def try_sum(df, level="OR_period", OR_cost=False):
+        if type(OR_cost) != bool:
+            try:
+                foo = (df * OR_cost).sum().sum()
+            except:
+                foo = 0
+        else:
+            try:
+                foo = df.sum(axis=1).sum(level=level)
+            except Exception as e:
+                foo = 0
+                print("! Failed to sum, ", e)
+        return foo
+
     k = scen_name
     global newdata
     # flywheel,
@@ -134,9 +148,33 @@ def run_case(scen_name, data, gdxpath, indicators):
             OR_demand_other = gdx(f, "PS_OR_min")
             OR_available = gdx(f, "o_PS_OR_available")
             OR_deficiency = gdx(f, "v_PS_OR_deficiency").level
-            OR_available_thermal = gdx(f, "o_PS_OR_available_thermal")
-            OR_net_import = gdx(f, "o_PS_OR_net_import")
             OR_cost = gdx(f, "o_PS_OR_cost")
+            OR_available_thermal = gdx(f, "o_PS_OR_available_thermal")
+            OR_summed_thermal = try_sum(OR_available_thermal)
+            OR_available_ESS = gdx(f, "o_PS_OR_available_ESS")
+            OR_summed_ESS = try_sum(OR_available_ESS)
+            OR_available_BEV = gdx(f, "o_PS_OR_available_BEV")
+            OR_summed_BEV = try_sum(OR_available_BEV)
+            OR_available_VRE = gdx(f, "o_PS_OR_available_VRE")
+            OR_summed_VRE = try_sum(OR_available_VRE)
+            OR_available_hydro = gdx(f, "o_PS_OR_available_hydro")
+            OR_summed_hydro = try_sum(OR_available_hydro)
+            OR_value = {
+                "thermal": try_sum(OR_available_thermal, OR_cost=OR_cost),
+                "ESS": try_sum(OR_available_ESS, OR_cost=OR_cost),
+                "BEV": try_sum(OR_available_BEV, OR_cost=OR_cost),
+                "hydro": try_sum(OR_available_hydro, OR_cost=OR_cost),
+                "VRE": try_sum(OR_available_VRE, OR_cost=OR_cost),
+            }
+            OR_value["total"] = sum([OR_value[i] for i in OR_value])
+            if OR_value["total"] == 0:
+                OR_value["total"] = 1
+            OR_value_share = {key: val/OR_value["total"] for key, val in OR_value.items() if key != "total"}
+            OR_value_share_thermal = OR_value_share["thermal"]
+            OR_value_share_VRE = OR_value_share["VRE"]
+            OR_value_share_ESS = OR_value_share["ESS"]
+            OR_value_share_BEV = OR_value_share["BEV"]
+            OR_net_import = gdx(f, "o_PS_OR_net_import")
             OR_demand = {"wind": OR_demand_VRE.filter(like="WO", axis=0).groupby(level=[1]).sum(),
                          "PV": OR_demand_VRE.filter(like="PV", axis=0).groupby(level=[1]).sum(),
                          "other": OR_demand_other,
@@ -145,6 +183,7 @@ def run_case(scen_name, data, gdxpath, indicators):
             PS = True
         except Exception as e:
             PS = False
+            OR_value_share_thermal = False
             print("%ancillary_services% was not activated for", k, "because:")
             print(format_exc())
 
@@ -164,6 +203,7 @@ def run_case(scen_name, data, gdxpath, indicators):
     for i in indicators:
         if i not in to_save:
             print(i, "from Indicators is not currently captured! ~~")
+
     new_data = {}
     for variable in to_save:
         try:
