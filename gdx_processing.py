@@ -39,8 +39,15 @@ indicators = ["cost_tot",
               "OR_value_share_VRE",
               "OR_value_share_ESS",
               "OR_value_share_BEV",
+              "OR_value_share_PtH",
+              "OR_share_thermal",
+              "OR_share_VRE",
+              "OR_share_ESS",
+              "OR_share_BEV",
+              "OR_share_PtH",
+              "OR_FFR_cost_share",
               "G",
-              'sync_cond',
+#              'sync_cond',
               'bat',
               'FC',
               'H2store',
@@ -62,6 +69,9 @@ if "PLIA" in comp_name:
     path = "C:\\Users\\Jonathan\\Box\\python\\output\\"
     gdxpath = "C:\\git\\multinode\\results\\"  # where to find gdx files
 elif "QGTORT8" in comp_name:
+    path = "C:\\Users\\Jonathan\\git\\python\\output\\"
+    gdxpath = "C:\\Users\\Jonathan\\git\\multinode\\results\\"  # where to find gdx files
+elif "DAJ99D7" in comp_name:
     path = "C:\\Users\\Jonathan\\git\\python\\output\\"
     gdxpath = "C:\\Users\\Jonathan\\git\\multinode\\results\\"  # where to find gdx files
 else:

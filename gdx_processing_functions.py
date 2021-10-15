@@ -75,9 +75,11 @@ def run_case(scen_name, data, gdxpath, indicators):
         else:
             try:
                 foo = df.sum(axis=1).sum(level=level)
+            except ValueError:
+                foo = 0
             except Exception as e:
                 foo = 0
-                print("! Failed to sum, ", e)
+                print("! Failed to sum, ", type(e), e)
         return foo
 
     k = scen_name
@@ -136,6 +138,7 @@ def run_case(scen_name, data, gdxpath, indicators):
         charge = gdx(f, "v_charge")
         demand = gdx(f, "o_load")
         inv_cost = gdx(f, "inv_cost")
+
         try:
             ESS_available = gdx(f, "o_PS_ESS_available")
             inertia_available = gdx(f, "o_PS_inertia_available")
@@ -149,6 +152,8 @@ def run_case(scen_name, data, gdxpath, indicators):
             OR_available = gdx(f, "o_PS_OR_available")
             OR_deficiency = gdx(f, "v_PS_OR_deficiency").level
             OR_cost = gdx(f, "o_PS_OR_cost")
+            OR_period_cost = gdx(f, "o_PS_OR_cost_perPeriod")
+            OR_FFR_cost_share = gdx(f, "o_PS_OR_cost_FFRshare")
             OR_available_thermal = gdx(f, "o_PS_OR_available_thermal")
             OR_summed_thermal = try_sum(OR_available_thermal)
             OR_available_ESS = gdx(f, "o_PS_OR_available_ESS")
@@ -159,21 +164,16 @@ def run_case(scen_name, data, gdxpath, indicators):
             OR_summed_VRE = try_sum(OR_available_VRE)
             OR_available_hydro = gdx(f, "o_PS_OR_available_hydro")
             OR_summed_hydro = try_sum(OR_available_hydro)
-            OR_value = {
-                "thermal": try_sum(OR_available_thermal, OR_cost=OR_cost),
-                "ESS": try_sum(OR_available_ESS, OR_cost=OR_cost),
-                "BEV": try_sum(OR_available_BEV, OR_cost=OR_cost),
-                "hydro": try_sum(OR_available_hydro, OR_cost=OR_cost),
-                "VRE": try_sum(OR_available_VRE, OR_cost=OR_cost),
-            }
-            OR_value["total"] = sum([OR_value[i] for i in OR_value])
-            if OR_value["total"] == 0:
-                OR_value["total"] = 1
-            OR_value_share = {key: val/OR_value["total"] for key, val in OR_value.items() if key != "total"}
-            OR_value_share_thermal = OR_value_share["thermal"]
-            OR_value_share_VRE = OR_value_share["VRE"]
-            OR_value_share_ESS = OR_value_share["ESS"]
-            OR_value_share_BEV = OR_value_share["BEV"]
+            OR_value_share_thermal = gdx(f, "o_PS_OR_thermal_value_share", silent=True)
+            OR_value_share_VRE = gdx(f, "o_PS_OR_VRE_value_share", silent=True)
+            OR_value_share_ESS = gdx(f, "o_PS_OR_ESS_value_share", silent=True)
+            OR_value_share_BEV = gdx(f, "o_PS_OR_BEV_value_share", silent=True)
+            OR_value_share_PtH = gdx(f, "o_PS_OR_PtH_value_share", silent=True)
+            OR_share_thermal = gdx(f, "o_PS_OR_thermal_share", silent=True)
+            OR_share_VRE = gdx(f, "o_PS_OR_VRE_share", silent=True)
+            OR_share_ESS = gdx(f, "o_PS_OR_ESS_share", silent=True)
+            OR_share_BEV = gdx(f, "o_PS_OR_BEV_share", silent=True)
+            OR_share_PtH = gdx(f, "o_PS_OR_PtH_share", silent=True)
             OR_net_import = gdx(f, "o_PS_OR_net_import")
             OR_demand = {"wind": OR_demand_VRE.filter(like="WO", axis=0).groupby(level=[1]).sum(),
                          "PV": OR_demand_VRE.filter(like="PV", axis=0).groupby(level=[1]).sum(),
@@ -267,6 +267,7 @@ def excel(scen:str, data, row, writer, indicators):
     scen_row += cap_len+2
     print_df(writer, data["curtailment_profile_total"].round(decimals=3), "Curtailment", stripped_scen)
     print_df(writer, data["el_price"].round(decimals=3), "Elec. price", stripped_scen, row_inc=2)
+    print_df(writer, data["OR_period_cost"].round(decimals=3), "OR period cost", stripped_scen, row_inc=2)
 
     print_gen(writer, stripped_scen, gen, data["gamsTimestep"])
 

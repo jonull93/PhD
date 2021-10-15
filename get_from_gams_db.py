@@ -85,8 +85,11 @@ def which_set(iterable):
     return ''
 
 
-def gdx(f, symbol_name):
-    symbol = f[symbol_name]
+def gdx(f, symbol_name, silent=False):
+    try: symbol = f[symbol_name]
+    except KeyError:
+        if not silent: print(f"Unable to get {symbol_name} from gdx")
+        return 0
     symbol_type = type(symbol)
 
     def betterIndex(symbol):
