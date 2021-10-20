@@ -80,7 +80,7 @@ def which_set(iterable):
         for item in set:
             # print("checking item", item)
             if item in iterable:
-                return ["I_reg", "tech", "timestep", "OR_period", "year", "tech_con"][i]
+                return ["I_reg", "tech", "timestep", "FR_period", "year", "tech_con"][i]
     if len(iterable) > 0: ("found no match for", iterable)
     return ''
 

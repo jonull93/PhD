@@ -24,7 +24,7 @@ overwrite = []  # names of scenarios to overwrite regardless of existence in pic
 #overwrite = [reg+"_inertia_0.1x" for reg in ["ES3", "HU", "IE", "SE2"]]+\
 #            [reg+"_inertia" for reg in ["ES3", "HU", "IE", "SE2"]]+\
 #            [reg+"_inertia_noSyn" for reg in ["ES3", "HU", "IE", "SE2"]]
-h = 6  # time resolution
+h = 12  # time resolution
 suffix = ""  # Optional suffix for the run, e.g. "test" or "highBioCost"
 suffix = '_'+suffix if len(suffix) > 0 else ''
 name = f"results_{h}h{suffix}"  # this will be the name of the output excel file
@@ -35,17 +35,19 @@ indicators = ["cost_tot",
               "VRE_share_total",
               'curtailment',
               # 'flywheel',
-              "OR_value_share_thermal",
-              "OR_value_share_VRE",
-              "OR_value_share_ESS",
-              "OR_value_share_BEV",
-              "OR_value_share_PtH",
-              "OR_share_thermal",
-              "OR_share_VRE",
-              "OR_share_ESS",
-              "OR_share_BEV",
-              "OR_share_PtH",
-              "OR_FFR_cost_share",
+              "FR_value_share_thermal",
+              "FR_value_share_VRE",
+              "FR_value_share_ESS",
+              "FR_value_share_BEV",
+              "FR_value_share_PtH",
+              "FR_value_share_hydro",
+              "FR_share_thermal",
+              "FR_share_VRE",
+              "FR_share_ESS",
+              "FR_share_BEV",
+              "FR_share_PtH",
+              "FR_share_hydro",
+              "FR_FFR_cost_share",
               "G",
 #              'sync_cond',
               'bat',

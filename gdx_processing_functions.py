@@ -66,10 +66,10 @@ def run_case(scen_name, data, gdxpath, indicators):
             foo = 0
         return foo
 
-    def try_sum(df, level="OR_period", OR_cost=False):
-        if type(OR_cost) != bool:
+    def try_sum(df, level="FR_period", FR_cost=False):
+        if type(FR_cost) != bool:
             try:
-                foo = (df * OR_cost).sum().sum()
+                foo = (df * FR_cost).sum().sum()
             except:
                 foo = 0
         else:
@@ -147,43 +147,45 @@ def run_case(scen_name, data, gdxpath, indicators):
             inertia_available_PTH = gdx(f, "o_PS_inertia_PTH")
             inertia_available_BEV = gdx(f, "o_PS_inertia_BEV")
             inertia_demand = gdx(f, "PS_Nminus1")
-            OR_demand_VRE = gdx(f, "o_PS_OR_demand_VRE")
-            OR_demand_other = gdx(f, "PS_OR_min")
-            OR_available = gdx(f, "o_PS_OR_available")
-            OR_deficiency = gdx(f, "v_PS_OR_deficiency").level
-            OR_cost = gdx(f, "o_PS_OR_cost")
-            OR_period_cost = gdx(f, "o_PS_OR_cost_perPeriod")
-            OR_FFR_cost_share = gdx(f, "o_PS_OR_cost_FFRshare")
-            OR_available_thermal = gdx(f, "o_PS_OR_available_thermal")
-            OR_summed_thermal = try_sum(OR_available_thermal)
-            OR_available_ESS = gdx(f, "o_PS_OR_available_ESS")
-            OR_summed_ESS = try_sum(OR_available_ESS)
-            OR_available_BEV = gdx(f, "o_PS_OR_available_BEV")
-            OR_summed_BEV = try_sum(OR_available_BEV)
-            OR_available_VRE = gdx(f, "o_PS_OR_available_VRE")
-            OR_summed_VRE = try_sum(OR_available_VRE)
-            OR_available_hydro = gdx(f, "o_PS_OR_available_hydro")
-            OR_summed_hydro = try_sum(OR_available_hydro)
-            OR_value_share_thermal = gdx(f, "o_PS_OR_thermal_value_share", silent=True)
-            OR_value_share_VRE = gdx(f, "o_PS_OR_VRE_value_share", silent=True)
-            OR_value_share_ESS = gdx(f, "o_PS_OR_ESS_value_share", silent=True)
-            OR_value_share_BEV = gdx(f, "o_PS_OR_BEV_value_share", silent=True)
-            OR_value_share_PtH = gdx(f, "o_PS_OR_PtH_value_share", silent=True)
-            OR_share_thermal = gdx(f, "o_PS_OR_thermal_share", silent=True)
-            OR_share_VRE = gdx(f, "o_PS_OR_VRE_share", silent=True)
-            OR_share_ESS = gdx(f, "o_PS_OR_ESS_share", silent=True)
-            OR_share_BEV = gdx(f, "o_PS_OR_BEV_share", silent=True)
-            OR_share_PtH = gdx(f, "o_PS_OR_PtH_share", silent=True)
-            OR_net_import = gdx(f, "o_PS_OR_net_import")
-            OR_demand = {"wind": OR_demand_VRE.filter(like="WO", axis=0).groupby(level=[1]).sum(),
-                         "PV": OR_demand_VRE.filter(like="PV", axis=0).groupby(level=[1]).sum(),
-                         "other": OR_demand_other,
-                         "total": OR_demand_VRE.groupby(level=[1]).sum() + OR_demand_other.fillna(0)
+            FR_demand_VRE = gdx(f, "o_PS_FR_demand_VRE")
+            FR_demand_other = gdx(f, "PS_FR_min")
+            FR_available = gdx(f, "o_PS_FR_available")
+            FR_deficiency = gdx(f, "v_PS_FR_deficiency").level
+            FR_cost = gdx(f, "o_PS_FR_cost")
+            FR_period_cost = gdx(f, "o_PS_FR_cost_perPeriod")
+            FR_FFR_cost_share = gdx(f, "o_PS_FR_cost_FFRshare")
+            FR_available_thermal = gdx(f, "o_PS_FR_available_thermal")
+            FR_summed_thermal = try_sum(FR_available_thermal)
+            FR_available_ESS = gdx(f, "o_PS_FR_available_ESS")
+            FR_summed_ESS = try_sum(FR_available_ESS)
+            FR_available_BEV = gdx(f, "o_PS_FR_available_BEV")
+            FR_summed_BEV = try_sum(FR_available_BEV)
+            FR_available_VRE = gdx(f, "o_PS_FR_available_VRE")
+            FR_summed_VRE = try_sum(FR_available_VRE)
+            FR_available_hydro = gdx(f, "o_PS_FR_available_hydro")
+            FR_summed_hydro = try_sum(FR_available_hydro)
+            FR_value_share_thermal = gdx(f, "o_PS_FR_thermal_value_share", silent=True)
+            FR_value_share_VRE = gdx(f, "o_PS_FR_VRE_value_share", silent=True)
+            FR_value_share_ESS = gdx(f, "o_PS_FR_ESS_value_share", silent=True)
+            FR_value_share_BEV = gdx(f, "o_PS_FR_BEV_value_share", silent=True)
+            FR_value_share_PtH = gdx(f, "o_PS_FR_PtH_value_share", silent=True)
+            FR_value_share_hydro = gdx(f, "o_PS_FR_hydro_value_share", silent=True)
+            FR_share_thermal = gdx(f, "o_PS_FR_thermal_share", silent=True)
+            FR_share_VRE = gdx(f, "o_PS_FR_VRE_share", silent=True)
+            FR_share_ESS = gdx(f, "o_PS_FR_ESS_share", silent=True)
+            FR_share_BEV = gdx(f, "o_PS_FR_BEV_share", silent=True)
+            FR_share_PtH = gdx(f, "o_PS_FR_PtH_share", silent=True)
+            FR_share_hydro = gdx(f, "o_PS_FR_hydro_share", silent=True)
+            FR_net_import = gdx(f, "o_PS_FR_net_import")
+            FR_demand = {"wind": FR_demand_VRE.filter(like="WO", axis=0).groupby(level=[1]).sum(),
+                         "PV": FR_demand_VRE.filter(like="PV", axis=0).groupby(level=[1]).sum(),
+                         "other": FR_demand_other,
+                         "total": FR_demand_VRE.groupby(level=[1]).sum() + FR_demand_other.fillna(0)
                          }
             PS = True
         except Exception as e:
             PS = False
-            OR_value_share_thermal = False
+            FR_value_share_thermal = False
             print("%ancillary_services% was not activated for", k, "because:")
             print(format_exc())
 
@@ -243,7 +245,7 @@ def excel(scen:str, data, row, writer, indicators):
         ind_type = type(thing)
         if isinstance([], ind_type):
             print_num(writer, thing, "Indicators", row + 1, c, 0)
-        elif ind_type in [type(1.), type(3), type(''), np.float64]:
+        elif ind_type in [type(1.), type(3), type(''), type(True), np.float64]:
             print_num(writer, [thing], "Indicators", row + 1, c, 0)
         elif ind_type == pd.core.series.Series:
             try: print_num(writer, [thing.sum()], "Indicators", row + 1, c, 0)
@@ -267,20 +269,21 @@ def excel(scen:str, data, row, writer, indicators):
     scen_row += cap_len+2
     print_df(writer, data["curtailment_profile_total"].round(decimals=3), "Curtailment", stripped_scen)
     print_df(writer, data["el_price"].round(decimals=3), "Elec. price", stripped_scen, row_inc=2)
-    print_df(writer, data["OR_period_cost"].round(decimals=3), "OR period cost", stripped_scen, row_inc=2)
+    print_df(writer, data["FR_period_cost"].round(decimals=3), "FR period cost", stripped_scen, row_inc=2)
 
     print_gen(writer, stripped_scen, gen, data["gamsTimestep"])
 
     if data["PS"]:
-        try: print_df(writer, data["OR_cost"].round(decimals=3), "OR: Cost", stripped_scen, row_inc=2)
-        except IndexError: print(stripped_scen, data["OR_cost"])
-        print_df(writer, data["OR_available"].round(decimals=3), "OR: Available", stripped_scen, header=False)
-        print_df(writer, data["OR_deficiency"].round(decimals=2), "OR: Deficiency", stripped_scen, header=False)
-        print_df(writer, data["OR_net_import"].round(decimals=3), "OR: Net-import", stripped_scen, header=False)
-        print_df(writer, data["OR_demand"]["wind"].round(decimals=3), "OR demand: Wind", stripped_scen, header=True)
-        print_df(writer, data["OR_demand"]["PV"].round(decimals=3), "OR demand: PV", stripped_scen, header=True)
-        print_df(writer, data["OR_demand"]["other"].round(decimals=3), "OR demand: Other", stripped_scen, header=True)
-        print_df(writer, data["OR_demand"]["total"].round(decimals=3), "OR demand: Total", stripped_scen, header=True, row_inc=2)
+        try: print_df(writer, data["FR_cost"].round(decimals=3), "FR: Cost", stripped_scen, row_inc=2)
+        except IndexError:
+            if "lowFlex" in stripped_scen: print(stripped_scen, data["FR_cost"])
+        print_df(writer, data["FR_available"].round(decimals=3), "FR: Available", stripped_scen, header=False)
+        print_df(writer, data["FR_deficiency"].round(decimals=2), "FR: Deficiency", stripped_scen, header=False)
+        print_df(writer, data["FR_net_import"].round(decimals=3), "FR: Net-import", stripped_scen, header=False)
+        print_df(writer, data["FR_demand"]["wind"].round(decimals=3), "FR demand: Wind", stripped_scen, header=True)
+        print_df(writer, data["FR_demand"]["PV"].round(decimals=3), "FR demand: PV", stripped_scen, header=True)
+        print_df(writer, data["FR_demand"]["other"].round(decimals=3), "FR demand: Other", stripped_scen, header=True)
+        print_df(writer, data["FR_demand"]["total"].round(decimals=3), "FR demand: Total", stripped_scen, header=True, row_inc=2)
         print_df(writer, data["inertia_available"].round(decimals=3), "Inertia: Available", stripped_scen, header=True)
         print_df(writer, data["inertia_available_thermals"].round(decimals=3), "Inertia: Thermals", stripped_scen, header=True, row_inc=2)
     else:
