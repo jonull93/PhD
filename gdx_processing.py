@@ -58,12 +58,13 @@ indicators = ["cost_tot",
 
 cases = []
 systemFlex = ["lowFlex", "highFlex"]
-modes = ["noFC", "fullFC"]  # , "fullFC", "inertia", "OR"]#
+modes = ["noFC", "fullFC", "inertia"]  # , "fullFC", "inertia", "OR"]#
 for reg in ["iberia", "brit", "nordic"]:
     for flex in systemFlex:
         for mode in modes:
             for year in [2020,2025,2030,2040]:
-                cases.append(f"{reg}_{flex}_{mode}{suffix}_{year}{'_'+str(h)+'h' if h>1 else ''}")
+                if f"{reg}_{flex}_{mode}{suffix}_{year}{'_'+str(h)+'h' if h>1 else ''}" == "nordic_highFlex_noFC_2040_6h": continue
+                cases.append(f"{reg}_{flex}_{mode}_{year}{suffix}{'_'+str(h)+'h' if h>1 else ''}")
 
 
 comp_name = os.environ['COMPUTERNAME']

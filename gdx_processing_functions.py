@@ -218,7 +218,7 @@ def run_case(scen_name, data, gdxpath, indicators):
 
 def excel(scen:str, data, row, writer, indicators):
     global scen_row
-    stripped_scen = "_".join(scen.split("_")[:5])  # stripping unnecessary name components, like "6h"
+    stripped_scen = "_".join(scen.split("_")[:4])  # stripping unnecessary name components, like "6h"
     scen_row = 0
     cap = data["tot_cap"].rename("Cap").round(decimals=3)
     cap = cap[cap!=0]
