@@ -24,7 +24,7 @@ overwrite = []  # names of scenarios to overwrite regardless of existence in pic
 #overwrite = [reg+"_inertia_0.1x" for reg in ["ES3", "HU", "IE", "SE2"]]+\
 #            [reg+"_inertia" for reg in ["ES3", "HU", "IE", "SE2"]]+\
 #            [reg+"_inertia_noSyn" for reg in ["ES3", "HU", "IE", "SE2"]]
-h = 12  # time resolution
+h = 3  # time resolution
 suffix = ""  # Optional suffix for the run, e.g. "test" or "highBioCost"
 suffix = '_'+suffix if len(suffix) > 0 else ''
 name = f"results_{h}h{suffix}"  # this will be the name of the output excel file
@@ -142,10 +142,10 @@ def crawl_gdx(q_gdx, old_data, gdxpath, thread_nr, overwrite, todo_gdx_len):
             start_time_thread = tm.time()
             success, new_data[scen_name] = gpf.run_case(scen_name, old_data, gdxpath, indicators)
             print("Finished " + scen_name.ljust(20) + " after " + str(round(tm.time() - start_time_thread,
-                                                                          1)) + f" seconds, with {q_gdx.qsize()}/{len(todo_gdx)} files to go")
+                                                                          1)) + f" seconds")
             if success:
                 q_excel.put((scen_name, True))
-                print(f'q_excel appended and is now : {q_excel.qsize()} items long')
+                print(f' (q_excel appended and is now : {q_excel.qsize()} items long)')
         except FileNotFoundError:
             print("! Could not find file for", scen_name)
         except:
@@ -161,6 +161,7 @@ def crawl_gdx(q_gdx, old_data, gdxpath, thread_nr, overwrite, todo_gdx_len):
 
     # print(f"gdx crawler {thread_nr[threading.get_ident()]} now unemployed due to lack of work")
     return True
+
 def crawl_excel(path, old_data):
     global q_excel
     global q_gdx
@@ -213,15 +214,15 @@ for scen in todo_gdx:
     try:
         old_data[scen] = new_data[scen]
     except KeyError:
-        print("! Could not add", scen, "to the pickle jar because",scen,"was not found in newdata")
+        print("! Not saved (probably not a found gdx):", scen)
     except Exception as e:
-        print("! Could not add", scen, "to the pickle jar because",)
+        print("! Could not add", scen, "to the pickle jar because",str(e))
 
 pickle.dump(old_data, open("PickleJar\\data_" + name + ".pickle", "wb"))
 # for scen in file_list: run_case([0,scen], data, path, io_lock, True)
 
 print("Finished the queue after ", str(round((tm.time() - start_time_script) / 60, 2)),
-      "minutes - now saving excel file!")
+      "minutes - now saving excel file at", datetime.now().strftime('%H:%M:%S'))
 try:
     f = open(excel_name, "r+")
     f.close()
@@ -241,12 +242,6 @@ except FileNotFoundError:
 except Exception as e:
     print("!! Unknown error when opening Excel file:", type(e), str(e))
 
-worksheet = writer.sheets["Indicators"]
-worksheet.column_dimensions["A"].width = 20
-worksheet.column_dimensions["B"].width = 10
-worksheet.column_dimensions["C"].width = 10
-worksheet.column_dimensions["D"].width = 10
-worksheet.column_dimensions["E"].width = 10
 writer.save()
 print('Script finished completed after', str(round((tm.time() - start_time_script) / 60, 2)), 'minutes with',
-      str(errors), "errors.")
+      str(errors), "errors, at", datetime.now().strftime('%H:%M:%S'))

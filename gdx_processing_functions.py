@@ -117,6 +117,7 @@ def run_case(scen_name, data, gdxpath, indicators):
             if 0 < vals.upper == vals.level:
                 print(" ! ! Found capped investment at",index)
         gen = gdx(f, "o_generation")
+        gen_per_eltech = gdx(f, "o_generation_el")
         el_price = gdx(f, "o_el_cost")
         load_profile = gdx(f, "demandprofile_average")
         net_load = gdx(f, "o_net_load")
@@ -150,7 +151,8 @@ def run_case(scen_name, data, gdxpath, indicators):
             FR_demand_VRE = gdx(f, "o_PS_FR_demand_VRE")
             FR_demand_other = gdx(f, "PS_FR_min")
             FR_available = gdx(f, "o_PS_FR_available")
-            FR_deficiency = gdx(f, "v_PS_FR_deficiency").level
+            try: FR_deficiency = gdx(f, "v_PS_FR_deficiency").level
+            except AttributeError: FR_deficiency = gdx(f, "v_PS_OR_deficiency").level
             FR_cost = gdx(f, "o_PS_FR_cost")
             FR_period_cost = gdx(f, "o_PS_FR_cost_perPeriod")
             FR_FFR_cost_share = gdx(f, "o_PS_FR_cost_FFRshare")
