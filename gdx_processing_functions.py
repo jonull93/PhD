@@ -91,6 +91,7 @@ def run_case(scen_name, data, gdxpath, indicators):
     # H2store
     # el_tot,
     region = k.split("_")[0]
+    year = k.split("_")[3]
     with gdxr.GdxFile(gdxpath + k + ".gdx") as f:
         before = [i for i in locals().keys()]  # variables defined before this line do not get pickled
         gamsTimestep = gdx(f, "timestep")
@@ -126,7 +127,26 @@ def run_case(scen_name, data, gdxpath, indicators):
         timestep = [i + 1 for i in iter_t]  # 1
         TT = 8760 / len(gams_timestep)
         allwind = gdx(f, "timestep")
-        cost_tot = gdx(f, "v_totcost").level
+        cost_tot = gdx(f, "o_cost_total_oldinv", silent=True)
+        if cost_tot == None:  # this whole thing should become redundant as new runs are made and the line above returns the actual value
+            cost_tot = gdx(f, "v_totcost").level
+            previous_investments = gdx(f, "previousInvestments")
+            annuity = gdx(f, "annuity")
+            inv_cost = gdx(f, "inv_cost")
+            try:
+                for ind, preInv in previous_investments.items():
+                    _tech = ind[0]
+                    _region = ind[1]
+                    cost_tot += preInv*annuity[_tech]*inv_cost[(_tech, year)]/1000
+            except Exception as e:
+                print(f"!! failed because {e}")
+                print(previous_investments)
+
+        cost_tot_onlynew = gdx(f, "v_totcost").level
+        if isinstance(gdx(f, "o_cost_total"),type(1.)) and round(cost_tot_onlynew, 5) != round(gdx(f, "o_cost_total"), 5):
+            print(f"! Mismatching tot_cost in {scen_name}: {round(cost_tot_onlynew, 5)}, {round(cost_tot, 5)}")
+        cost_partload = gdx(f, "o_cost_partload")
+        cost_flexlim = gdx(f, "o_cost_flexlim")
         allthermal = gdx(f, "allthermal")
         allstorage = gdx(f, "allwind")
         withdrawal_rate = gdx(f, "withdrawal_rate")
@@ -203,7 +223,7 @@ def run_case(scen_name, data, gdxpath, indicators):
     except KeyError: bat = 0
 
     after = locals().keys()
-    to_save = [i for i in after if i not in before]
+    to_save = [i for i in after if i not in before and "_" != i[0]]  # skip variables that start with _
     for i in indicators:
         if i not in to_save:
             print(i, "from Indicators is not currently captured! ~~")
@@ -249,6 +269,8 @@ def excel(scen:str, data, row, writer, indicators):
             print_num(writer, thing, "Indicators", row + 1, c, 0)
         elif ind_type in [type(1.), type(3), type(''), type(True), np.float64]:
             print_num(writer, [thing], "Indicators", row + 1, c, 0)
+        elif isinstance(None, ind_type):
+            print_num(writer, ["-"], "Indicators", row + 1, c, 0)
         elif ind_type == pd.core.series.Series:
             try: print_num(writer, [thing.sum()], "Indicators", row + 1, c, 0)
             except: print(f"Failed to print {indicator} to excel!")
