@@ -2,11 +2,20 @@ import pickle
 from os import path
 
 import matplotlib.pyplot as plt
+import matplotlib.text as mpltext
 import pandas as pd
 
+def int_if_int(i):
+    if isinstance(i, int): return i
+    if isinstance(i, mpltext.Text): i = i.get_text()
+    if isinstance(i, str):
+        try: i = float(i)
+        except ValueError: return i
+    if i.is_integer(): return int(i)
+    else: return round(i, 3)
 
 def percent_stacked_area(region, mode, timestep, indicator_string: str, set: dict, years=None, FC=True,
-                         secondary_y="FR_cost", pickle_suffix=""):
+                         secondary_y="FR_cost", pickle_suffix="", bars=True):
     if len(pickle_suffix) > 0 and pickle_suffix[0] != "_":
         pickle_suffix = "_" + pickle_suffix
     if years is None:
@@ -44,22 +53,31 @@ def percent_stacked_area(region, mode, timestep, indicator_string: str, set: dic
 
     # ---- plotting
     # takes DataFrame and plots stacked area and optionally a line on secondary y axis
-    ax = df.div(df.sum(axis=1), axis=0).plot(kind="area", linewidth=0)
-    ax.set_xticks(df.index)
+    if bars is True:
+        ax = df.div(df.sum(axis=1), axis=0).plot.bar(stacked=True, rot=15, figsize=(4,5))
+    else:
+        ax = df.div(df.sum(axis=1), axis=0).plot(kind="area", linewidth=0)
+    #ax.set_xticks(df.index)
     if indicator_string == "FR_cost":
         ax.set_title(f"Interval share and cost, {region.capitalize()}, {mode}")
     else:
         ax.set_title(f"Reserve share and cost, {region.capitalize()}, {mode}")
     ax.set_ylabel("Reserve share [-]")
-    ax.set_xlabel("Year")
     current_handles, current_labels = plt.gca().get_legend_handles_labels()
+    #_locs, _labels = plt.yticks()
+    #print([int_if_int(i) for i in _locs])
+    _ticks = [0, 0.2, 0.4, 0.6, 0.8, 1]
+    ax.set_yticks(_ticks)
+    ax.set_yticklabels([int_if_int(i) for i in _ticks])
     ax2 = ax.twinx()
     if "per_gen" in secondary_y: ax2.set_ylabel("Reserve cost per year and generation [€/GWh]")
     else: ax2.set_ylabel("Total reserve cost per year [M€]")
-    line = ax2.plot(df.index, secondary_y_values, "k--", )
+    line = ax2.plot(secondary_y_values, "k--", )
     handles = current_handles + line
     labels = [h.get_label() for h in handles]
     labels[-1] = "Cost"
+    ax.set_xticklabels(["2020", "Short-term", "Intermediate\n-term", "Long-term"])
+    ax.set_xlabel("Time into future")
     ax.legend(handles, labels)
     ax2.set_ylim(ymin=0)
     # ax2.ticklabel_format(style="sci", scilimits=(0, 0))
@@ -67,7 +85,7 @@ def percent_stacked_area(region, mode, timestep, indicator_string: str, set: dic
 
 
 mode = "lowFlex"
-pickle_suff = "earlyBat"
+pickle_suff = ""
 secondary_y = "FR_cost" #_per_gen
 if len(pickle_suff) > 0: pickle_suff = "_" + pickle_suff
 timestep = 12
@@ -77,7 +95,7 @@ FR_intervals = {"FFR": 1, "5-30s": 2, "30s-5min": 3, "5-15min": 4, "15-30min": 5
 # ax = percent_stacked_area("nordic", mode, timestep, "FR_value_share_", reserve_technologies, secondary_y="FR_cost_per_gen")
 # plt.show()
 for region in ["nordic", "brit", "iberia"]:
-    print("_______________" * 3)
+    print("________________" * 3)
     print(f" .. Making figure for {region} .. ")
     ax = percent_stacked_area(region, mode, timestep, "FR_value_share_", reserve_technologies,
                               secondary_y=secondary_y, pickle_suffix=pickle_suff)
