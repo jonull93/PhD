@@ -174,8 +174,9 @@ def label_axes(fig, labels=None, loc=None, **kwargs):
     labels = itertools.cycle(labels)
     if loc is None:
         loc = (.9, .9)
+    print(len(fig.axes))
     for ax, lab in zip(fig.axes, labels):
-        ax.annotate(lab, xy=loc,
+        ax.annotate(lab+")", xy=loc,
                     xycoords='axes fraction',
                     **kwargs)
 
