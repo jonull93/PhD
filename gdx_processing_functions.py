@@ -127,24 +127,34 @@ def run_case(scen_name, data, gdxpath, indicators):
         timestep = [i + 1 for i in iter_t]  # 1
         TT = 8760 / len(gams_timestep)
         allwind = gdx(f, "timestep")
-        cost_tot = gdx(f, "o_cost_total_oldinv", silent=True)
-        if cost_tot == None:  # this whole thing should become redundant as new runs are made and the line above returns the actual value
-            cost_tot = gdx(f, "v_totcost").level
-            previous_investments = gdx(f, "previousInvestments")
+        cost_tot = gdx(f, "o_cost_total_oldinv", silent=False)
+        if True:  # this whole thing should become redundant as new runs are made and the line above returns the actual value
+            cost_tot2 = gdx(f, "v_totcost").level
+            previous_investments = gdx(f, "previous_investments_yearly")
             annuity = gdx(f, "annuity")
             inv_cost = gdx(f, "inv_cost")
+            techprop = gdx(f, "techprop")
+            OM_fix = techprop[:, "OM_fix"]
             try:
                 for ind, preInv in previous_investments.items():
                     _tech = ind[0]
                     _region = ind[1]
-                    cost_tot += preInv*annuity[_tech]*inv_cost[(_tech, year)]/1000
+                    _year = ind[2]
+                    cost_tot2 += preInv*annuity[_tech]*inv_cost[(_tech, _year)]/1000
+                    try: cost_tot2 += preInv * OM_fix[_tech] / 1000
+                    except KeyError:
+                        if _tech not in ["EB", "bat"]: print("Unexpectedly failed to add OM_fix for", _tech)
             except Exception as e:
                 print(f"!! failed because {e}")
                 print(previous_investments)
+                raise Exception
 
         cost_tot_onlynew = gdx(f, "v_totcost").level
-        if isinstance(gdx(f, "o_cost_total"),type(1.)) and round(cost_tot_onlynew, 5) != round(gdx(f, "o_cost_total"), 5):
-            print(f"! Mismatching tot_cost in {scen_name}: {round(cost_tot_onlynew, 5)}, {round(cost_tot, 5)}")
+        if round(cost_tot, 3) != round(cost_tot2, 3):
+            print(f"- Discrepancy when adding previousInvestments in {scen_name}: from {round(cost_tot_onlynew, 5)} to {round(cost_tot, 5)} (or {round(cost_tot2,5)})")
+            if cost_tot > cost_tot2+1 and "fullFC" in scen_name:
+                cost_tot = cost_tot2
+                print("Replacing value - cost_tot is now",cost_tot)
         cost_partload = gdx(f, "o_cost_partload")
         cost_flexlim = gdx(f, "o_cost_flexlim")
         allthermal = gdx(f, "allthermal")
@@ -173,7 +183,15 @@ def run_case(scen_name, data, gdxpath, indicators):
             FR_available = gdx(f, "o_PS_FR_available")
             try: FR_deficiency = gdx(f, "v_PS_FR_deficiency").level
             except AttributeError: FR_deficiency = gdx(f, "v_PS_OR_deficiency").level
-            FR_cost = gdx(f, "o_PS_FR_cost")
+            try: FR_cost = gdx(f, "EQU_PS_FR_loadbalance").marginal.clip(upper=0)*-1e6/TT
+            except AttributeError: FR_cost = gdx(f, "EQU_PS_FR_supply").marginal.clip(upper=0) * -1e6 / TT
+            try:
+                if FR_cost.sum().sum() > 0: print("FR cost in ", k, "=", round(FR_cost.sum().sum()))
+                elif "lowFlex" in k and "fullFC" in k:
+                    print("!! Missing non-zero FR_cost in", k)
+            except:
+                if "lowFlex" in k and "fullFC" in k:
+                    print("!! Missing non-zero FR_cost in",k)
             FR_period_cost = gdx(f, "o_PS_FR_cost_perPeriod")
             FR_FFR_cost_share = gdx(f, "o_PS_FR_cost_FFRshare")
             FR_available_thermal = gdx(f, "o_PS_FR_available_thermal")
@@ -188,7 +206,7 @@ def run_case(scen_name, data, gdxpath, indicators):
             FR_summed_hydro = try_sum(FR_available_hydro)
             FR_value_share_thermal = gdx(f, "o_PS_FR_thermal_value_share", silent=True)
             FR_value_share_VRE = gdx(f, "o_PS_FR_VRE_value_share", silent=True)
-            FR_value_share_ESS = gdx(f, "o_PS_FR_ESS_value_share", silent=True)
+            FR_value_share_ESS = gdx(f, "o_PS_FR_ESS_value_share", silent=True, error_return=0)
             FR_value_share_BEV = gdx(f, "o_PS_FR_BEV_value_share", silent=True)
             FR_value_share_PtH = gdx(f, "o_PS_FR_PtH_value_share", silent=True)
             FR_value_share_hydro = gdx(f, "o_PS_FR_hydro_value_share", silent=True)
@@ -208,6 +226,7 @@ def run_case(scen_name, data, gdxpath, indicators):
         except Exception as e:
             PS = False
             FR_value_share_thermal = False
+            FR_value_share_VRE = False
             print("%ancillary_services% was not activated for", k, "because:")
             print(format_exc())
 
@@ -263,7 +282,8 @@ def excel(scen:str, data, row, writer, indicators):
     for indicator in indicators:
         # print(data[k][i])
         print_num(writer, [indicator], "Indicators", 0, c, 0)
-        thing = data[indicator]
+        try: thing = data[indicator]
+        except KeyError: thing = None
         ind_type = type(thing)
         if isinstance([], ind_type):
             print_num(writer, thing, "Indicators", row + 1, c, 0)
@@ -293,14 +313,14 @@ def excel(scen:str, data, row, writer, indicators):
     scen_row += cap_len+2
     print_df(writer, data["curtailment_profile_total"].round(decimals=3), "Curtailment", stripped_scen)
     print_df(writer, data["el_price"].round(decimals=3), "Elec. price", stripped_scen, row_inc=2)
-    print_df(writer, data["FR_period_cost"].round(decimals=3), "FR period cost", stripped_scen, row_inc=2)
+    if data["PS"]: print_df(writer, data["FR_period_cost"].round(decimals=3), "FR period cost", stripped_scen, row_inc=2)
 
     print_gen(writer, stripped_scen, gen, data["gamsTimestep"])
 
     if data["PS"]:
         try: print_df(writer, data["FR_cost"].round(decimals=3), "FR: Cost", stripped_scen, row_inc=2)
         except IndexError:
-            if "lowFlex" in stripped_scen: print(stripped_scen, data["FR_cost"])
+            if "lowFlex" in stripped_scen and "fullFC" in stripped_scen: print(stripped_scen, data["FR_cost"])
         print_df(writer, data["FR_available"].round(decimals=3), "FR: Available", stripped_scen, header=False)
         print_df(writer, data["FR_deficiency"].round(decimals=2), "FR: Deficiency", stripped_scen, header=False)
         print_df(writer, data["FR_net_import"].round(decimals=3), "FR: Net-import", stripped_scen, header=False)

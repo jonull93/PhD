@@ -18,13 +18,13 @@ import gdx_processing_functions as gpf
 start_time_script = tm.time()
 print("Excel-writing script started at", datetime.now().strftime('%H:%M:%S'))
 
-excel = True  # will only make a .pickle if excel == False
+excel = False  # will only make a .pickle if excel == False
 run_output = "w"  # 'w' to (over)write or 'rw' to only add missing scenarios
-overwrite = []  # names of scenarios to overwrite regardless of existence in pickled data
+overwrite = ["brit_lowFlex_fullFC_2040_6h","brit_lowFlex_noFC_2040_6h"]  # names of scenarios to overwrite regardless of existence in pickled data
 #overwrite = [reg+"_inertia_0.1x" for reg in ["ES3", "HU", "IE", "SE2"]]+\
 #            [reg+"_inertia" for reg in ["ES3", "HU", "IE", "SE2"]]+\
 #            [reg+"_inertia_noSyn" for reg in ["ES3", "HU", "IE", "SE2"]]
-h = 3  # time resolution
+h = 6  # time resolution
 suffix = ""  # Optional suffix for the run, e.g. "test" or "highBioCost"
 suffix = '_'+suffix if len(suffix) > 0 else ''
 name = f"results_{h}h{suffix}"  # this will be the name of the output excel file
@@ -48,6 +48,7 @@ indicators = ["cost_tot",
               "FR_share_PtH",
               "FR_share_hydro",
               "FR_FFR_cost_share",
+              "cost_flexlim",
               "G",
 #              'sync_cond',
               'bat',
@@ -63,7 +64,7 @@ for reg in ["iberia", "brit", "nordic"]:
     for flex in systemFlex:
         for mode in modes:
             for year in [2020,2025,2030,2040]:
-                if f"{reg}_{flex}_{mode}{suffix}_{year}{'_'+str(h)+'h' if h>1 else ''}" == "nordic_highFlex_noFC_2040_6h": continue
+                #if f"{reg}_{flex}_{mode}{suffix}_{year}{'_'+str(h)+'h' if h>1 else ''}" == "nordic_lowFlex_fullFC_2040_6h": continue
                 cases.append(f"{reg}_{flex}_{mode}_{year}{suffix}{'_'+str(h)+'h' if h>1 else ''}")
 
 
@@ -107,9 +108,10 @@ q_excel = Queue(maxsize=0)
 for i, scen in enumerate(todo_gdx):
     q_gdx.put((i, scen))  # put (index, {scenarioname}) at the end of the queue
 
-for scen in [j for j in cases if j not in todo_gdx]:
-    # the False below relates to
-    q_excel.put((scen, False))  # if some data is ready to be sent to excel right away, fill the queue accordingly
+if excel:
+    for scen in [j for j in cases if j not in todo_gdx]:
+        # the False below relates to
+        q_excel.put((scen, False))  # if some data is ready to be sent to excel right away, fill the queue accordingly
 
 new_data = {}
 # io_lock = threading.Lock()
@@ -143,7 +145,7 @@ def crawl_gdx(q_gdx, old_data, gdxpath, thread_nr, overwrite, todo_gdx_len):
             success, new_data[scen_name] = gpf.run_case(scen_name, old_data, gdxpath, indicators)
             print("Finished " + scen_name.ljust(20) + " after " + str(round(tm.time() - start_time_thread,
                                                                           1)) + f" seconds")
-            if success:
+            if success and excel:
                 q_excel.put((scen_name, True))
                 print(f' (q_excel appended and is now : {q_excel.qsize()} items long)')
         except FileNotFoundError:
@@ -170,7 +172,7 @@ def crawl_excel(path, old_data):
     while True:
         if not q_excel.empty():
             scen_name, scen_new = q_excel.get()
-            print("Starting excel() for", scen_name, "at", datetime.now().strftime('%H:%M:%S'))
+            print("Starting excel() for", scen_name, "at", datetime.now().strftime('%H:%M:%S'), f' ({q_excel.qsize()} items in excel queue)')
             if scen_new:
                 try:
                     data = new_data[scen_name]
@@ -193,55 +195,58 @@ def crawl_excel(path, old_data):
 
 
 # Starting worker threads on queue processing
-print('Starting excel thread(s)')
-worker = threading.Thread(target=crawl_excel, args=(path, old_data))
-worker.start()
+if excel:
+    print('Starting excel thread(s)')
+    worker = threading.Thread(target=crawl_excel, args=(path, old_data))
+    worker.start()
 for i in range(num_threads):
     print('Starting gdx thread', i + 1)
     worker = threading.Thread(target=crawl_gdx, args=(q_gdx, old_data, gdxpath, thread_nr, overwrite, len(todo_gdx)),
                               daemon=False)
     # setting threads as "daemon" allows main program to exit eventually even if these dont finish correctly
     worker.start()
-    tm.sleep(3)  # staggering gdx threads shouldnt matter as long as the excel process has something to work on
+    tm.sleep(1+excel*2)  # staggering gdx threads shouldnt matter as long as the excel process has something to work on
 # now we wait until the queue has been processed
 q_gdx.join()  # first we make sure there are no gdx files waiting to get processed
 isgdxdone = True
 if opened_file: print(" ! REMINDER TO MAKE SURE EXCEL FILE IS CLOSED !")
-print("GDX queue empty!")
-q_excel.join()  # and then we make sure the excel queue is also empty
+
+print("Finished the GDX queue after ", str(round((tm.time() - start_time_script) / 60, 2)),
+      "minutes - now saving pickle at", datetime.now().strftime('%H:%M:%S'))
 
 for scen in todo_gdx:
     try:
         old_data[scen] = new_data[scen]
     except KeyError:
-        print("! Not saved (probably not a found gdx):", scen)
+        print("! Not saved (probably a missing gdx):", scen)
     except Exception as e:
         print("! Could not add", scen, "to the pickle jar because",str(e))
 
 pickle.dump(old_data, open("PickleJar\\data_" + name + ".pickle", "wb"))
 # for scen in file_list: run_case([0,scen], data, path, io_lock, True)
 
-print("Finished the queue after ", str(round((tm.time() - start_time_script) / 60, 2)),
+q_excel.join()  # and then we make sure the excel queue is also empty
+print("Finished excel queue after ", str(round((tm.time() - start_time_script) / 60, 2)),
       "minutes - now saving excel file at", datetime.now().strftime('%H:%M:%S'))
-try:
-    f = open(excel_name, "r+")
-    f.close()
-except PermissionError:
-    opened_file = True
-    print("OBS: EXCEL FILE IS OPEN - PLEASE CLOSE IT TO RESUME SCRIPT")
-    while opened_file:
-        try:
-            f = open(excel_name, "r+")
-            f.close()
-            print("thank you for closing the file :)")
-            opened_file = False
-        except PermissionError:
-            time.sleep(5)
-except FileNotFoundError:
-    None
-except Exception as e:
-    print("!! Unknown error when opening Excel file:", type(e), str(e))
-
-writer.save()
+if excel:
+    try:
+        f = open(excel_name, "r+")
+        f.close()
+    except PermissionError:
+        opened_file = True
+        print("OBS: EXCEL FILE IS OPEN - PLEASE CLOSE IT TO RESUME SCRIPT")
+        while opened_file:
+            try:
+                f = open(excel_name, "r+")
+                f.close()
+                print("thank you for closing the file :)")
+                opened_file = False
+            except PermissionError:
+                time.sleep(5)
+    except FileNotFoundError:
+        None
+    except Exception as e:
+        print("!! Unknown error when opening Excel file:", type(e), str(e))
+    writer.save()
 print('Script finished completed after', str(round((tm.time() - start_time_script) / 60, 2)), 'minutes with',
       str(errors), "errors, at", datetime.now().strftime('%H:%M:%S'))
