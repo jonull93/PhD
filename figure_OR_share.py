@@ -140,10 +140,10 @@ print("________________" * 3)
 print(f" .. Making figure for {regions} .. ")
 percent_stacked_area(regions, mode, timestep, "FR_value_share_", reserve_technologies,
                      secondary_y=secondary_y, pickle_suffix=pickle_suff)
-plt.savefig(rf"figures\reserve_valueshare_{mode}{pickle_suff}.png", dpi=600, bbox_inches="tight")
+plt.savefig(rf"figures\reserve_valueshare_{mode}{pickle_suff}_{timestep}h.png", dpi=600, bbox_inches="tight")
 percent_stacked_area(regions, mode, timestep, "FR_share_", reserve_technologies, secondary_y=secondary_y,
                      pickle_suffix=pickle_suff)
-plt.savefig(rf"figures\reserve_share_{mode}{pickle_suff}.png", dpi=600, bbox_inches="tight")
+plt.savefig(rf"figures\reserve_share_{mode}{pickle_suff}_{timestep}h.png", dpi=600, bbox_inches="tight")
 percent_stacked_area(regions, mode, timestep, "FR_cost", FR_intervals, secondary_y=secondary_y,
                      pickle_suffix=pickle_suff)
 plt.savefig(rf"figures\interval_costs_{mode}{pickle_suff}_{timestep}h.png", dpi=600, bbox_inches="tight")
