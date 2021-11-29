@@ -72,9 +72,9 @@ def percent_stacked_area(regions, mode, timestep, indicator_string: str, set: di
     data = pickle.load(open(path.relpath(rf"PickleJar\data_results_{timestep}h{pickle_suffix}.pickle"), "rb"))
     fig, axes = plt.subplots(nrows=1, ncols=len(regions), figsize=(8, 4), )
     label_axes(fig, loc=(-0.1, 1.03))
-    print(axes)
     for j, region in enumerate(regions):
         scenarios = [f"{region}_{mode}_{'fullFC' if FC else 'noFC'}_{y}{pickle_suffix}_{timestep}h" for y in years]
+        print("Cost_tot:", [round(data[scen]["cost_tot"], 2) for scen in scenarios])
         if indicator_string == "FR_cost":
             indicator_data = {pretty: [0. for i in range(len(scenarios))] for pretty in set}
             for pretty, name in set.items():
@@ -129,7 +129,7 @@ mode = "lowFlex"
 pickle_suff = ""
 secondary_y = "FR_syscost_per_gen"  # _per_gen
 if len(pickle_suff) > 0: pickle_suff = "_" + pickle_suff
-timestep = 3
+timestep = 6
 reserve_technologies = {"Thermals": "thermal", "VRE": "VRE", "ESS": "ESS", "BEV": "BEV", "PtH": "PtH", "Hydro": "hydro"}
 FR_intervals = {"FFR": 1, "5-30s": 2, "30s-5min": 3, "5-15min": 4, "15-30min": 5, "30-60min": 6}
 
@@ -146,4 +146,4 @@ percent_stacked_area(regions, mode, timestep, "FR_share_", reserve_technologies,
 plt.savefig(rf"figures\reserve_share_{mode}{pickle_suff}.png", dpi=600, bbox_inches="tight")
 percent_stacked_area(regions, mode, timestep, "FR_cost", FR_intervals, secondary_y=secondary_y,
                      pickle_suffix=pickle_suff)
-plt.savefig(rf"figures\interval_costs_{mode}{pickle_suff}.png", dpi=600, bbox_inches="tight")
+plt.savefig(rf"figures\interval_costs_{mode}{pickle_suff}_{timestep}h.png", dpi=600, bbox_inches="tight")

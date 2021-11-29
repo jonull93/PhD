@@ -4,6 +4,7 @@ order_gen = [
             'efuel',
             'electrolyser',
             'EB',
+            'HP',
             'PTES_L',
             'PTES_L_HX',
             'TTES',
