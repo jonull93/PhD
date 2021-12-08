@@ -85,7 +85,7 @@ def plot_cap_multipleyears(ax, data, scenario, years=None, new=True, patterns=No
         df_gen.loc[tech] = 0
     df_VMS = cap_series.to_frame(name="VMS").drop(labels=[i for i in techs if i not in VMS], errors="ignore", level=0)
     df = df_gen.join(df_VMS)
-    df[df < 0.001] = 0
+    df[df < 0.01][df > -0.01] = 0
     colors = [color_dict[tech] for tech in df.index.get_level_values(0)]
     plot = df.T.plot(kind="bar", stacked=True, color=colors, legend=False, width=0.9, rot=0, ax=ax, )
     if comparison: plot.axhline(linewidth=1, color="black")
@@ -120,7 +120,7 @@ for i in range(2):
 tech_collections = []
 patterns = ['X', '/', '.', '']
 years = [2020, 2025, 2030, 2040]
-reg = "iberia"
+reg = "nordic"
 for i_f, flex in enumerate(["lowFlex", "highFlex"]):
     plot, t, df = plot_cap_multipleyears(axes[i_f][0], data, f"{reg}_{flex}_noFC_YEAR_6h", patterns=patterns,
                                          years=years)

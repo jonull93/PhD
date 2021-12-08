@@ -29,8 +29,12 @@ def df_to_stacked_areas(scen_data, ax, to_drop=None, region=None, startday=1, da
             print(df)
             bat_SoC = False
     if FR:
-        FR_price = scen_data["FR_cost"].sum().reindex(list(df),fill_value=0).rename("FR price")
-        FFR_price = scen_data["FR_cost"].sum(level=1).loc["1"].reindex(list(df),fill_value=0).rename("FFR price")
+        try:
+            FR_price = scen_data["FR_cost"].sum().reindex(list(df),fill_value=0).rename("FR price")
+            FFR_price = scen_data["FR_cost"].sum(level=1).loc["1"].reindex(list(df), fill_value=0).rename("FFR price")
+        except AttributeError:
+            FR = False
+
 
     df.drop(to_drop, axis=0, inplace=True, errors='ignore')
 
@@ -87,11 +91,11 @@ def df_to_stacked_areas(scen_data, ax, to_drop=None, region=None, startday=1, da
     return df
 
 
-timestep = 3
-year = 2025
-region = "iberia"
+timestep = 6
+year = 2040
+region = "brit"
 mode = "lowFlex"
-FC = "fullFC"
+FC = "noFC"
 pickle_suff = ""
 if len(pickle_suff) > 0: pickle_suff = "_" + pickle_suff
 data = pickle.load(open(os.path.relpath(rf"PickleJar\data_results_{timestep}h{pickle_suff}.pickle"), "rb"))
@@ -99,7 +103,8 @@ data = pickle.load(open(os.path.relpath(rf"PickleJar\data_results_{timestep}h{pi
 scenario = f"{region}_{mode}_{FC}_{year}_{timestep}h"
 fig_path = f"figures\\{scenario}\\"
 os.makedirs(fig_path, exist_ok=True)
-for day in range(1, 358, 56):
+for day in range(1, 358, 28):
     fig, ax = plt.subplots()
+    plt.title(f"{region.capitalize()} {mode}, {FC}")
     df = df_to_stacked_areas(data[scenario], ax, startday=day)
     plt.savefig(fig_path+f"week {int(np.ceil(day/7))}.png", dpi=300, bbox_inches='tight')
