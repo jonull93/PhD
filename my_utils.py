@@ -174,9 +174,8 @@ def label_axes(fig, labels=None, loc=None, **kwargs):
     labels = itertools.cycle(labels)
     if loc is None:
         loc = (.9, .9)
-    print(len(fig.axes))
     for ax, lab in zip(fig.axes, labels):
-        ax.annotate(lab+")", xy=loc,
+        ax.annotate(lab, xy=loc,
                     xycoords='axes fraction',
                     **kwargs)
 
@@ -243,6 +242,14 @@ def write_inc_from_df_columns(path, filename, var: pandas.DataFrame):
     return None
 
 
+def append_to_file(filename, scenario, time_to_solve):
+    "adds 'to_add' to a new line at the top of originalfile"
+    to_add = f"{dt.datetime.now().strftime('%D - %H:%M:%S')} : {scenario:<40} : " \
+             f"{time_to_solve} min\n"
+    with open(filename + ".txt", 'a') as f2:
+        f2.write(to_add)
+
+
 def add_in_dict(d, key, val, group_vre=False, tech_position=0):
     is_touple = type(key) == tuple
     if is_touple:
@@ -263,3 +270,37 @@ def add_in_dict(d, key, val, group_vre=False, tech_position=0):
         d[key] += val
     else:
         d[key] = val
+
+
+def crawl_resource_usage(timer=5):
+    import time
+    import psutil
+    from termcolor import colored
+    print(f"Resource usage crawler started. Will print memory and CPU usage (%) every {timer} minutes.")
+    while True:
+        color = "red" if psutil.virtual_memory().percent > 80 or psutil.cpu_percent(2) > 80 else "white"
+        print(colored(
+            f"~~ Resource crawler, {dt.datetime.now().strftime('%H:%M:%S')} ~~, RAM: {psutil.virtual_memory().percent} %, CPU: {psutil.cpu_percent(2)} %",
+            color))
+        time.sleep(timer * 60)
+
+
+def print_red(to_print: str, **argv):
+    from termcolor import colored
+    for arg in argv:
+        to_print += str(arg)
+    print(colored(to_print, "red"))
+
+
+def print_green(to_print: str, **argv):
+    from termcolor import colored
+    for arg in argv:
+        to_print += str(arg)
+    print(colored(to_print, "green"))
+
+
+def print_cyan(to_print: str, **argv):
+    from termcolor import colored
+    for arg in argv:
+        to_print += " "+str(arg)
+    print(colored(to_print, "cyan"))
