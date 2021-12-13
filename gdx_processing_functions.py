@@ -10,7 +10,7 @@ import numpy as np
 
 from get_from_gams_db import gdx
 from copy import copy
-from my_utils import TECH, order_map_cap, order_map_gen
+from my_utils import TECH, order_map_cap, order_map_gen, print_green, print_cyan, print_red
 
 
 def print_gen(writer, sheet, df, gamsTimestep):
@@ -154,7 +154,6 @@ def run_case(scen_name, data, gdxpath, indicators):
             print(f"- Discrepancy when adding previousInvestments in {scen_name}: from {round(cost_tot_onlynew, 5)} to {round(cost_tot, 5)} (or {round(cost_tot2,5)})")
             if cost_tot > cost_tot2+1 and "fullFC" in scen_name:
                 cost_tot = cost_tot2
-                print("Replacing value - cost_tot is now",cost_tot)
         cost_partload = gdx(f, "o_cost_partload")
         cost_flexlim = gdx(f, "o_cost_flexlim")
         allthermal = gdx(f, "allthermal")

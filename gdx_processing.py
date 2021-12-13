@@ -18,14 +18,14 @@ import gdx_processing_functions as gpf
 start_time_script = tm.time()
 print("Excel-writing script started at", datetime.now().strftime('%H:%M:%S'))
 
-excel = False  # will only make a .pickle if excel == False
+excel = True  # will only make a .pickle if excel == False
 run_output = "w"  # 'w' to (over)write or 'rw' to only add missing scenarios
 overwrite = ["brit_lowFlex_fullFC_2040_6h","brit_lowFlex_noFC_2040_6h"]  # names of scenarios to overwrite regardless of existence in pickled data
 #overwrite = [reg+"_inertia_0.1x" for reg in ["ES3", "HU", "IE", "SE2"]]+\
 #            [reg+"_inertia" for reg in ["ES3", "HU", "IE", "SE2"]]+\
 #            [reg+"_inertia_noSyn" for reg in ["ES3", "HU", "IE", "SE2"]]
 h = 6  # time resolution
-suffix = ""  # Optional suffix for the run, e.g. "test" or "highBioCost"
+suffix = "noGpeak"  # Optional suffix for the run, e.g. "test" or "highBioCost"
 suffix = '_'+suffix if len(suffix) > 0 else ''
 name = f"results_{h}h{suffix}"  # this will be the name of the output excel file
 
@@ -205,7 +205,7 @@ for i in range(num_threads):
                               daemon=False)
     # setting threads as "daemon" allows main program to exit eventually even if these dont finish correctly
     worker.start()
-    tm.sleep(1+excel*2)  # staggering gdx threads shouldnt matter as long as the excel process has something to work on
+    tm.sleep(1+excel)  # staggering gdx threads shouldnt matter as long as the excel process has something to work on
 # now we wait until the queue has been processed
 q_gdx.join()  # first we make sure there are no gdx files waiting to get processed
 isgdxdone = True
