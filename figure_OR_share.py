@@ -91,8 +91,7 @@ def percent_stacked_area(regions, mode, timestep, indicator_string: str, set: di
                             print(type(e), e)
         else:
             indicator_data = {pretty: [data[scen][f"{indicator_string}{name}"] for scen in scenarios] for pretty, name
-                              in
-                              set.items()}
+                              in set.items()}
         if secondary_y == "FR_cost":
             secondary_y_values = [data[scen][secondary_y].sum().sum().round() / 1000 for scen in scenarios]
         elif secondary_y == "FR_cost_per_gen":

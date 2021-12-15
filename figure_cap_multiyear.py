@@ -10,7 +10,10 @@ import os
 from my_utils import color_dict, order_cap, add_in_dict, tech_names, scen_names, print_cyan, print_red, print_green
 
 pickleJar = ""
-data = pickle.load(open(os.path.relpath(r"PickleJar\data_results_6h.pickle"), "rb"))
+h = 6
+suffix = "noGpeak"
+suffix = "_"+suffix if len(suffix)>0 else ""
+data = pickle.load(open(os.path.relpath(rf"PickleJar\data_results_{h}h{suffix}.pickle"), "rb"))
 
 H2 = ['electrolyser', 'H2store', 'FC']
 bat = ['bat', 'bat_cap']
@@ -61,9 +64,9 @@ def plot_cap_multipleyears(ax, data, scenario, years=None, new=True, patterns=No
             print(f"! Did not find {scen.replace('YEAR', str(y))} in the data")
         elif new:
             foo = data[scen]["new_cap"].level
-            cap[y] = foo[foo != 0].swaplevel(i=0, j=1).sum(level=1)
+            cap[y] = foo[foo != 0].swaplevel(i=0, j=1).groupby(level=1).sum()
         else:
-            cap[y] = data[scen]["tot_cap"].swaplevel(i=0, j=1).sum(level=1)
+            cap[y] = data[scen]["tot_cap"].swaplevel(i=0, j=1).groupby(level=1).sum()
 
     cap_summedVRE = {}
     for tech in order_cap:
@@ -101,20 +104,23 @@ def plot_cap_multipleyears(ax, data, scenario, years=None, new=True, patterns=No
         bar.set_hatch(patterns[j])
     return plot, list(df.index.levels[0]), df
 
+
 # -- All modelled cases
-for reg in ["nordic", "brit", "iberia"]:
+separate_figures = ["lowFlex", "highFlex"]
+for flex in separate_figures:
     cases = []
     h = 6
-    systemFlex = ["lowFlex", "highFlex"]
-    modes = ["noFC", "fullFC",]  # , "FCnoPTH", "FCnoH2", "FCnoWind", "FCnoBat", "FCnoSynth"]
+    regions = ["nordic", "brit", "iberia"]
+    modes = ["noFC", "fullFC"]  # , "FCnoPTH", "FCnoH2", "FCnoWind", "FCnoBat", "FCnoSynth"]
     nr_comparisons = len(modes)-1
-
+    y_subplots = len(regions)
     # -- Building figure axes
-    fig = plt.figure(figsize=(7, 6))  # (width, height) in inches
-    outer = gridspec.GridSpec(2, 2, wspace=0.33, hspace=0.3, width_ratios=[1, nr_comparisons])  # an outer 2x2, inner 1x1 to the left and 1x3 to the right
+    fig = plt.figure(figsize=(7, 8))  # (width, height) in inches
+    outer = gridspec.GridSpec(ncols=2, nrows=y_subplots, wspace=0.33, hspace=0.34, width_ratios=[1, nr_comparisons])  # an outer 2x2, inner 1x1 to the left and 1x3 to the right
     r_ax = []  # will contain upper and lower right containers, each with one ax for each non-base scenario
-    axes = [[plt.Subplot(fig, outer[0])], [plt.Subplot(fig, outer[2])]]  # all axes, [[all upper], [all lower]]
-    for i in range(2):
+    axes = [[plt.Subplot(fig, outer[0])], [plt.Subplot(fig, outer[2])], [plt.Subplot(fig, outer[4])]]  # all axes, [[all upper], [all lower]]
+    print(axes)
+    for i in range(y_subplots):
         r_ax.append(gridspec.GridSpecFromSubplotSpec(1, nr_comparisons, subplot_spec=outer[i*2+1], wspace=0.5))
         for j in range(nr_comparisons):
             axes[i].append(plt.Subplot(fig, r_ax[i][j]))
@@ -123,22 +129,29 @@ for reg in ["nordic", "brit", "iberia"]:
     tech_collections = []
     patterns = ['X', '/', '.', '']
     years = [2020, 2025, 2030, 2040]
-    print_cyan(reg.capitalize())
-    for i_f, flex in enumerate(systemFlex):
-        plot, t, df = plot_cap_multipleyears(axes[i_f][0], data, f"{reg}_{flex}_noFC_YEAR_{h}h", patterns=patterns,
+    print_cyan(flex.capitalize())
+    for i_f, reg in enumerate(regions):
+        print_cyan(reg.capitalize())
+        plot, t, df = plot_cap_multipleyears(axes[i_f][0], data, f"{reg}_{flex}_noFC_YEAR{suffix}_{h}h", patterns=patterns,
                                              years=years)
         plot.set_title(scen_names["noFC"])
-        plot.set_ylabel("New capacity [GW(h)]")
+        if y_subplots % 2 == 1:  # if odd number of y_plots
+            if i_f % 2 == 1: plot.set_ylabel("New capacity [GW(h)]")
+        else:
+            plot.set_ylabel("New capacity [GW(h)]")
         tech_collections.append(t)
         fig.add_subplot(plot)
         for i_m, mode in enumerate(modes[1:]):
-            plot, t, _ = plot_cap_multipleyears(axes[i_f][1+i_m], data, f"{reg}_{flex}_{mode}_YEAR_{h}h", comparison_data=df,
-                                                patterns=patterns, years=years)
-            if i_m == 0:
+            plot, t, _ = plot_cap_multipleyears(axes[i_f][1+i_m], data, f"{reg}_{flex}_{mode}_YEAR{suffix}_{h}h",
+                                                comparison_data=df, patterns=patterns, years=years)
+            if y_subplots % 2 == 1:  # if odd number of y_plots
+                if i_f % 2 == 1 and i_m == 0: plot.set_ylabel("Difference from $\it{Base}$ [GW(h)]")
+            elif i_m == 0:
                 plot.set_ylabel("Difference from $\it{Base}$ [GW(h)]")
             plot.set_title(scen_names[mode])
             tech_collections.append(t)
             fig.add_subplot(plot)
+        axes[i_f][0].text(-0.35, 0.5, f"{reg.capitalize()}:", transform=axes[i_f][0].transAxes, ha='right', ma='center', fontsize=14)
     techs = []
     for tech in order_cap:
         for collection in tech_collections:
@@ -147,12 +160,13 @@ for reg in ["nordic", "brit", "iberia"]:
                 break
     handles = [Patch(color=color_dict[tech], label=tech_names[tech]) for tech in techs[::-1]]+\
               [Patch(facecolor="#FFF", hatch=patterns[i]*2, label=years[i]) for i in range(4)]
-    axes[0][0].text(-0.35, 0.5, "Low\nFlex:", transform=axes[0][0].transAxes, ha='right', ma='center', fontsize=14)
-    axes[1][0].text(-0.35, 0.5, "High\nFlex:", transform=axes[1][0].transAxes, ha='right', ma='center', fontsize=14)
-    fig.suptitle(reg.capitalize(),fontsize=16)
+    #axes[0][0].text(-0.35, 0.5, "Low\nFlex:", transform=axes[0][0].transAxes, ha='right', ma='center', fontsize=14)
+    #axes[1][0].text(-0.35, 0.5, "High\nFlex:", transform=axes[1][0].transAxes, ha='right', ma='center', fontsize=14)
+    #axes[2][0].text(-0.35, 0.5, "High\nFlex:", transform=axes[1][0].transAxes, ha='right', ma='center', fontsize=14)
+    fig.suptitle(f"Investments, {flex.capitalize()}",fontsize=16)
     fig.legend(handles=handles, loc="center left", bbox_to_anchor=(0.91, 0.5), )
     fig.show()
-    fig.savefig(f"figures/cap_{reg}.png",bbox_inches="tight", dpi=600)
+    fig.savefig(f"figures/cap_{flex}.png",bbox_inches="tight", dpi=600)
     del df
 # plot_cap(data,first_case)
 # plt.show()

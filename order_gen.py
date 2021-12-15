@@ -55,6 +55,7 @@ order_gen = [
          'PV',
          'backstop',
          'bat',
+         #'Bat. storage',
          'bat_PS',
          'bat_cap_PS',
          'flywheel',

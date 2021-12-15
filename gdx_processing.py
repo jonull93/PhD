@@ -18,14 +18,14 @@ import gdx_processing_functions as gpf
 start_time_script = tm.time()
 print("Excel-writing script started at", datetime.now().strftime('%H:%M:%S'))
 
-excel = True  # will only make a .pickle if excel == False
+excel = False  # will only make a .pickle if excel == False
 run_output = "w"  # 'w' to (over)write or 'rw' to only add missing scenarios
 overwrite = ["brit_lowFlex_fullFC_2040_6h","brit_lowFlex_noFC_2040_6h"]  # names of scenarios to overwrite regardless of existence in pickled data
 #overwrite = [reg+"_inertia_0.1x" for reg in ["ES3", "HU", "IE", "SE2"]]+\
 #            [reg+"_inertia" for reg in ["ES3", "HU", "IE", "SE2"]]+\
 #            [reg+"_inertia_noSyn" for reg in ["ES3", "HU", "IE", "SE2"]]
 h = 6  # time resolution
-suffix = "noGpeak"  # Optional suffix for the run, e.g. "test" or "highBioCost"
+suffix = ""  # Optional suffix for the run, e.g. "test" or "highBioCost"
 suffix = '_'+suffix if len(suffix) > 0 else ''
 name = f"results_{h}h{suffix}"  # this will be the name of the output excel file
 
@@ -65,12 +65,13 @@ for reg in ["iberia", "brit", "nordic"]:
         for mode in modes:
             for year in [2020,2025,2030,2040]:
                 #if f"{reg}_{flex}_{mode}{suffix}_{year}{'_'+str(h)+'h' if h>1 else ''}" == "nordic_lowFlex_fullFC_2040_6h": continue
+                if f"{reg}_{flex}_{mode}{suffix}_{year}{'_'+str(h)+'h' if h>1 else ''}" != "nordic_lowFlex_fullFC_2040_6h": continue
                 cases.append(f"{reg}_{flex}_{mode}_{year}{suffix}{'_'+str(h)+'h' if h>1 else ''}")
 
 
 comp_name = os.environ['COMPUTERNAME']
 if "PLIA" in comp_name:
-    path = "C:\\Users\\Jonathan\\Box\\python\\output\\"
+    path = "C:\\git\\quality-of-life-scripts\\output\\"
     gdxpath = "C:\\git\\multinode\\results\\"  # where to find gdx files
 elif "QGTORT8" in comp_name:
     path = "C:\\Users\\Jonathan\\git\\python\\output\\"

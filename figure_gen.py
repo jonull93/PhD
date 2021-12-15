@@ -7,13 +7,13 @@ from matplotlib.patches import Patch
 import matplotlib.gridspec as gridspec
 import os
 #os.chdir(r"C:\Users\Jonathan\git\python")  # not needed unless running line-by-line in a console
-from my_utils import TECH, color_dict, order_map_gen, add_in_dict, tech_names, scen_names
+from my_utils import TECH, color_dict, order_map_gen, add_in_dict, tech_names, scen_names, print_red, print_cyan
 
 WON = ["WON"+a+str(b) for a in ["A","B"] for b in range(1, 6)]
 PV = ["PVPA1", "PVPB1", "PVR1"]
 
 
-def df_to_stacked_areas(scen_data, ax, to_drop=None, region=None, startday=1, days=7, sum_VRE=True, bat_SoC=True, FR=True):
+def df_to_stacked_areas(scen_data, ax, to_drop=None, region=None, startday=1, days=7, sum_VRE=True, bat_SoC=True, FR=True, expect_battery=True):
     df = scen_data["gen"].copy()
     timesteps = scen_data["gams_timestep"]
     if to_drop is None:
@@ -26,21 +26,19 @@ def df_to_stacked_areas(scen_data, ax, to_drop=None, region=None, startday=1, da
             bat = bat.sum()
             bat = bat.rename("Bat. storage")
         except Exception as e:
-            print(df)
+            if expect_battery: print_red("Could not find battery")
             bat_SoC = False
     if FR:
         try:
             FR_price = scen_data["FR_cost"].sum().reindex(list(df),fill_value=0).rename("FR price")
-            FFR_price = scen_data["FR_cost"].sum(level=1).loc["1"].reindex(list(df), fill_value=0).rename("FFR price")
+            FFR_price = scen_data["FR_cost"].groupby(level=1).sum().loc["1"].reindex(list(df), fill_value=0).rename("FFR price")
         except AttributeError:
             FR = False
 
-
     df.drop(to_drop, axis=0, inplace=True, errors='ignore')
-
     # sum regions if region=None, else filter out regions that arent 'region'
     if region is None:
-        df = df.sum(level=0, axis=0)
+        df = df.groupby(level=0).sum()
     elif type(region) == str:
         df = df.loc[:, region]
     # find indexes that correspond to startday and startday+days
@@ -77,7 +75,9 @@ def df_to_stacked_areas(scen_data, ax, to_drop=None, region=None, startday=1, da
     try: df.drop("bat_cap",inplace=True)
     except KeyError: None
     df.drop(columns="sort_by", inplace=True)
-    df.iloc[:, start:end].T.plot(kind="area", ax=ax, linewidth=0.1)  # plotting
+    to_plot = df.iloc[:, start:end].T
+    plotted_techs = list(to_plot.columns)
+    to_plot.plot(kind="area", ax=ax, linewidth=0.1, color=[color_dict[tech] for tech in to_plot.columns])  # plotting
     curtailment = df.clip(lower=0).sum().add(scen_data["curtailment_profile_total"].sum(), fill_value=0).rename("Load")
     curtailment.iloc[start:end].plot(kind="line", ax=ax, linewidth=1)
     if bat_SoC: bat.iloc[start:end].plot(kind="line", ax=ax, linewidth=1, color="k")
@@ -86,25 +86,55 @@ def df_to_stacked_areas(scen_data, ax, to_drop=None, region=None, startday=1, da
         FFR_price.iloc[start:end].plot(kind="line", ax=ax, linewidth=1)
     ymax = np.ceil(df.clip(lower=0).sum().max()/5)*5
     ymin = np.floor(df.min().min()/5)*5
-    plt.legend(loc=6, bbox_to_anchor=(1.01, 0.5))
+    handles, labels = ax.get_legend_handles_labels()
+    #plt.legend(loc=6, bbox_to_anchor=(1.01, 0.5))
     ax.set_ylim([ymin, ymax])
-    return df
+    return df, handles, labels, bat_SoC
 
 
 timestep = 6
-year = 2040
-region = "brit"
-mode = "lowFlex"
-FC = "noFC"
-pickle_suff = ""
-if len(pickle_suff) > 0: pickle_suff = "_" + pickle_suff
-data = pickle.load(open(os.path.relpath(rf"PickleJar\data_results_{timestep}h{pickle_suff}.pickle"), "rb"))
+years = [2020, 2025, 2040]
+regions = ["brit"]#, "iberia", "nordic"]
+modes = ["lowFlex"]
+suffix = ""
+if len(suffix) > 0: pickle_suff = "_" + suffix
+data = pickle.load(open(os.path.relpath(rf"PickleJar\data_results_{timestep}h{suffix}.pickle"), "rb"))
 
-scenario = f"{region}_{mode}_{FC}_{year}_{timestep}h"
-fig_path = f"figures\\{scenario}\\"
-os.makedirs(fig_path, exist_ok=True)
-for day in range(1, 358, 28):
-    fig, ax = plt.subplots()
-    plt.title(f"{region.capitalize()} {mode}, {FC}")
-    df = df_to_stacked_areas(data[scenario], ax, startday=day)
-    plt.savefig(fig_path+f"week {int(np.ceil(day/7))}.png", dpi=300, bbox_inches='tight')
+for region in regions:
+    for mode in modes:
+        for year in years:
+            scenario = f"{region}_{mode}_FC_{year}{suffix}_{timestep}h"
+            stripped_scenario = scenario.replace("_FC", "")
+            print_cyan(stripped_scenario)
+            fig_path = f"figures\\{stripped_scenario}\\"
+            os.makedirs(fig_path, exist_ok=True)
+            for day in range(1, 358, 28):
+                fig, axes = plt.subplots(nrows=2, ncols=1, figsize=(6, 7))
+                fig.suptitle(f"{region.capitalize()} {mode} {year}")
+                handles = []
+                labels = []
+                for i, FC in enumerate(["noFC", "fullFC"]):
+                    current_scenario = scenario.replace("_FC", f"_{FC}")
+                    df, handles_, labels_, bat = df_to_stacked_areas(data[current_scenario], axes[i], startday=day, expect_battery=year>2020)
+                    axes[i].set_title(FC)
+                    handles += handles_
+                    labels += labels_
+                    axes[i].get_legend().remove()
+                labels_to_legend = []
+                handles_to_legend = []
+                # print(labels)
+                for tech in order_map_gen:
+                    if tech in labels:
+                        labels_to_legend.append(tech)
+                        tech_index = labels.index(tech)
+                        handles_to_legend.append(handles[tech_index])
+                for tech in labels:
+                    if tech not in labels_to_legend and tech not in ["Load", "FR price", "FFR price", "Bat. storage"]: print_red(f"did not find {tech} in order_gen!")
+                labels_to_legend += labels[-3-bat:]
+                handles_to_legend += handles[-3-bat:]
+                labels_to_legend.reverse()
+                handles_to_legend.reverse()
+                fig.tight_layout()
+                fig.legend(handles_to_legend,labels_to_legend,bbox_to_anchor=(1, 0.5), ncol=1, loc="center left")
+                plt.savefig(fig_path+f"week {int(np.ceil(day/7))}.png", dpi=300, bbox_inches='tight')
+                plt.close(fig)

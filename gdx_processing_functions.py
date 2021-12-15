@@ -180,6 +180,7 @@ def run_case(scen_name, data, gdxpath, indicators):
             FR_demand_VRE = gdx(f, "o_PS_FR_demand_VRE")
             FR_demand_other = gdx(f, "PS_FR_min")
             FR_available = gdx(f, "o_PS_FR_available")
+            FR_available_total = gdx(f, "o_PS_FR_available_total_actualESS")
             try: FR_deficiency = gdx(f, "v_PS_FR_deficiency").level
             except AttributeError: FR_deficiency = gdx(f, "v_PS_OR_deficiency").level
             try: FR_cost = gdx(f, "EQU_PS_FR_loadbalance").marginal.clip(upper=0)*-1e6/TT
@@ -199,7 +200,11 @@ def run_case(scen_name, data, gdxpath, indicators):
             FR_summed_ESS = try_sum(FR_available_ESS)
             FR_available_BEV = gdx(f, "o_PS_FR_available_BEV")
             FR_summed_BEV = try_sum(FR_available_BEV)
-            FR_available_VRE = gdx(f, "o_PS_FR_available_VRE")
+            FR_available_VRE = pd.concat([curtailment_profile_total], keys=["1"], names=["FR_period"])
+            for _i in range(5):
+                _new_line = pd.concat([curtailment_profile_total], keys=[str(_i+2)], names=["FR_period"])
+                FR_available_VRE = pd.concat([FR_available_VRE, _new_line])
+            FR_available_VRE = FR_available_VRE.reorder_levels(["I_reg", "FR_period"]).sort_index()
             FR_summed_VRE = try_sum(FR_available_VRE)
             FR_available_hydro = gdx(f, "o_PS_FR_available_hydro")
             FR_summed_hydro = try_sum(FR_available_hydro)
@@ -215,12 +220,30 @@ def run_case(scen_name, data, gdxpath, indicators):
             FR_share_BEV = gdx(f, "o_PS_FR_BEV_share", silent=True)
             FR_share_PtH = gdx(f, "o_PS_FR_PtH_share", silent=True)
             FR_share_hydro = gdx(f, "o_PS_FR_hydro_share", silent=True)
-            FR_net_import = gdx(f, "o_PS_FR_net_import")
+            FR_net_import = gdx(f, "o_PS_FR_net_import").reindex(columns=FR_cost.columns, fill_value=0)
+            FR_VRE_timetable = gdx(f, "PS_timetable_VREramping").reindex()
             FR_demand = {"wind": FR_demand_VRE.filter(like="WO", axis=0).groupby(level=[1]).sum(),
                          "PV": FR_demand_VRE.filter(like="PV", axis=0).groupby(level=[1]).sum(),
                          "other": FR_demand_other,
-                         "total": FR_demand_VRE.groupby(level=[1]).sum() + FR_demand_other.fillna(0)
+                         "total": FR_demand_other*0  # *0 to discard all values but get index and header
                          }
+            for index, val in FR_available_total.iterrows():
+                if int(index[1]) > 2:
+                    _to_add = FR_demand_other.loc[index] + FR_demand_VRE.groupby(level=[1]).sum().loc[index[0]]
+                    FR_demand["total"].loc[index] = _to_add
+                else:
+                    _to_add = FR_demand_other.loc[index]
+                    FR_demand["total"].loc[index] = _to_add
+            FR_supply_excess = FR_available_total - FR_demand["total"] + FR_net_import
+
+            # no change if FR_demand==FR_available, a downscaling if FR_demand<FR_available
+            # this downscaling should also make the new FR_available==FR_demand
+            FR_summed_BEV = FR_summed_BEV*FR_demand["total"]/FR_available_total
+            FR_available_ESS = FR_available_ESS * FR_demand["total"] / FR_available_total
+            FR_available_hydro = FR_available_hydro * FR_demand["total"] / FR_available_total
+            FR_available_ESS = FR_available_ESS * FR_demand["total"] / FR_available_total
+            FR_available_thermal = FR_available_thermal * FR_demand["total"] / FR_available_total
+            FR_available_VRE = FR_available_VRE * FR_demand["total"] / FR_available_total
             PS = True
         except Exception as e:
             PS = False

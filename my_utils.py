@@ -103,17 +103,17 @@ scen_names = {"_pre": "Base case", "_leanOR": "Lean OR", "_OR": "OR", "_OR_fixed
               "_inertia_3xCost": "Inertia (3x)", "_inertia_noSyn_3xCost": "Inertia (noSyn) (3x)", "noFC": "Base",
               "fullFC": "Inertia+FR", "OR": "FR", "inertia": "Inertia"}
 color_dict = {'wind_onshore': '#B9B9B9', 'wind_offshore': '#DADADA', 'RO': 'xkcd:ocean blue', 'U': 'xkcd:grape',
-              'GWGCCS': 'xkcd:dark peach', 'CHP_wa': 'xkcd:deep lavender', 'CHP_bio': 'xkcd:tree green',
+              'GWGCCS': 'xkcd:dark peach', 'WA_CHP': 'xkcd:deep lavender', 'CHP_bio': 'xkcd:tree green',
               'WG': '#a4be20', 'WG_peak': '#b6cb4d', "WG_CHP": "#83981a",
               'PV_cSiOPT': 'xkcd:mustard', 'CHP_WG_L': 'xkcd:mid green',
-              'HP': (255 / 255, 192 / 255, 0), 'EB': (91 / 255, 155 / 255, 213 / 255),
+              'HP': "#e85d04", 'EB': "#f48c06",
               'CHP_WG': (0, 176 / 255, 80 / 255),
               'HOB_WG': (128 / 255, 128 / 255, 0), 'solarheat': (204 / 255, 51 / 255, 0), 'HOB_bio': 'green',
               'Load': 'Black', "bat_discharge": "xkcd:amber", 'bat': "#714b92",
-              'bat_cap': "#8d5eb7", 'bat_PS': "xkcd:deep lavender",
+              'bat_cap': "#8d5eb7", 'Bat. In': "#8d5eb7", 'Bat. Out': "#8d5eb7", 'bat_PS': "xkcd:deep lavender",
               'bat_cap_PS': "xkcd:deep lavender", "sync_cond": 'xkcd:aqua', "curtailment": "xkcd:slate",
               'WOFF': '#DADADA', 'WON': '#B9B9B9', "H": "#172226", "W": "#014421",
-              "W_CHP": "#016421", "G": "#5B90F6", "G_peak": "#7B90F6", "G_CHP": "#5BB0F6", "PV": "#FDC12A",
+              "W_CHP": "#016421", "G": "#5B90F6", "G_peak": "#7209b7", "G_CHP": "#5BB0F6", "PV": "#FDC12A",
               "FC": "#c65082", "H2store": "#ad054d", "electrolyser": "#68032e", "BECCS": "#5b9aa0"}
 
 EPODreg_to_country = {  # dictionary for going between EPODreg to country
