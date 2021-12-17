@@ -85,12 +85,19 @@ def which_set(iterable):
     return ''
 
 
-def gdx(f, symbol_name, silent=False, error_return=None):
+def gdx(f, symbol_name, silent=False, error_return=None, keep_na=False, dud_df_return=False):
+    expected_a_df = type(dud_df_return) != bool
     try: symbol = f[symbol_name]
     except KeyError:
         if not silent: print(f"Unable to get {symbol_name} from gdx")
-        return error_return
+        if expected_a_df:
+            return dud_df_return
+        else:
+            return error_return
+
     symbol_type = type(symbol)
+    if symbol_type == pandas.core.series.Series and len(symbol) == 0 and expected_a_df:
+        return dud_df_return
 
     def betterIndex(symbol):
         index_names = [which_set(symbol.index.get_level_values(i).astype(str)) for i in range(symbol.index.nlevels)]
@@ -107,9 +114,14 @@ def gdx(f, symbol_name, silent=False, error_return=None):
             symbol = betterIndex(symbol)
         else:
             symbol.index = symbol.index.astype(str)
+        if not keep_na: symbol.fillna(0, inplace=True)
+        if expected_a_df:
+            symbol = symbol.reindex(index=dud_df_return.index, columns=dud_df_return.columns, fill_value=0)
     elif symbol_type == pandas.core.series.Series:
         if type(symbol.index) == pandas.core.indexes.multi.MultiIndex:
             symbol = betterIndex(symbol)
         else:
             symbol.index = symbol.index.astype(str)
+        if not keep_na: symbol.fillna(0, inplace=True)
+        if expected_a_df: symbol = symbol.reindex(index=dud_df_return.index, columns=dud_df_return.columns, fill_value=0)
     return symbol

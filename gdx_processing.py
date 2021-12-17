@@ -1,11 +1,9 @@
 # %%
-# from gams import *
 import pickle  # for dumping and loading variable to/from file
 import os
 from datetime import datetime
 import time as tm
 import pandas as pd
-import numpy as np
 from multiprocessing import cpu_count
 from queue import Queue
 import pickle  # for dumping and loading variable to/from file
@@ -14,18 +12,19 @@ import time
 import traceback
 from traceback import format_exc
 import gdx_processing_functions as gpf
-
+from my_utils import print_red, print_cyan, print_green
+from termcolor import colored
 start_time_script = tm.time()
 print("Excel-writing script started at", datetime.now().strftime('%H:%M:%S'))
 
 excel = False  # will only make a .pickle if excel == False
 run_output = "w"  # 'w' to (over)write or 'rw' to only add missing scenarios
-overwrite = ["brit_lowFlex_fullFC_2040_6h","brit_lowFlex_noFC_2040_6h"]  # names of scenarios to overwrite regardless of existence in pickled data
+overwrite = []  # names of scenarios to overwrite regardless of existence in pickled data
 #overwrite = [reg+"_inertia_0.1x" for reg in ["ES3", "HU", "IE", "SE2"]]+\
 #            [reg+"_inertia" for reg in ["ES3", "HU", "IE", "SE2"]]+\
 #            [reg+"_inertia_noSyn" for reg in ["ES3", "HU", "IE", "SE2"]]
 h = 6  # time resolution
-suffix = ""  # Optional suffix for the run, e.g. "test" or "highBioCost"
+suffix = "noGpeak"  # Optional suffix for the run, e.g. "test" or "highBioCost"
 suffix = '_'+suffix if len(suffix) > 0 else ''
 name = f"results_{h}h{suffix}"  # this will be the name of the output excel file
 
@@ -64,8 +63,7 @@ for reg in ["iberia", "brit", "nordic"]:
     for flex in systemFlex:
         for mode in modes:
             for year in [2020,2025,2030,2040]:
-                #if f"{reg}_{flex}_{mode}{suffix}_{year}{'_'+str(h)+'h' if h>1 else ''}" == "nordic_lowFlex_fullFC_2040_6h": continue
-                if f"{reg}_{flex}_{mode}{suffix}_{year}{'_'+str(h)+'h' if h>1 else ''}" != "nordic_lowFlex_fullFC_2040_6h": continue
+                #if f"{reg}_{flex}_{mode}_{year}{suffix}{'_'+str(h)+'h' if h>1 else ''}" != "iberia_lowFlex_fullFC_2030_noGpeak_6h": continue
                 cases.append(f"{reg}_{flex}_{mode}_{year}{suffix}{'_'+str(h)+'h' if h>1 else ''}")
 
 
@@ -118,7 +116,7 @@ new_data = {}
 # io_lock = threading.Lock()
 threads = {}
 thread_nr = {}
-num_threads = min(max(cpu_count() - 1, 6), len(todo_gdx))
+num_threads = min(max(cpu_count() - 1, 4), len(todo_gdx))
 excel_name = path + name + ".xlsx"
 writer = pd.ExcelWriter(excel_name, engine="openpyxl")
 opened_file = False
@@ -144,13 +142,13 @@ def crawl_gdx(q_gdx, old_data, gdxpath, thread_nr, overwrite, todo_gdx_len):
             print(f"- Starting {scen_name} on thread {thread_nr[threading.get_ident()]}")
             start_time_thread = tm.time()
             success, new_data[scen_name] = gpf.run_case(scen_name, old_data, gdxpath, indicators)
-            print("Finished " + scen_name.ljust(20) + " after " + str(round(tm.time() - start_time_thread,
+            print_green("Finished " + scen_name.ljust(20) + " after " + str(round(tm.time() - start_time_thread,
                                                                           1)) + f" seconds")
             if success and excel:
                 q_excel.put((scen_name, True))
                 print(f' (q_excel appended and is now : {q_excel.qsize()} items long)')
         except FileNotFoundError:
-            print("! Could not find file for", scen_name)
+            print_cyan("! Could not find file for", scen_name)
         except:
             identifier = thread_nr[threading.get_ident()]
             global errors
@@ -201,12 +199,12 @@ if excel:
     worker = threading.Thread(target=crawl_excel, args=(path, old_data))
     worker.start()
 for i in range(num_threads):
-    print('Starting gdx thread', i + 1)
+    print(colored(f'Starting gdx thread {i + 1}',"white"))
     worker = threading.Thread(target=crawl_gdx, args=(q_gdx, old_data, gdxpath, thread_nr, overwrite, len(todo_gdx)),
                               daemon=False)
     # setting threads as "daemon" allows main program to exit eventually even if these dont finish correctly
     worker.start()
-    tm.sleep(1+excel)  # staggering gdx threads shouldnt matter as long as the excel process has something to work on
+    tm.sleep(0.1+3*excel)  # staggering gdx threads shouldnt matter as long as the excel process has something to work on
 # now we wait until the queue has been processed
 q_gdx.join()  # first we make sure there are no gdx files waiting to get processed
 isgdxdone = True

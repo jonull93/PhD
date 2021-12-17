@@ -55,7 +55,7 @@ def print_cap(writer, num, sheet, row, col, ind):
     num_df.to_excel(writer, sheet_name=sheet, startcol=col, startrow=row)
 
 
-def run_case(scen_name, data, gdxpath, indicators):
+def run_case(scen_name, data, gdxpath, indicators, print_FR_summary=False):
     def get_from_cap(tech_name, round=False):
         try:
             if round:
@@ -69,7 +69,7 @@ def run_case(scen_name, data, gdxpath, indicators):
     def try_sum(df, level="FR_period", FR_cost=False):
         if type(FR_cost) != bool:
             try:
-                foo = (df * FR_cost).sum().sum()
+                foo = (df * FR_cost).values.sum()
             except:
                 foo = 0
         else:
@@ -143,7 +143,7 @@ def run_case(scen_name, data, gdxpath, indicators):
                     cost_tot2 += preInv*annuity[_tech]*inv_cost[(_tech, _year)]/1000
                     try: cost_tot2 += preInv * OM_fix[_tech] / 1000
                     except KeyError:
-                        if _tech not in ["EB", "bat"]: print("Unexpectedly failed to add OM_fix for", _tech)
+                        if _tech not in ["EB", "bat", "H2store"]: print("Unexpectedly failed to add OM_fix for", _tech)
             except Exception as e:
                 print(f"!! failed because {e}")
                 print(previous_investments)
@@ -151,7 +151,7 @@ def run_case(scen_name, data, gdxpath, indicators):
 
         cost_tot_onlynew = gdx(f, "v_totcost").level
         if round(cost_tot, 3) != round(cost_tot2, 3):
-            print(f"- Discrepancy when adding previousInvestments in {scen_name}: from {round(cost_tot_onlynew, 5)} to {round(cost_tot, 5)} (or {round(cost_tot2,5)})")
+            print_red(f"! cost_tot (w/oldcap) in {scen_name}: {round(cost_tot, 4)} from gams, {round(cost_tot2,4)} from python")
             if cost_tot > cost_tot2+1 and "fullFC" in scen_name:
                 cost_tot = cost_tot2
         cost_partload = gdx(f, "o_cost_partload")
@@ -168,7 +168,6 @@ def run_case(scen_name, data, gdxpath, indicators):
         charge = gdx(f, "v_charge")
         demand = gdx(f, "o_load")
         inv_cost = gdx(f, "inv_cost")
-
         try:
             ESS_available = gdx(f, "o_PS_ESS_available")
             inertia_available = gdx(f, "o_PS_inertia_available")
@@ -179,49 +178,65 @@ def run_case(scen_name, data, gdxpath, indicators):
             inertia_demand = gdx(f, "PS_Nminus1")
             FR_demand_VRE = gdx(f, "o_PS_FR_demand_VRE")
             FR_demand_other = gdx(f, "PS_FR_min")
+            _empty_FR_df = pd.DataFrame(columns=demand.columns, index=FR_demand_other.index, data=0)
             FR_available = gdx(f, "o_PS_FR_available")
-            FR_available_total = gdx(f, "o_PS_FR_available_total_actualESS")
+            #FR_available_total = gdx(f, "o_PS_FR_available_total_actualESS")
             try: FR_deficiency = gdx(f, "v_PS_FR_deficiency").level
             except AttributeError: FR_deficiency = gdx(f, "v_PS_OR_deficiency").level
             try: FR_cost = gdx(f, "EQU_PS_FR_loadbalance").marginal.clip(upper=0)*-1e6/TT
             except AttributeError: FR_cost = gdx(f, "EQU_PS_FR_supply").marginal.clip(upper=0) * -1e6 / TT
-            try:
-                if FR_cost.sum().sum() > 0: print("FR cost in ", k, "=", round(FR_cost.sum().sum()))
-                elif "lowFlex" in k and "fullFC" in k:
-                    print("!! Missing non-zero FR_cost in", k)
-            except:
-                if "lowFlex" in k and "fullFC" in k:
-                    print("!! Missing non-zero FR_cost in",k)
             FR_period_cost = gdx(f, "o_PS_FR_cost_perPeriod")
             FR_FFR_cost_share = gdx(f, "o_PS_FR_cost_FFRshare")
-            FR_available_thermal = gdx(f, "o_PS_FR_available_thermal")
+            FR_available_thermal = gdx(f, "o_PS_FR_available_thermal", dud_df_return=_empty_FR_df)
             FR_summed_thermal = try_sum(FR_available_thermal)
-            FR_available_ESS = gdx(f, "o_PS_FR_available_ESS")
+            FR_available_ESS = gdx(f, "o_PS_FR_available_ESS", dud_df_return=_empty_FR_df)
             FR_summed_ESS = try_sum(FR_available_ESS)
-            FR_available_BEV = gdx(f, "o_PS_FR_available_BEV")
+            FR_available_BEV = gdx(f, "o_PS_FR_available_BEV", dud_df_return=_empty_FR_df)
             FR_summed_BEV = try_sum(FR_available_BEV)
             FR_available_VRE = pd.concat([curtailment_profile_total], keys=["1"], names=["FR_period"])
             for _i in range(5):
                 _new_line = pd.concat([curtailment_profile_total], keys=[str(_i+2)], names=["FR_period"])
                 FR_available_VRE = pd.concat([FR_available_VRE, _new_line])
-            FR_available_VRE = FR_available_VRE.reorder_levels(["I_reg", "FR_period"]).sort_index()
+            try: FR_available_VRE = FR_available_VRE.reorder_levels(["I_reg", "FR_period"]).sort_index().reindex(index=_empty_FR_df.index, columns=_empty_FR_df.columns, fill_value=0)
+            except AssertionError:
+                FR_available_VRE = FR_available_VRE.unstack(level=2).fillna(0).reindex(index=_empty_FR_df.index, columns=_empty_FR_df.columns, fill_value=0)
+
             FR_summed_VRE = try_sum(FR_available_VRE)
-            FR_available_hydro = gdx(f, "o_PS_FR_available_hydro")
+            FR_available_hydro = gdx(f, "o_PS_FR_available_hydro", dud_df_return=_empty_FR_df)
             FR_summed_hydro = try_sum(FR_available_hydro)
+            FR_available_PtH = gdx(f, "o_PS_FR_available_PtH", dud_df_return=_empty_FR_df)
+            FR_summed_PtH = try_sum(FR_available_PtH)
+            FR_available_total = FR_available_PtH+FR_available_hydro+FR_available_thermal+FR_available_ESS+\
+                                 FR_available_BEV+FR_available_VRE
+            if print_FR_summary:
+                print(f"{scen_name}: sum(FR_available_total) = {round(FR_available_total.values.sum())}")
+                try:
+                    if FR_cost.values.sum() > 0: print(f"{scen_name}: sum(FR cost) = {round(FR_cost.values.sum())}")
+                    elif "lowFlex" in k and "fullFC" in k:
+                        print_red("!! sum(FR_cost) is zero in", k)
+                except AttributeError:
+                    if "lowFlex" in k and "fullFC" in k:
+                        print_red("!! sum(FR_cost) is zero in", k)
             FR_value_share_thermal = gdx(f, "o_PS_FR_thermal_value_share", silent=True)
             FR_value_share_VRE = gdx(f, "o_PS_FR_VRE_value_share", silent=True)
             FR_value_share_ESS = gdx(f, "o_PS_FR_ESS_value_share", silent=True, error_return=0)
             FR_value_share_BEV = gdx(f, "o_PS_FR_BEV_value_share", silent=True)
             FR_value_share_PtH = gdx(f, "o_PS_FR_PtH_value_share", silent=True)
             FR_value_share_hydro = gdx(f, "o_PS_FR_hydro_value_share", silent=True)
-            FR_share_thermal = gdx(f, "o_PS_FR_thermal_share", silent=True)
-            FR_share_VRE = gdx(f, "o_PS_FR_VRE_share", silent=True)
-            FR_share_ESS = gdx(f, "o_PS_FR_ESS_share", silent=True)
-            FR_share_BEV = gdx(f, "o_PS_FR_BEV_share", silent=True)
-            FR_share_PtH = gdx(f, "o_PS_FR_PtH_share", silent=True)
-            FR_share_hydro = gdx(f, "o_PS_FR_hydro_share", silent=True)
-            FR_net_import = gdx(f, "o_PS_FR_net_import").reindex(columns=FR_cost.columns, fill_value=0)
-            FR_VRE_timetable = gdx(f, "PS_timetable_VREramping").reindex()
+            #FR_share_thermal = gdx(f, "o_PS_FR_thermal_share", silent=True)
+            #FR_share_VRE = gdx(f, "o_PS_FR_VRE_share", silent=True)
+            #FR_share_ESS = gdx(f, "o_PS_FR_ESS_share", silent=True)
+            #FR_share_BEV = gdx(f, "o_PS_FR_BEV_share", silent=True)
+            #FR_share_PtH = gdx(f, "o_PS_FR_PtH_share", silent=True)
+            #FR_share_hydro = gdx(f, "o_PS_FR_hydro_share", silent=True)
+            try: FR_net_import = gdx(f, "o_PS_FR_net_import", dud_df_return=_empty_FR_df)
+            except TypeError:
+                FR_net_import = gdx(f, "o_PS_FR_net_import")
+                if len(FR_net_import) == 0:
+                    FR_net_import = pd.DataFrame(columns=demand.columns, index=FR_demand_other.index, data=0)
+                elif type(FR_net_import) == type(pd.Series()):
+                    FR_net_import = FR_net_import.unstack("", fill_value=0).reindex(index=_empty_FR_df.index, columns=_empty_FR_df.columns, fill_value=0)
+            FR_VRE_timetable = gdx(f, "PS_timetable_VREramping")
             FR_demand = {"wind": FR_demand_VRE.filter(like="WO", axis=0).groupby(level=[1]).sum(),
                          "PV": FR_demand_VRE.filter(like="PV", axis=0).groupby(level=[1]).sum(),
                          "other": FR_demand_other,
@@ -234,16 +249,33 @@ def run_case(scen_name, data, gdxpath, indicators):
                 else:
                     _to_add = FR_demand_other.loc[index]
                     FR_demand["total"].loc[index] = _to_add
-            FR_supply_excess = FR_available_total - FR_demand["total"] + FR_net_import
+            if "noFC" not in scen_name:
+                try: FR_supply_excess = FR_available_total - FR_demand["total"] + FR_net_import
+                except:
+                    print_cyan(scen_name, "excess = ", FR_available_total, FR_demand["total"], FR_net_import)
+                # no change if FR_demand==FR_available, a downscaling if FR_demand<FR_available
+                # this downscaling should also make the new FR_available==FR_demand
+                try: FR_available_ESS = (FR_available_ESS * FR_demand["total"] / FR_available_total).fillna(0)
+                except:
+                    print_cyan(scen_name, "ESS = ", FR_available_ESS, FR_demand["total"], FR_available_total)
 
-            # no change if FR_demand==FR_available, a downscaling if FR_demand<FR_available
-            # this downscaling should also make the new FR_available==FR_demand
-            FR_summed_BEV = FR_summed_BEV*FR_demand["total"]/FR_available_total
-            FR_available_ESS = FR_available_ESS * FR_demand["total"] / FR_available_total
-            FR_available_hydro = FR_available_hydro * FR_demand["total"] / FR_available_total
-            FR_available_ESS = FR_available_ESS * FR_demand["total"] / FR_available_total
-            FR_available_thermal = FR_available_thermal * FR_demand["total"] / FR_available_total
-            FR_available_VRE = FR_available_VRE * FR_demand["total"] / FR_available_total
+                FR_available_BEV = (FR_available_BEV * (FR_demand["total"]-FR_net_import) / FR_available_total).fillna(0)
+                FR_available_hydro = (FR_available_hydro * (FR_demand["total"]-FR_net_import) / FR_available_total).fillna(0)
+                FR_available_thermal = (FR_available_thermal * (FR_demand["total"]-FR_net_import) / FR_available_total).fillna(0)
+                FR_available_VRE = (FR_available_VRE * (FR_demand["total"]-FR_net_import) / FR_available_total).fillna(0)
+                FR_available_PtH = (FR_available_PtH * (FR_demand["total"]-FR_net_import) / FR_available_total).fillna(0)
+            else: FR_supply_excess = _empty_FR_df
+            FR_available_total_cutoff = FR_available_VRE + FR_available_PtH + FR_available_hydro + FR_available_thermal + FR_available_ESS + FR_available_BEV
+            FR_share_thermal = FR_available_thermal.values.sum() / FR_available_total_cutoff.values.sum()
+            FR_share_VRE = FR_available_VRE.values.sum() / FR_available_total_cutoff.values.sum()
+            FR_share_ESS = FR_available_ESS.values.sum() / FR_available_total_cutoff.values.sum()
+            FR_share_BEV = FR_available_BEV.values.sum() / FR_available_total_cutoff.values.sum()
+            FR_share_PtH = FR_available_PtH.values.sum() / FR_available_total_cutoff.values.sum()
+            FR_share_hydro = FR_available_hydro.values.sum() / FR_available_total_cutoff.values.sum()
+            if "noFC" not in scen_name:
+                print_cyan(f"Reserve share in {scen_name}:\nThermal: {round(FR_share_thermal*100,1)} %, VRE: {round(FR_share_VRE*100,1)} %, "
+                             f"ESS: {round(FR_share_ESS*100,1)} %, BEV: {round(FR_share_BEV*100,1)} %, "
+                             f"Hydro: {round(FR_share_hydro*100,1)} %, PtH: {round(FR_share_PtH*100,1)} %")
             PS = True
         except Exception as e:
             PS = False

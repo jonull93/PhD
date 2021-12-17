@@ -285,22 +285,37 @@ def crawl_resource_usage(timer=5):
         time.sleep(timer * 60)
 
 
-def print_red(to_print: str, **argv):
+def print_red(to_print: str, *argv):
     from termcolor import colored
-    for arg in argv:
-        to_print += str(arg)
-    print(colored(to_print, "red"))
+    try:
+        for arg in argv:
+            to_print += " "+str(arg)
+        print(colored(to_print, "red"))
+    except:
+        print(colored(to_print, "red"))
+        for arg in argv:
+            print(colored(arg, "red"))
 
 
-def print_green(to_print: str, **argv):
+def print_green(to_print: str, *argv):
     from termcolor import colored
-    for arg in argv:
-        to_print += str(arg)
-    print(colored(to_print, "green"))
+    try:
+        for arg in argv:
+            to_print += " "+str(arg)
+        print(colored(to_print, "green"))
+    except:
+        print(colored(to_print, "green"))
+        for arg in argv:
+            print(colored(arg, "green"))
 
 
-def print_cyan(to_print: str, **argv):
+def print_cyan(to_print: str, *argv):
     from termcolor import colored
-    for arg in argv:
-        to_print += " "+str(arg)
-    print(colored(to_print, "cyan"))
+    try:
+        for arg in argv:
+            to_print += " "+str(arg)
+        print(colored(to_print, "cyan"))
+    except:
+        print(colored(to_print, "cyan"))
+        for arg in argv:
+            print(colored(arg, "cyan"))
