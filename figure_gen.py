@@ -94,10 +94,10 @@ def df_to_stacked_areas(scen_data, ax, to_drop=None, region=None, startday=1, da
 
 timestep = 6
 years = [2020, 2025, 2040]
-regions = ["brit"]#, "iberia", "nordic"]
-modes = ["lowFlex"]
-suffix = ""
-if len(suffix) > 0: pickle_suff = "_" + suffix
+regions = ["nordic", "iberia", "nordic"]
+modes = ["highFlex"]
+suffix = "noGpeak"
+if len(suffix) > 0: suffix = "_" + suffix
 data = pickle.load(open(os.path.relpath(rf"PickleJar\data_results_{timestep}h{suffix}.pickle"), "rb"))
 
 for region in regions:
@@ -125,11 +125,16 @@ for region in regions:
                 # print(labels)
                 for tech in order_map_gen:
                     if tech in labels:
-                        labels_to_legend.append(tech)
+                        if tech in tech_names:
+                            labels_to_legend.append(tech_names[tech])
+                        else:
+                            labels_to_legend.append(tech)
+                            print_red(tech, "missing from tech_names")
                         tech_index = labels.index(tech)
                         handles_to_legend.append(handles[tech_index])
                 for tech in labels:
-                    if tech not in labels_to_legend and tech not in ["Load", "FR price", "FFR price", "Bat. storage"]: print_red(f"did not find {tech} in order_gen!")
+                    if (tech in tech_names and tech_names[tech] not in labels_to_legend) and tech not in ["Load", "FR price", "FFR price", "Bat. storage", "Bat. In", "Bat. Out"]:
+                        print_red(f"did not find {tech} in order_gen!")
                 labels_to_legend += labels[-3-bat:]
                 handles_to_legend += handles[-3-bat:]
                 labels_to_legend.reverse()
