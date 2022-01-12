@@ -80,13 +80,13 @@ def percent_stacked_area(regions, mode, timestep, indicator_string: str, set: di
             for pretty, name in set.items():
                 for i, scen in enumerate(scenarios):
                     try:
-                        indicator_data[pretty][i] = data[scen]["FR_cost"].sum(axis=1).sum(level=1)[str(name)]
+                        indicator_data[pretty][i] = data[scen]["FR_cost"].sum(axis=1).groupby(level=1).sum()[str(name)]
                     except KeyError:
                         indicator_data[pretty][i] = 0
                     except ValueError:
                         print("!! weird formatting in FR_cost !!")
                         try:
-                            indicator_data[pretty][i] = data[scen]["FR_cost"].sum(level=2)[str(name)]
+                            indicator_data[pretty][i] = data[scen]["FR_cost"].groupby(level=2).sum()[str(name)]
                         except Exception as e:
                             print(type(e), e)
         else:
@@ -114,7 +114,7 @@ def percent_stacked_area(regions, mode, timestep, indicator_string: str, set: di
             title = f"{region.capitalize()}"
         if j == 0: left_ylabel="Reserve share"
         else: left_ylabel=False
-        if j == len(regions)-1: right_ylabel="Cost [€ cent/MWh]"
+        if j == len(regions)-1: right_ylabel="System cost increase [€ cent/MWh]"
         else: right_ylabel=False
         _, _, (handles, labels) = make_plot(df, title, secondary_y_values, left_ylabel=left_ylabel,
                                             right_ylabel=right_ylabel, _ax=axes[j])
@@ -125,7 +125,7 @@ def percent_stacked_area(regions, mode, timestep, indicator_string: str, set: di
 
 
 mode = "lowFlex"
-pickle_suff = ""
+pickle_suff = "noGpeak"
 secondary_y = "FR_syscost_per_gen"  # _per_gen
 if len(pickle_suff) > 0: pickle_suff = "_" + pickle_suff
 timestep = 6

@@ -81,7 +81,7 @@ thermals = [
 
 order_map_cap = {j: i for i, j in enumerate(order_cap)}
 order_map_gen = {j: i for i, j in enumerate(order_gen)}
-tech_names = {'RO': 'Hydro', 'U': 'Nuclear',
+tech_names = {'RO': 'Hydro', 'RR': 'Run-of-river', 'U': 'Nuclear', "b": "Lignite ST",
               'CHP_wa': 'Waste CHP', 'CHP_bio': 'Woodchip CHP', "G_CHP": "N. Gas CHP", "W_CHP": "Biomass CHP",
               "WA_CHP": "Waste CHP", "B_CHP": "Lignite CCS", "H_CHP": "Coal CHP", "WG_CHP": "Biogas CHP",
               'GWGCCS': 'Gas-mix CCS', "BCCS": "Lignite CCS", "HCCS": "Coal CCS", "GCCS": "N. Gas CCS",
@@ -102,9 +102,9 @@ scen_names = {"_pre": "Base case", "_leanOR": "Lean OR", "_OR": "OR", "_OR_fixed
               "_inertia_noSyn": "Inertia (noSyn)", "_OR_inertia_3xCost": "OR + Inertia (3x)",
               "_inertia_3xCost": "Inertia (3x)", "_inertia_noSyn_3xCost": "Inertia (noSyn) (3x)", "noFC": "Base",
               "fullFC": "Inertia+FR", "OR": "FR", "inertia": "Inertia"}
-color_dict = {'wind_onshore': '#B9B9B9', 'wind_offshore': '#DADADA', 'RO': 'xkcd:ocean blue', 'U': 'xkcd:grape',
-              'GWGCCS': 'xkcd:dark peach', 'WA_CHP': 'xkcd:deep lavender', 'CHP_bio': 'xkcd:tree green',
-              'WG': '#a4be20', 'WG_peak': '#b6cb4d', "WG_CHP": "#83981a",
+color_dict = {'wind_onshore': '#B9B9B9', 'wind_offshore': '#DADADA', 'RO': 'xkcd:ocean blue', 'RR': 'xkcd:ocean blue',
+              'U': 'xkcd:grape', 'GWGCCS': 'xkcd:dark peach', 'WA_CHP': 'xkcd:deep lavender',
+              'CHP_bio': 'xkcd:tree green', 'WG': '#a4be20', 'WG_peak': '#b6cb4d', "WG_CHP": "#83981a",
               'PV_cSiOPT': 'xkcd:mustard', 'CHP_WG_L': 'xkcd:mid green',
               'HP': "#e85d04", 'EB': "#f48c06",
               'CHP_WG': (0, 176 / 255, 80 / 255),
@@ -112,9 +112,9 @@ color_dict = {'wind_onshore': '#B9B9B9', 'wind_offshore': '#DADADA', 'RO': 'xkcd
               'Load': 'Black', "bat_discharge": "xkcd:amber", 'bat': "#714b92",
               'bat_cap': "#8d5eb7", 'Bat. In': "#8d5eb7", 'Bat. Out': "#8d5eb7", 'bat_PS': "xkcd:deep lavender",
               'bat_cap_PS': "xkcd:deep lavender", "sync_cond": 'xkcd:aqua', "curtailment": "xkcd:slate",
-              'WOFF': '#DADADA', 'WON': '#B9B9B9', "H": "#172226", "W": "#014421",
-              "W_CHP": "#016421", "G": "#5B90F6", "G_peak": "#7209b7", "G_CHP": "#5BB0F6", "PV": "#FDC12A",
-              "FC": "#c65082", "H2store": "#ad054d", "electrolyser": "#68032e", "BECCS": "#5b9aa0"}
+              'WOFF': '#DADADA', 'WON': '#B9B9B9', "H": "#172226", "H_CHP": "#172618", "b": "#172226", "B_CHP": "#23343A",
+              "W": "#014421", "W_CHP": "#016421", "G": "#5B90F6", "G_peak": "#7209b7", "G_CHP": "#5BB0F6",
+              "PV": "#FDC12A", "FC": "#c65082", "H2store": "#ad054d", "electrolyser": "#68032e", "BECCS": "#5b9aa0"}
 
 EPODreg_to_country = {  # dictionary for going between EPODreg to country
     'AT': 'Austria', 'BE': 'Belgium', 'BO': 'Bosnia', 'BG': 'Bulgaria', 'CR': 'Croatia', 'CY': 'Cyprus',
