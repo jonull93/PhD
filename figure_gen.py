@@ -7,7 +7,7 @@ from matplotlib.patches import Patch
 import matplotlib.gridspec as gridspec
 import os
 #os.chdir(r"C:\Users\Jonathan\git\python")  # not needed unless running line-by-line in a console
-from my_utils import TECH, color_dict, order_map_gen, add_in_dict, tech_names, scen_names, print_red, print_cyan
+from my_utils import TECH, color_dict, order_map_gen, add_in_dict, tech_names, print_red, print_cyan, year_names
 
 WON = ["WON"+a+str(b) for a in ["A","B"] for b in range(1, 6)]
 PV = ["PVPA1", "PVPB1", "PVR1"]
@@ -92,10 +92,10 @@ def df_to_stacked_areas(scen_data, ax, to_drop=None, region=None, startday=1, da
     return df, handles, labels, bat_SoC
 
 
-timestep = 6
-years = [2020, 2025, 2040]
-regions = ["nordic", "iberia", "nordic"]
-modes = ["highFlex"]
+timestep = 3
+years = [2020, 2025, 2030, 2040]
+regions = ["nordic", "iberia", "brit"]
+modes = ["lowFlex"]
 suffix = "noGpeak"
 if len(suffix) > 0: suffix = "_" + suffix
 data = pickle.load(open(os.path.relpath(rf"PickleJar\data_results_{timestep}h{suffix}.pickle"), "rb"))
@@ -110,7 +110,7 @@ for region in regions:
             os.makedirs(fig_path, exist_ok=True)
             for day in range(1, 358, 28):
                 fig, axes = plt.subplots(nrows=2, ncols=1, figsize=(6, 7))
-                fig.suptitle(f"{region.capitalize()} {mode} {year}")
+                fig.suptitle(f"{region.capitalize()}{', HighFlex' if 'high' in mode else ''}, {year_names[year]}")
                 handles = []
                 labels = []
                 for i, FC in enumerate(["noFC", "fullFC"]):

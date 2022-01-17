@@ -124,11 +124,11 @@ def percent_stacked_area(regions, mode, timestep, indicator_string: str, set: di
     plt.subplots_adjust(wspace=0.49)
 
 
-mode = "lowFlex"
+mode = "highFlex"
 pickle_suff = "noGpeak"
 secondary_y = "FR_syscost_per_gen"  # _per_gen
 if len(pickle_suff) > 0: pickle_suff = "_" + pickle_suff
-timestep = 6
+timestep = 3
 reserve_technologies = {"Thermals": "thermal", "VRE": "VRE", "ESS": "ESS", "BEV": "BEV", "PtH": "PtH", "Hydro": "hydro"}
 FR_intervals = {"FFR": 1, "5-30s": 2, "30s-5min": 3, "5-15min": 4, "15-30min": 5, "30-60min": 6}
 

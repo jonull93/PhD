@@ -102,12 +102,12 @@ scen_names = {"_pre": "Base case", "_leanOR": "Lean OR", "_OR": "OR", "_OR_fixed
               "_inertia_noSyn": "Inertia (noSyn)", "_OR_inertia_3xCost": "OR + Inertia (3x)",
               "_inertia_3xCost": "Inertia (3x)", "_inertia_noSyn_3xCost": "Inertia (noSyn) (3x)", "noFC": "Base",
               "fullFC": "Inertia+FR", "OR": "FR", "inertia": "Inertia"}
-color_dict = {'wind_onshore': '#B9B9B9', 'wind_offshore': '#DADADA', 'RO': 'xkcd:ocean blue', 'RR': 'xkcd:ocean blue',
-              'U': 'xkcd:grape', 'GWGCCS': 'xkcd:dark peach', 'WA_CHP': 'xkcd:deep lavender',
+color_dict = {'wind_onshore': '#B9B9B9', 'wind_offshore': '#DADADA', 'Wind': '#B9B9B9', 'RO': 'xkcd:ocean blue',
+              'U': 'xkcd:grape', 'Nuclear': 'xkcd:grape', 'GWGCCS': 'xkcd:dark peach', 'WA_CHP': 'xkcd:deep lavender',
               'CHP_bio': 'xkcd:tree green', 'WG': '#a4be20', 'WG_peak': '#b6cb4d', "WG_CHP": "#83981a",
-              'PV_cSiOPT': 'xkcd:mustard', 'CHP_WG_L': 'xkcd:mid green',
-              'HP': "#e85d04", 'EB': "#f48c06",
-              'CHP_WG': (0, 176 / 255, 80 / 255),
+              'PV_cSiOPT': 'xkcd:mustard', 'CHP_WG_L': 'xkcd:mid green', 'RR': 'xkcd:ocean blue',
+              'HP': "#e85d04", 'EB': "#f48c06", "Fossil thermals": "#2b2d42", "Bio thermals": "#2a9d8f",
+              'CHP_WG': (0, 176 / 255, 80 / 255), "Solar PV": 'xkcd:mustard', 'Hydro': 'xkcd:ocean blue',
               'HOB_WG': (128 / 255, 128 / 255, 0), 'solarheat': (204 / 255, 51 / 255, 0), 'HOB_bio': 'green',
               'Load': 'Black', "bat_discharge": "xkcd:amber", 'bat': "#714b92",
               'bat_cap': "#8d5eb7", 'Bat. In': "#8d5eb7", 'Bat. Out': "#8d5eb7", 'bat_PS': "xkcd:deep lavender",
@@ -132,6 +132,8 @@ EPODs = EPODreg_to_country.keys()
 
 scenario_shortening = {"iberia": "IB", "brit": "BR", "nordic": "NE",
                        "CO2price": "CO2p", "fullFC": "FC", }
+
+year_names = {2020: "2020", 2025: "Short-term", 2030:"Mid-term", 2040:"Long-term"}
 
 def country_to_reg(dictionary, country):
     """

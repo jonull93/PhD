@@ -10,7 +10,7 @@ import os
 from my_utils import color_dict, order_cap, add_in_dict, tech_names, scen_names, print_cyan, print_red, print_green
 
 pickleJar = ""
-h = 6
+h = 3
 suffix = "noGpeak"
 suffix = "_"+suffix if len(suffix)>0 else ""
 data = pickle.load(open(os.path.relpath(rf"PickleJar\data_results_{h}h{suffix}.pickle"), "rb"))
@@ -82,11 +82,11 @@ def plot_cap_multipleyears(ax, data, scenario, years=None, new=True, patterns=No
                     val2 = comparison_data.loc[(tech,year)].sum()
                 add_in_dict(cap_summedVRE, (tech, year), val-val2, group_vre=True)
     cap_series = pd.Series(cap_summedVRE, name="Cap")
-    df_gen = cap_series.to_frame(name="Gen")
+    df_gen = cap_series.to_frame(name="Gen.")
     techs = df_gen.index.levels[0]
     for tech in [t for t in techs if t in VMS]:  # doing this instead of .drop maintains tech order and colors
         df_gen.loc[tech] = 0
-    df_VMS = cap_series.to_frame(name="VMS").drop(labels=[i for i in techs if i not in VMS], errors="ignore", level=0)
+    df_VMS = cap_series.to_frame(name="Storage").drop(labels=[i for i in techs if i not in VMS], errors="ignore", level=0)
     df = df_gen.join(df_VMS)
     df = df[df.abs() > 0.01].fillna(0)
     #print(df[df<0.0001])
@@ -109,7 +109,6 @@ def plot_cap_multipleyears(ax, data, scenario, years=None, new=True, patterns=No
 separate_figures = ["lowFlex", "highFlex"]
 for flex in separate_figures:
     cases = []
-    h = 6
     regions = ["nordic", "brit", "iberia"]
     modes = ["noFC", "fullFC"]  # , "FCnoPTH", "FCnoH2", "FCnoWind", "FCnoBat", "FCnoSynth"]
     nr_comparisons = len(modes)-1
@@ -166,7 +165,7 @@ for flex in separate_figures:
     fig.suptitle(f"Investments, {flex.capitalize()}",fontsize=16)
     fig.legend(handles=handles, loc="center left", bbox_to_anchor=(0.91, 0.5), )
     fig.show()
-    fig.savefig(f"figures/cap_{flex}.png",bbox_inches="tight", dpi=600)
+    fig.savefig(f"figures/cap_{flex}_{h}h.png",bbox_inches="tight", dpi=600)
     del df
 # plot_cap(data,first_case)
 # plt.show()
