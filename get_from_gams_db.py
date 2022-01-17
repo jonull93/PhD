@@ -1,7 +1,7 @@
 import gams
 import numpy
 import pandas
-
+from my_utils import tech_names, EPODs
 
 class GamsSymbol(object):
     def __init__(self, symbol):
@@ -68,20 +68,21 @@ def get_from_db(db, symbol_name):
 
 
 def which_set(iterable):
-    for i, set in enumerate([['UK2','UK3','IE','ES3', 'ES_N','SE3','SE_S','PT','DE_N','FI'],
-                             ['b','bat','W_CHP','WOFF','WONA4','PVA1','sync_cond','WONA2', 'WONA3', 'WONB5','H2store',
-                              'HP', 'W_HOB'],
-                             ['d001a', 'd001c','d001','d060a','d005b', 'd005c', 'd006a', 'd006a', 'd007b', 'd008a',
-                              'd360a','d043', 'd057', 'd078', 'd109e'],
+    import string
+    for i, set in enumerate([['ES_N','ES_S','SE_S','DE_N',]+EPODs,
+                             list(tech_names.keys()),
+                             [f"d{d:03}{h}" for d in range(1,366) for h in string.ascii_lowercase[:24]],  # d001a etc
                              [str(i) for i in range(1, 9)],
                              ['2020', '2025', '2030', '2035', '2040', '2045', '2050'],
-                             ['OHAC', 'SCDC']]):
+                             ['OHAC', 'SCDC'],
+                             ['life', 'heat_type', 'd-cost', 'OM_var', 'OM_fix', 'LF', 'd', 'fuel']
+                             ]):
         # print("checking set",set)
         for item in set:
             # print("checking item", item)
             if item in iterable:
-                return ["I_reg", "tech", "timestep", "FR_period", "year", "tech_con"][i]
-    if len(iterable) > 0: ("found no match for", iterable)
+                return ["I_reg", "tech", "timestep", "FR_period", "year", "tech_con", "tech_prop"][i]
+    if len(iterable) > 0: print("found no match for", iterable)
     return ''
 
 
@@ -123,5 +124,12 @@ def gdx(f, symbol_name, silent=False, error_return=None, keep_na=False, dud_df_r
         else:
             symbol.index = symbol.index.astype(str)
         if not keep_na: symbol.fillna(0, inplace=True)
-        if expected_a_df: symbol = symbol.reindex(index=dud_df_return.index, columns=dud_df_return.columns, fill_value=0)
+        try:
+            if expected_a_df: symbol = symbol.reindex(index=dud_df_return.index, columns=dud_df_return.columns, fill_value=0)
+        except TypeError:
+            print("Failed to reindex:",symbol, "will now try to unstack and reindex again")
+            print(symbol.columns)
+            symbol = symbol.unstack(level="", fill_value=0)
+            symbol = symbol.reindex(index=dud_df_return.index, columns=dud_df_return.columns, fill_value=0)
+            print(symbol)
     return symbol

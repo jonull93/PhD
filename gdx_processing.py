@@ -23,7 +23,7 @@ overwrite = []  # names of scenarios to overwrite regardless of existence in pic
 #overwrite = [reg+"_inertia_0.1x" for reg in ["ES3", "HU", "IE", "SE2"]]+\
 #            [reg+"_inertia" for reg in ["ES3", "HU", "IE", "SE2"]]+\
 #            [reg+"_inertia_noSyn" for reg in ["ES3", "HU", "IE", "SE2"]]
-h = 6  # time resolution
+h = 3  # time resolution
 suffix = "noGpeak"  # Optional suffix for the run, e.g. "test" or "highBioCost"
 suffix = '_'+suffix if len(suffix) > 0 else ''
 name = f"results_{h}h{suffix}"  # this will be the name of the output excel file
@@ -116,7 +116,7 @@ new_data = {}
 # io_lock = threading.Lock()
 threads = {}
 thread_nr = {}
-num_threads = min(max(cpu_count() - 1, 4), len(todo_gdx))
+num_threads = min(max(cpu_count() - 5, 4), len(todo_gdx))
 excel_name = path + name + ".xlsx"
 writer = pd.ExcelWriter(excel_name, engine="openpyxl")
 opened_file = False

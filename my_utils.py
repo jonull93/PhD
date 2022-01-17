@@ -128,7 +128,7 @@ EPODreg_to_country = {  # dictionary for going between EPODreg to country
     'ES1': 'Spain', 'ES2': 'Spain', 'ES3': 'Spain', 'ES4': 'Spain', 'SE_N': 'Sweden', 'SE_S': 'Sweden', 'SE1': 'Sweden',
     'SE2': 'Sweden', 'SE3': 'Sweden', 'SE4': 'Sweden', 'CH': 'Switzerland', 'UK1': 'UK', 'UK2': 'UK', 'UK3': 'UK'
 }
-EPODs = EPODreg_to_country.keys()
+EPODs = list(EPODreg_to_country.keys())
 
 scenario_shortening = {"iberia": "IB", "brit": "BR", "nordic": "NE",
                        "CO2price": "CO2p", "fullFC": "FC", }
