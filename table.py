@@ -15,9 +15,9 @@ flexes = ["lowFlex",]
 FC = ["noFC", "fullFC"]
 years = [2020, 2025, 2030, 2040]
 indicators = {"cost_tot": [], "VRE_share_total": [], "thermal_share_total": [], "curtailment": [], "bat": [],
-              "cost_flexlim": [], "FR_binding_hours": 0., "base_mid_thermal_FLHs": [], "peak_thermal_FLHs": []}
-print(list(indicators.keys()))
+              "cost_flexlim": [], "FR_binding_hours": 0., "FR_hard_binding_hours": 0., "base_mid_thermal_FLHs": [], "peak_thermal_FLHs": []}
 base_scenarios = [f"{reg}_{flex}_noFC_{year}{suffix}_{timestep}h" for reg in regions for flex in flexes for year in years]
+print(",".join(indicators))
 for scen in base_scenarios:
     for ind in indicators:
         if "flexlim" in ind:
@@ -31,7 +31,9 @@ for scen in base_scenarios:
         elif ind in ["curtailment", "VRE_share_total", "thermal_share_total"]:
             indicators[ind] = [data[scen][ind]*100, data[scen.replace("noFC", "fullFC")][ind]*100]
         elif ind == "FR_binding_hours":
-            indicators[ind] = sum([1 for i in data[scen.replace("noFC", "fullFC")]["FR_cost"].sum() if i>10])
+            indicators[ind] = sum([1 for i in data[scen.replace("noFC", "fullFC")]["FR_cost"].sum() if i > 0.5])
+        elif ind == "FR_hard_binding_hours":
+            indicators[ind] = sum([1 for i in data[scen.replace("noFC", "fullFC")]["FR_cost"].sum() if i > 10])
         elif "thermal_FLH" in ind:
             techs = []
             if "mid" in ind:
@@ -70,7 +72,7 @@ for scen in base_scenarios:
             to_print.append(f"{round(val[0], 2)} / {round(val[2], 2)} ({'+' if val[1] - val[0] >= 0 else ''}{round(val[1] - val[0], 2)} / {'+' if val[3] - val[2] >= 0 else ''}{round(val[3] - val[2], 2)})")
         elif ind in ["curtailment", "VRE_share_total", "thermal_share_total"]:
             to_print.append(f"{round(val[0], 1)} ({'+' if val[1] - val[0] >= 0 else ''}{round(val[1] - val[0], 1)})")
-        elif ind == "FR_binding_hours":
+        elif ind in ["FR_binding_hours", "FR_hard_binding_hours"]:
             to_print.append(f"{val} ({val*3})")
         else:
             to_print.append(f"{round(val[0], 3)} ({'+' if val[1] - val[0] >= 0 else ''}{round(val[1] - val[0], 3)})")

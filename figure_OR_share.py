@@ -1,6 +1,6 @@
 import pickle
 from os import path
-from my_utils import label_axes
+from my_utils import label_axes, print_cyan
 import matplotlib.pyplot as plt
 import matplotlib.text as mpltext
 import pandas as pd
@@ -49,7 +49,7 @@ def make_plot(df, title, secondary_y_values, xlabels=None, legend=False, left_yl
     ax2 = ax.twinx()
     if right_ylabel:
         ax2.set_ylabel(right_ylabel)
-    line = ax2.plot(secondary_y_values, "k--", )
+    line = ax2.plot(secondary_y_values, "kD", markerfacecolor='none')
     handles = current_handles + line
     labels = [h.get_label() for h in handles]
     labels[-1] = "Cost"
@@ -64,7 +64,9 @@ def make_plot(df, title, secondary_y_values, xlabels=None, legend=False, left_yl
 
 
 def percent_stacked_area(regions, mode, timestep, indicator_string: str, set: dict, years=None, FC=True,
-                         secondary_y="FR_cost", pickle_suffix="", bars=True, figtitle="Interval share, and \u0394system-cost"):
+                         secondary_y="FR_cost", pickle_suffix="", bars=True,
+                         figtitle="Interval share, and \u0394system-cost", filepath="test.png"):
+    print_cyan(f"Starting percent_stacked_area() for {indicator_string}")
     if len(pickle_suffix) > 0 and pickle_suffix[0] != "_":
         pickle_suffix = "_" + pickle_suffix
     if years is None:
@@ -73,6 +75,7 @@ def percent_stacked_area(regions, mode, timestep, indicator_string: str, set: di
     fig, axes = plt.subplots(nrows=1, ncols=len(regions), figsize=(8, 4), )
     label_axes(fig, loc=(-0.1, 1.03))
     for j, region in enumerate(regions):
+        print_cyan(f"- {region} -")
         scenarios = [f"{region}_{mode}_{'fullFC' if FC else 'noFC'}_{y}{pickle_suffix}_{timestep}h" for y in years]
         print("Cost_tot:", [round(data[scen]["cost_tot"], 2) for scen in scenarios])
         if indicator_string == "FR_cost":
@@ -105,8 +108,8 @@ def percent_stacked_area(regions, mode, timestep, indicator_string: str, set: di
         df = pd.DataFrame(data=
                           {pretty_name: indicator_data[pretty_name] for pretty_name in indicator_data}
                           , index=years).round(decimals=4)
-        print(indicator_string)
-        print(df)
+        #print(indicator_string)
+        #print(df)
         print(f"{secondary_y}: {secondary_y_values}")
         if indicator_string == "FR_cost":
             title = f"{region.capitalize()}"
@@ -122,9 +125,10 @@ def percent_stacked_area(regions, mode, timestep, indicator_string: str, set: di
     fig.legend(handles,labels,bbox_to_anchor=(0.5, 0.93), ncol=4, loc="lower center")
     fig.suptitle(f"{figtitle}: {mode}", y=1.13)
     plt.subplots_adjust(wspace=0.49)
+    plt.savefig(filepath, dpi=600, bbox_inches="tight")
 
 
-mode = "highFlex"
+mode = "lowFlex"
 pickle_suff = "noGpeak"
 secondary_y = "FR_syscost_per_gen"  # _per_gen
 if len(pickle_suff) > 0: pickle_suff = "_" + pickle_suff
@@ -137,12 +141,15 @@ FR_intervals = {"FFR": 1, "5-30s": 2, "30s-5min": 3, "5-15min": 4, "15-30min": 5
 regions = ["nordic", "brit", "iberia"]
 print("________________" * 3)
 print(f" .. Making figure for {regions} .. ")
-percent_stacked_area(regions, mode, timestep, "FR_value_share_", reserve_technologies,
-                     secondary_y=secondary_y, pickle_suffix=pickle_suff, figtitle="Cost-weighted interval share, and \u0394system-cost")
-plt.savefig(rf"figures\reserve_valueshare_{mode}{pickle_suff}_{timestep}h.png", dpi=600, bbox_inches="tight")
+percent_stacked_area(regions, mode, timestep, "FR_value_share_", reserve_technologies,secondary_y=secondary_y,
+                     pickle_suffix=pickle_suff, figtitle="Cost-weighted technology share, and \u0394system-cost",
+                     filepath=rf"figures\reserve_valueshare_{mode}{pickle_suff}_{timestep}h.png")
+
 percent_stacked_area(regions, mode, timestep, "FR_share_", reserve_technologies, secondary_y=secondary_y,
-                     pickle_suffix=pickle_suff)
-plt.savefig(rf"figures\reserve_share_{mode}{pickle_suff}_{timestep}h.png", dpi=600, bbox_inches="tight")
+                     pickle_suffix=pickle_suff, figtitle="Technology reserve share, and \u0394system-cost",
+                     filepath=rf"figures\reserve_share_{mode}{pickle_suff}_{timestep}h.png")
+#plt.savefig(rf"figures\reserve_share_{mode}{pickle_suff}_{timestep}h.png", dpi=600, bbox_inches="tight")
 percent_stacked_area(regions, mode, timestep, "FR_cost", FR_intervals, secondary_y=secondary_y,
-                     pickle_suffix=pickle_suff)
-plt.savefig(rf"figures\interval_costs_{mode}{pickle_suff}_{timestep}h.png", dpi=600, bbox_inches="tight")
+                     pickle_suffix=pickle_suff, figtitle="Interval reserve share, and \u0394system-cost",
+                     filepath=rf"figures\interval_costs_{mode}{pickle_suff}_{timestep}h.png")
+#plt.savefig(rf"figures\interval_costs_{mode}{pickle_suff}_{timestep}h.png", dpi=600, bbox_inches="tight")

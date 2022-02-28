@@ -49,7 +49,7 @@ def plot_cap_singleyear(ax, data, scen, new=False):
 def plot_cap_multipleyears(ax, data, scenario, years=None, new=True, patterns=None,
                            comparison_data=pd.Series({(None, None): None}), ):
     if years is None:
-        years = [2030, 2040, 2050]
+        years = [2025, 2030, 2040, 2050]
     if patterns is None:
         patterns = ['X', '/','o', '']*2
         # doing it this round-about way ensures that changing the patterns/years for one function-call won't linger
@@ -91,22 +91,25 @@ def plot_cap_multipleyears(ax, data, scenario, years=None, new=True, patterns=No
     df = df[df.abs() > 0.01].fillna(0)
     #print(df[df<0.0001])
     colors = [color_dict[tech] for tech in df.index.get_level_values(0)]
+    df = df.unstack(fill_value=0)
     plot = df.T.plot(kind="bar", stacked=True, color=colors, legend=False, width=0.9, rot=0, ax=ax, )
     if comparison: plot.axhline(linewidth=1, color="black")
-    bars = ax.patches
+    """bars = ax.patches
+    #year_list = [df.columns[i][1] for i in range(len(df.columns))]*len(df.index)
     year_list = [df.index[i][1] for i in range(len(df))]
-    print(year_list)
     year_per_bar = []
+    print(bars, year_list, df)
     for i, bar in enumerate(bars):
         year = year_list[int(i/2)]  # len(bars)=2*len(df) because even the zero/NaN values gets a bar
         j = years.index(year)
         year_per_bar.append((year,j))
         bar.set_hatch(patterns[j])
-    return plot, list(df.index.levels[0]), df
+    #return plot, list(df.index.levels[0]), df"""
+    return plot, list(df.columns.levels[0]), df
 
 
 # -- All modelled cases
-separate_figures = ["lowFlex", "highFlex"]
+separate_figures = ["lowFlex",]
 for flex in separate_figures:
     cases = []
     regions = ["nordic", "brit", "iberia"]
@@ -141,7 +144,7 @@ for flex in separate_figures:
         tech_collections.append(t)
         fig.add_subplot(plot)
         for i_m, mode in enumerate(modes[1:]):
-            plot, t, _ = plot_cap_multipleyears(axes[i_f][1+i_m], data, f"{reg}_{flex}_{mode}_YEAR{suffix}_{h}h",
+            plot, t, df_return = plot_cap_multipleyears(axes[i_f][1+i_m], data, f"{reg}_{flex}_{mode}_YEAR{suffix}_{h}h",
                                                 comparison_data=df, patterns=patterns, years=years)
             if y_subplots % 2 == 1:  # if odd number of y_plots
                 if i_f % 2 == 1 and i_m == 0: plot.set_ylabel("Difference from $\it{Base}$ [GW(h)]")
@@ -166,7 +169,6 @@ for flex in separate_figures:
     fig.legend(handles=handles, loc="center left", bbox_to_anchor=(0.91, 0.5), )
     fig.show()
     fig.savefig(f"figures/cap_{flex}_{h}h.png",bbox_inches="tight", dpi=600)
-    del df
 # plot_cap(data,first_case)
 # plt.show()
 # cap.unstack().plot(kind="bar",stacked=True)
