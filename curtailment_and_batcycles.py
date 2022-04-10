@@ -1,7 +1,7 @@
 import os
 import pickle
 
-from my_utils import print_cyan, print_green
+from my_utils import print_cyan, print_green, print_red
 
 timestep = 3
 suffix = "noGpeak"
@@ -31,6 +31,7 @@ for reg in regions:
             for subreg in bat.index:
                 regbat = bat.loc[subreg]
                 zeroes = regbat.index[regbat == 0]
-                regcurt = data[scen]["curtailment_profile_total"][reg]
+                try: regcurt = data[scen]["curtailment_profile_total"].loc[subreg]
+                except Exception as e: print_red(e, data[scen]["curtailment_profile_total"])
 
     print("")

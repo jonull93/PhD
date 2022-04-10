@@ -6,12 +6,12 @@ from termcolor import colored
 
 # os.chdir(r"C:\Users\Jonathan\Box\python")  # not needed unless running line-by-line in a console
 
-suffix = "noGpeak"
+suffix = "slimSpain"
 if len(suffix) > 0: suffix = "_" + suffix
 timestep = 3
 data = pickle.load(open(os.path.relpath(rf"PickleJar\data_results_{timestep}h{suffix}.pickle"), "rb"))
-regions = ["brit", "iberia", "nordic"]
-flexes = ["lowFlex",]
+regions = ["iberia"]
+flexes = ["lowFlex","highFlex"]
 FC = ["noFC", "fullFC"]
 years = [2020, 2025, 2030, 2040]
 indicators = {"cost_tot": [], "VRE_share_total": [], "thermal_share_total": [], "curtailment": [], "bat": [],

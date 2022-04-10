@@ -15,9 +15,10 @@ suffix = "noGpeak"
 suffix = "_"+suffix if len(suffix)>0 else ""
 data = pickle.load(open(os.path.relpath(rf"PickleJar\data_results_{h}h{suffix}.pickle"), "rb"))
 
-H2 = ['electrolyser', 'H2store', 'FC']
-bat = ['bat', 'bat_cap']
+H2 = ['H2store']
+bat = ['bat']
 VMS = [tech_names[i] for i in H2 + bat] + [i for i in H2 + bat]
+exclude = ["electrolyser"]
 
 position = 0
 
@@ -47,14 +48,14 @@ def plot_cap_singleyear(ax, data, scen, new=False):
 
 
 def plot_cap_multipleyears(ax, data, scenario, years=None, new=True, patterns=None,
-                           comparison_data=pd.Series({(None, None): None}), ):
+                           comparison_data=pd.DataFrame({(None, None): None}, index=[None])):
     if years is None:
         years = [2025, 2030, 2040, 2050]
     if patterns is None:
         patterns = ['X', '/','o', '']*2
         # doing it this round-about way ensures that changing the patterns/years for one function-call won't linger
         # in the next function call (google "Default arguments value is mutable")
-    comparison = len(comparison_data) > 1  # True if comparison_data is longer than 0
+    comparison = len(comparison_data) > 1  # True if comparison_data is longer than 1
 
     cap = {}
     for y in years:
@@ -68,15 +69,16 @@ def plot_cap_multipleyears(ax, data, scenario, years=None, new=True, patterns=No
         else:
             cap[y] = data[scen]["tot_cap"].swaplevel(i=0, j=1).groupby(level=1).sum()
 
+    if comparison: print(comparison_data.columns)
     cap_summedVRE = {}
     for tech in order_cap:
         for year in years:
-            if tech in cap[year].index or (tech,year) in comparison_data.index:
+            if tech in cap[year].index or (tech,year) in comparison_data.columns:
                 if tech not in cap[year].index:
                     val = 0
                 else:
                     val = cap[year][tech]
-                if (tech, year) not in comparison_data.index:
+                if not comparison or (tech, year) not in comparison_data.columns:
                     val2 = 0  # this will always happen if comparison_data is not given, so the val-val2=val
                 else:
                     val2 = comparison_data.loc[(tech,year)].sum()
@@ -84,15 +86,35 @@ def plot_cap_multipleyears(ax, data, scenario, years=None, new=True, patterns=No
     cap_series = pd.Series(cap_summedVRE, name="Cap")
     df_gen = cap_series.to_frame(name="Gen.")
     techs = df_gen.index.levels[0]
-    for tech in [t for t in techs if t in VMS]:  # doing this instead of .drop maintains tech order and colors
-        df_gen.loc[tech] = 0
+    for tech in techs:
+        if tech in VMS:  # doing this instead of .drop maintains tech order and colors
+            df_gen.loc[tech] = 0
+        elif tech in exclude:
+            df_gen.drop(index=tech, level=0, inplace=True)
+
     df_VMS = cap_series.to_frame(name="Storage").drop(labels=[i for i in techs if i not in VMS], errors="ignore", level=0)
     df = df_gen.join(df_VMS)
     df = df[df.abs() > 0.01].fillna(0)
-    #print(df[df<0.0001])
-    colors = [color_dict[tech] for tech in df.index.get_level_values(0)]
     df = df.unstack(fill_value=0)
+    gen = []
+    storage = []
+    counter = 0
+    for col, colvalues in df.iteritems():
+        year = col[1]
+        if year == 2020:
+            counter = 0
+        if col[1]=="Gen.":
+            gen.append(counter)
+        else:
+            storage.append(counter)
+        counter += sum(colvalues)
+
+    df.loc["offset"] = gen+storage
+    reindexing = [len(df)-1]+[i for i in range(len(df)-1)]
+    df = df.iloc[reindexing]
+    colors = [color_dict[tech] for tech in df.index.get_level_values(0)]
     plot = df.T.plot(kind="bar", stacked=True, color=colors, legend=False, width=0.9, rot=0, ax=ax, )
+    plot.set_xticklabels(years*2, rotation=25)
     if comparison: plot.axhline(linewidth=1, color="black")
     """bars = ax.patches
     #year_list = [df.columns[i][1] for i in range(len(df.columns))]*len(df.index)
@@ -105,7 +127,7 @@ def plot_cap_multipleyears(ax, data, scenario, years=None, new=True, patterns=No
         year_per_bar.append((year,j))
         bar.set_hatch(patterns[j])
     #return plot, list(df.index.levels[0]), df"""
-    return plot, list(df.columns.levels[0]), df
+    return plot, list(df.index), df
 
 
 # -- All modelled cases
@@ -116,6 +138,7 @@ for flex in separate_figures:
     modes = ["noFC", "fullFC"]  # , "FCnoPTH", "FCnoH2", "FCnoWind", "FCnoBat", "FCnoSynth"]
     nr_comparisons = len(modes)-1
     y_subplots = len(regions)
+
     # -- Building figure axes
     fig = plt.figure(figsize=(7, 8))  # (width, height) in inches
     outer = gridspec.GridSpec(ncols=2, nrows=y_subplots, wspace=0.33, hspace=0.34, width_ratios=[1, nr_comparisons])  # an outer 2x2, inner 1x1 to the left and 1x3 to the right
@@ -131,7 +154,7 @@ for flex in separate_figures:
     tech_collections = []
     patterns = ['X', '/', '.', '']
     years = [2020, 2025, 2030, 2040]
-    print_cyan(flex.capitalize())
+    print_cyan('-',flex,'-')
     for i_f, reg in enumerate(regions):
         print_cyan(reg.capitalize())
         plot, t, df = plot_cap_multipleyears(axes[i_f][0], data, f"{reg}_{flex}_noFC_YEAR{suffix}_{h}h", patterns=patterns,
@@ -154,14 +177,16 @@ for flex in separate_figures:
             tech_collections.append(t)
             fig.add_subplot(plot)
         axes[i_f][0].text(-0.35, 0.5, f"{reg.capitalize()}:", transform=axes[i_f][0].transAxes, ha='right', ma='center', fontsize=14)
+
+    # -- Finishing off fig
     techs = []
     for tech in order_cap:
         for collection in tech_collections:
             if tech in collection:
                 techs.append(tech)
                 break
-    handles = [Patch(color=color_dict[tech], label=tech_names[tech]) for tech in techs[::-1]]+\
-              [Patch(facecolor="#FFF", hatch=patterns[i]*2, label=years[i]) for i in range(4)]
+    handles = [Patch(color=color_dict[tech], label=tech_names[tech]) for tech in techs[::-1]]#+\
+              #[Patch(facecolor="#FFF", hatch=patterns[i]*2, label=years[i]) for i in range(4)]
     #axes[0][0].text(-0.35, 0.5, "Low\nFlex:", transform=axes[0][0].transAxes, ha='right', ma='center', fontsize=14)
     #axes[1][0].text(-0.35, 0.5, "High\nFlex:", transform=axes[1][0].transAxes, ha='right', ma='center', fontsize=14)
     #axes[2][0].text(-0.35, 0.5, "High\nFlex:", transform=axes[1][0].transAxes, ha='right', ma='center', fontsize=14)
