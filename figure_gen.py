@@ -30,8 +30,8 @@ def df_to_stacked_areas(scen_data, ax, to_drop=None, region=None, startday=1, da
             bat_SoC = False
     if FR:
         try:
-            FR_price = scen_data["FR_cost"].sum().reindex(list(df),fill_value=0).rename("FR price")
-            FFR_price = scen_data["FR_cost"].groupby(level=1).sum().loc["1"].reindex(list(df), fill_value=0).rename("FFR price")
+            FR_price = scen_data["FR_cost"].sum().reindex(list(df),fill_value=0).rename("FR cost")
+            FFR_price = scen_data["FR_cost"].groupby(level=1).sum().loc["1"].reindex(list(df), fill_value=0).rename("FFR cost")
         except AttributeError:
             FR = False
 
@@ -78,7 +78,7 @@ def df_to_stacked_areas(scen_data, ax, to_drop=None, region=None, startday=1, da
     to_plot = df.iloc[:, start:end].T
     plotted_techs = list(to_plot.columns)
     to_plot.plot(kind="area", ax=ax, linewidth=0.1, color=[color_dict[tech] for tech in to_plot.columns])  # plotting
-    curtailment = df.clip(lower=0).sum().add(scen_data["curtailment_profile_total"].sum(), fill_value=0).rename("Load")
+    curtailment = df.clip(lower=0).sum().add(scen_data["curtailment_profile_total"].sum(), fill_value=0).rename("Load + curt.")
     curtailment.iloc[start:end].plot(kind="line", ax=ax, linewidth=1)
     if bat_SoC: bat.iloc[start:end].plot(kind="line", ax=ax, linewidth=1, color="k")
     if FR:
@@ -133,7 +133,7 @@ for region in regions:
                         tech_index = labels.index(tech)
                         handles_to_legend.append(handles[tech_index])
                 for tech in labels:
-                    if (tech in tech_names and tech_names[tech] not in labels_to_legend) and tech not in ["Load", "FR price", "FFR price", "Bat. storage", "Bat. In", "Bat. Out"]:
+                    if (tech in tech_names and tech_names[tech] not in labels_to_legend) and tech not in ["Load", "FR cost", "FFR cost", "Bat. storage", "Bat. In", "Bat. Out"]:
                         print_red(f"did not find {tech} in order_gen!")
                 labels_to_legend += labels[-3-bat:]
                 handles_to_legend += handles[-3-bat:]
