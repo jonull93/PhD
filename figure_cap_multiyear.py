@@ -157,29 +157,29 @@ for flex in separate_figures:
         if i_f == 0: plot.set_title(scen_names["noFC"], pad=15)
 
         if y_subplots % 2 == 1:  # if odd number of y_plots
-            if i_f % 2 == 1: plot.set_ylabel("New capacity [GW(h)]", fontsize=12)
+            if i_f % 2 == 1: plot.set_ylabel("New capacity", fontsize=12)
         else:
-            plot.set_ylabel("New capacity [GW(h)]", fontsize=12)
+            plot.set_ylabel("New capacity", fontsize=12)
         tech_collections.append(t)
         fig.add_subplot(plot)
         for i_m, mode in enumerate(modes[1:]):
             plot, t, df_return = plot_cap_multipleyears(axes[i_f][1+i_m], data, f"{reg}_{flex}_{mode}_YEAR{suffix}_{h}h",
                                                 comparison_data=df, patterns=patterns, years=years)
             if y_subplots % 2 == 1:  # if odd number of y_plots
-                if i_f % 2 == 1 and i_m == 0: plot.set_ylabel("Difference from $\it{Base}$ [GW(h)]", fontsize=12)
+                if i_f % 2 == 1 and i_m == 0: plot.set_ylabel("Difference from $\it{No FC}$", fontsize=12)
             elif i_m == 0:
-                plot.set_ylabel("Difference from $\it{Base}$ [GW(h)]", fontsize=12)
+                plot.set_ylabel("Difference from $\it{No FC}$", fontsize=12)
             if i_f == 0: plot.set_title(scen_names[mode], pad=15)
             tech_collections.append(t)
             fig.add_subplot(plot)
         axes[i_f][0].text(-0.35, 0.5, f"{reg.capitalize()}:", transform=axes[i_f][0].transAxes, ha='right', ma='center', fontsize=14)
         for i_m in range(len(modes)):
             ylim = axes[i_f][i_m].get_ylim()
-            axes[i_f][i_m].set_ylim([i*1.1 for i in ylim])
+            axes[i_f][i_m].set_ylim([i*1.15 for i in ylim])
             axes[i_f][i_m].axvline(x=3.5, color='k', linewidth=1)
-            text = axes[i_f][i_m].text(0.25, 1, "Power", transform=axes[i_f][i_m].transAxes, va="center", ha="center")
+            text = axes[i_f][i_m].text(0.25, 1, "Power [GW]", transform=axes[i_f][i_m].transAxes, va="center", ha="center")
             text.set_bbox(dict(facecolor='white', alpha=1, edgecolor='black'))
-            text = axes[i_f][i_m].text(0.75, 1, "Storage", transform=axes[i_f][i_m].transAxes, va="center", ha="center")
+            text = axes[i_f][i_m].text(0.75, 1, "Storage [GWh]", transform=axes[i_f][i_m].transAxes, va="center", ha="center")
             text.set_bbox(dict(facecolor='white', alpha=1, edgecolor='black'))
     axes[-1][0].text(0.5, 0.015, f"Year", transform=fig.transFigure, ha='center', ma='center', fontsize=12)
 
