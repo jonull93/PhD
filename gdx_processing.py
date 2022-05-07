@@ -14,19 +14,20 @@ from traceback import format_exc
 import gdx_processing_functions as gpf
 from my_utils import print_red, print_cyan, print_green
 from termcolor import colored
+from glob import glob
 start_time_script = tm.time()
 print("Excel-writing script started at", datetime.now().strftime('%H:%M:%S'))
 
-excel = False  # will only make a .pickle if excel == False
+excel = True  # will only make a .pickle if excel == False
 run_output = "w"  # 'w' to (over)write or 'rw' to only add missing scenarios
 overwrite = []  # names of scenarios to overwrite regardless of existence in pickled data
 #overwrite = [reg+"_inertia_0.1x" for reg in ["ES3", "HU", "IE", "SE2"]]+\
 #            [reg+"_inertia" for reg in ["ES3", "HU", "IE", "SE2"]]+\
 #            [reg+"_inertia_noSyn" for reg in ["ES3", "HU", "IE", "SE2"]]
 h = 3  # time resolution
-suffix = "noGpeak"  # Optional suffix for the run, e.g. "test" or "highBioCost"
+suffix = ""  # Optional suffix for the run, e.g. "test" or "highBioCost"
 suffix = '_'+suffix if len(suffix) > 0 else ''
-name = f"results_{h}h{suffix}"  # this will be the name of the output excel file
+name = f"results_{h}h{suffix}_noDoubleUse"  # this will be the name of the output excel file
 
 # indicators are shown in a summary first page to give an overview of all scenarios in one place
 # the name of an indicator should preferably match the name of a variable from the gdx, requires extra code if not
@@ -58,8 +59,10 @@ indicators = ["cost_tot",
 
 cases = []
 systemFlex = ["lowFlex", "highFlex"]
-modes = ["noFC", "fullFC", "inertia"]  # , "fullFC", "inertia", "OR"]#
-for reg in ["iberia", "brit", "nordic"]:
+modes = ["noFC", "fullFC", "fullFC_noDoubleUse"]  # , "fullFC", "inertia", "OR"]# "noFC",
+replace_with_alternative_solver_if_missing = True
+alternative_solutions = ["NCO"]  # to replace with if replace_with_alternative_solver_if_missing
+for reg in ["brit", "iberia","nordic"]:
     for flex in systemFlex:
         for mode in modes:
             for year in [2020,2025,2030,2040]:
@@ -128,11 +131,14 @@ except Exception as e:
         None
     elif "one sheet" not in str(e):
         opened_file = True
-        print("OBS: EXCEL FILE MAY BE OPEN - PLEASE CLOSE IT BEFORE SCRIPT FINISHES ", e)
+        print_red("OBS: EXCEL FILE MAY BE OPEN - PLEASE CLOSE IT BEFORE SCRIPT FINISHES ", e)
 
 # Unfortunately, global variables can only be used within the same file, so not all functions can be imported
 def crawl_gdx(q_gdx, old_data, gdxpath, thread_nr, overwrite, todo_gdx_len):
     thread_nr[threading.get_ident()] = len(thread_nr) + 1
+    files = []
+    for file in glob(gdxpath + "*.gdx"):
+        files.append(file.split("\\")[-1].replace(".gdx",""))
     while not q_gdx.empty():
         scen_i, scen_name = q_gdx.get()  # fetch new work from the Queue
         if run_output == "rw" and scen_name not in overwrite and scen_name in old_data:
@@ -140,6 +146,8 @@ def crawl_gdx(q_gdx, old_data, gdxpath, thread_nr, overwrite, todo_gdx_len):
             continue
         try:
             print(f"- Starting {scen_name} on thread {thread_nr[threading.get_ident()]}")
+            if scen_name not in files:
+                raise FileNotFoundError
             start_time_thread = tm.time()
             success, new_data[scen_name] = gpf.run_case(scen_name, old_data, gdxpath, indicators)
             print_green("Finished " + scen_name.ljust(20) + " after " + str(round(tm.time() - start_time_thread,
@@ -149,6 +157,13 @@ def crawl_gdx(q_gdx, old_data, gdxpath, thread_nr, overwrite, todo_gdx_len):
                 print(f' (q_excel appended and is now : {q_excel.qsize()} items long)')
         except FileNotFoundError:
             print_cyan("! Could not find file for", scen_name)
+            if replace_with_alternative_solver_if_missing:
+                for replacer in alternative_solutions:
+                    alternative = scen.split("_")
+                    alternative.insert(-1, replacer)
+                    if alternative in files:
+                        print_cyan("Found and added to the queue an alternative file:","_".join(alternative))
+                        q_gdx.put((scen_i, "_".join(alternative)))
         except:
             identifier = thread_nr[threading.get_ident()]
             global errors

@@ -6,25 +6,36 @@ from termcolor import colored
 
 # os.chdir(r"C:\Users\Jonathan\Box\python")  # not needed unless running line-by-line in a console
 
-suffix = ""
-if len(suffix) > 0: suffix = "_" + suffix
+file_suffix = "correct_IE_Nminus1"
+if len(file_suffix) > 0: file_suffix = "_" + file_suffix
+scen_suffix = ""
+if len(scen_suffix) > 0: scen_suffix = "_" + scen_suffix
 timestep = 3
-data = pickle.load(open(os.path.relpath(rf"PickleJar\data_results_{timestep}h{suffix}.pickle"), "rb"))
-regions = ["brit", "iberia", "nordic"]
-flexes = ["lowFlex", ]
-baseFC = "noFC"
-compareFC = "fullFC"
+data = pickle.load(open(os.path.relpath(rf"PickleJar\data_results_{timestep}h{file_suffix}.pickle"), "rb"))
+regions = ["brit"]#, "iberia", "nordic"]
+flexes = ["lowFlex", "highFlex"]
+baseFC = "fullFC"
+compare = ("suffix", "correct_IE_Nminus1")  # ("FC", "fullFC")
 years = [2020, 2025, 2030, 2040]
 indicators = {"cost_tot": [], "VRE_share_total": [], "thermal_share_total": [], "curtailment": [], "bat": [],
               "cost_flexlim": [], "FR_binding_hours": 0., "FR_hard_binding_hours": 0., "base_mid_thermal_FLHs": [],
               "peak_thermal_FLHs": []}
-base_scenarios = [f"{reg}_{flex}_{baseFC}_{year}{suffix}_{timestep}h" for reg in regions for flex in flexes for year in
+base_scenarios = [f"{reg}_{flex}_{baseFC}_{year}{scen_suffix}_{timestep}h" for reg in regions for flex in flexes for year in
                   years]
-print_green(f"- Comparing {baseFC} to {compareFC} -")
+print_green(f"- Comparing {baseFC} to {compare[0]}:{compare[1]} -")
 print(",".join(indicators))
 for scen in base_scenarios:
-    compscen = scen.replace(baseFC, compareFC)
-    if scen not in data or compscen not in data: continue
+    if compare[0] == "FC": compscen = scen.replace(baseFC, compare[1])
+    elif compare[0] == "suffix":
+        _ = scen.split("_")
+        _.insert(-1, compare[1])
+        compscen = "_".join(_)
+    if scen not in data:
+        print(scen, "was not found in data")
+        continue
+    if compscen not in data:
+        print(compscen,"was not found in data")
+        continue
     for ind in indicators:
         if "flexlim" in ind:
             indicators[ind] = [data[scen][ind].sum(), data[compscen][ind].sum()]
@@ -76,7 +87,7 @@ for scen in base_scenarios:
         else:
             indicators[ind] = [data[scen][ind], data[compscen][ind]]
     # print(colored(scen, "cyan"))
-    to_print = [f"{scen.replace('_noFC', '').replace(suffix, '')}"]
+    to_print = [f"{scen.replace('_noFC', '').replace(scen_suffix, '')}"]
     for ind, val in indicators.items():
         if "bat" in ind:
             to_print.append(

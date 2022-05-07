@@ -69,7 +69,7 @@ def get_from_db(db, symbol_name):
 
 def which_set(iterable):
     import string
-    for i, set in enumerate([['ES_N','ES_S','SE_S','DE_N',]+EPODs,
+    for i, set in enumerate([['ES_N','ES_S','SE_S','DE_N',]+[i for i in EPODs if i not in tech_names],
                              list(tech_names.keys()),
                              [f"d{d:03}{h}" for d in range(1,366) for h in string.ascii_lowercase[:24]],  # d001a etc
                              [str(i) for i in range(1, 9)],
@@ -86,7 +86,7 @@ def which_set(iterable):
     return ''
 
 
-def gdx(f, symbol_name, silent=False, error_return=None, keep_na=False, dud_df_return=False):
+def gdx(f, symbol_name, silent=False, error_return=None, keep_na=False, dud_df_return=False, rounding=5):
     expected_a_df = type(dud_df_return) != bool
     try: symbol = f[symbol_name]
     except KeyError:
@@ -118,6 +118,7 @@ def gdx(f, symbol_name, silent=False, error_return=None, keep_na=False, dud_df_r
         if not keep_na: symbol.fillna(0, inplace=True)
         if expected_a_df:
             symbol = symbol.reindex(index=dud_df_return.index, columns=dud_df_return.columns, fill_value=0)
+        symbol = symbol.round(rounding)
     elif symbol_type == pandas.core.series.Series:
         if type(symbol.index) == pandas.core.indexes.multi.MultiIndex:
             symbol = betterIndex(symbol)
@@ -132,4 +133,8 @@ def gdx(f, symbol_name, silent=False, error_return=None, keep_na=False, dud_df_r
             symbol = symbol.unstack(level="", fill_value=0)
             symbol = symbol.reindex(index=dud_df_return.index, columns=dud_df_return.columns, fill_value=0)
             print(symbol)
+        try:
+            symbol = symbol.round(rounding)
+        except:
+            print(f"Failed to round {symbol_name}")
     return symbol
