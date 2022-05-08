@@ -7,7 +7,7 @@ from matplotlib.patches import Patch
 import matplotlib.gridspec as gridspec
 import os
 #os.chdir(r"C:\Users\Jonathan\git\python")  # not needed unless running line-by-line in a console
-from my_utils import TECH, color_dict, order_map_gen, add_in_dict, tech_names, print_red, print_cyan, year_names
+from my_utils import TECH, color_dict, order_map_gen, add_in_dict, tech_names, print_red, print_cyan, year_names, scen_names
 
 WON = ["WON"+a+str(b) for a in ["A","B"] for b in range(1, 6)]
 PV = ["PVPA1", "PVPB1", "PVR1"]
@@ -86,6 +86,9 @@ def df_to_stacked_areas(scen_data, ax, to_drop=None, region=None, startday=1, da
         FFR_price.iloc[start:end].plot(kind="line", ax=ax, linewidth=1)
     ymax = np.ceil(df.clip(lower=0).sum().max()/5)*5
     ymin = np.floor(df.min().min()/5)*5
+    plt.sca(ax)
+    plt.xticks(ticks=np.arange(days*24/timestep,step=24/timestep), labels=np.arange(int(to_plot.index[0][1:4]), int(to_plot.index[-1][1:4])+1))
+    plt.xlabel("Day")
     handles, labels = ax.get_legend_handles_labels()
     #plt.legend(loc=6, bbox_to_anchor=(1.01, 0.5))
     ax.set_ylim([ymin, ymax])
@@ -96,9 +99,9 @@ timestep = 3
 years = [2020, 2025, 2030, 2040]
 regions = ["nordic", "iberia", "brit"]
 modes = ["lowFlex"]
-suffix = "noGpeak"
+suffix = ""
 if len(suffix) > 0: suffix = "_" + suffix
-data = pickle.load(open(os.path.relpath(rf"PickleJar\data_results_{timestep}h{suffix}.pickle"), "rb"))
+data = pickle.load(open(os.path.relpath(rf"PickleJar\data_results_{timestep}h{suffix}_base.pickle"), "rb"))
 
 for region in regions:
     for mode in modes:
@@ -116,7 +119,7 @@ for region in regions:
                 for i, FC in enumerate(["noFC", "fullFC"]):
                     current_scenario = scenario.replace("_FC", f"_{FC}")
                     df, handles_, labels_, bat = df_to_stacked_areas(data[current_scenario], axes[i], startday=day, expect_battery=year>2020)
-                    axes[i].set_title(FC)
+                    axes[i].set_title(scen_names[FC])
                     handles += handles_
                     labels += labels_
                     axes[i].get_legend().remove()

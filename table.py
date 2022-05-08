@@ -95,7 +95,7 @@ for scen in base_scenarios:
         elif ind in ["curtailment", "VRE_share_total", "thermal_share_total"]:
             to_print.append(f"{round(val[0], 1)} ({'+' if val[1] - val[0] >= 0 else ''}{round(val[1] - val[0], 1)})")
         elif ind in ["FR_binding_hours", "FR_hard_binding_hours"]:
-            to_print.append(f"{val} ({val * 3})")
+            to_print.append(f"{val*timestep}")
         else:
             to_print.append(f"{round(val[0], 3)} ({'+' if val[1] - val[0] >= 0 else ''}{round(val[1] - val[0], 3)})")
     print(",".join(to_print))
