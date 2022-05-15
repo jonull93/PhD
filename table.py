@@ -17,7 +17,7 @@ flexes = ["lowFlex"]
 baseFC = "fullFC"
 compare = ("FC", "fullFC_noDoubleUse")#("suffix", "correct_IE_Nminus1")  # ("FC", "fullFC")
 years = [2020, 2025, 2030, 2040]
-indicators = {"cost_tot": [], "VRE_share_total": [], "thermal_share_total": [], "curtailment": [], "bat": [],
+indicators = {"cost_tot": [], "VRE_share_total": [], "thermal_share_total": [], "curtailment": [], "bat": [], "bat_PS": [],
               "cost_flexlim": [], "FR_binding_hours": 0., "FR_hard_binding_hours": 0., "base_mid_thermal_FLHs": [],
               "peak_thermal_FLHs": []}
 base_scenarios = [f"{reg}_{flex}_{baseFC}_{year}{scen_suffix}_{timestep}h" for reg in regions for flex in flexes for year in
@@ -41,9 +41,9 @@ for scen in base_scenarios:
             indicators[ind] = [data[scen][ind].sum(), data[compscen][ind].sum()]
         elif "bat" in ind:
             try:
-                indicators[ind] = [data[scen]["tot_cap"].loc["bat"].sum(), data[compscen]["tot_cap"].loc["bat"].sum(),
-                                   data[scen]["tot_cap"].loc["bat_cap"].sum(),
-                                   data[compscen]["tot_cap"].loc["bat_cap"].sum()]
+                indicators[ind] = [data[scen]["tot_cap"].loc[ind].sum(), data[compscen]["tot_cap"].loc[ind].sum(),
+                                   data[scen]["tot_cap"].loc[ind+"_cap"].sum(),
+                                   data[compscen]["tot_cap"].loc[ind+"_cap"].sum()]
             except KeyError:
                 indicators[ind] = [0, 0, 0, 0]
         elif ind in ["curtailment", "VRE_share_total", "thermal_share_total"]:
