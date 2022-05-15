@@ -6,10 +6,10 @@ import pandas as pd
 from my_utils import print_cyan, print_green, print_red
 
 timestep = 3
-file_suffix = "slimSpain"
+file_suffix = "appended"
 if len(file_suffix) > 0: file_suffix = "_" + file_suffix
 data = pickle.load(open(os.path.relpath(rf"PickleJar\data_results_{timestep}h{file_suffix}.pickle"), "rb"))
-scen_suffix = "slimSpain"
+scen_suffix = ""
 if len(scen_suffix) > 0: scen_suffix = "_" + scen_suffix
 
 
@@ -54,6 +54,11 @@ for reg in regions:
         FR_cost = data[FCscen]["FR_cost"].sum()
         net_load = data[FCscen]["net_load"].sum()
         el_price = data[FCscen]["el_price"].sum()
+        highest_el_price = el_price.nlargest(25)
+        for ep in highest_el_price:
+            el_price.replace(to_replace=ep, value=highest_el_price[-1], inplace=True)
+        highest_FR_cost = FR_cost.nlargest(2)
+        FR_cost.replace(to_replace=highest_FR_cost[0], value=highest_FR_cost[1], inplace=True)
         weekly_FR_cost = pd.Series([round(sum(FR_cost.iloc[i:i + 56])) for i in range(0, 2910, 56)])
         weekly_net_load = pd.Series([round(sum(net_load.iloc[i:i + 56])) for i in range(0, 2910, 56)])
         weekly_el_price = pd.Series([round(sum(el_price.iloc[i:i + 56])) for i in range(0, 2910, 56)])

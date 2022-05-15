@@ -63,19 +63,19 @@ def make_plot(df, title, secondary_y_values, xlabels=None, legend=False, left_yl
     return ax, ax2, (handles, labels)
 
 
-def percent_stacked_area(data, regions, mode, timestep, indicator_string: str, set: dict, years=None, FC=True,
+def percent_stacked_area(data, regions, flex, timestep, indicator_string: str, set: dict, years=None, FC=True,
                          secondary_y="FR_cost", scen_suffix="", bars=True,
                          figtitle="Interval share, and \u0394system-cost", filepath="test.png",
                          baseFC = "noFC", compareFC = "fullFC"):
     print_cyan(f"Starting percent_stacked_area() for {indicator_string}")
     if years is None:
         years = [2020, 2025, 2030, 2040]
-
+    if "high" not in flex and "BEV" in set: set.pop("BEV")
     fig, axes = plt.subplots(nrows=1, ncols=len(regions), figsize=(8, 4), )
     label_axes(fig, loc=(-0.1, 1.03))
     for j, region in enumerate(regions):
         print_cyan(f"- {region} -")
-        scenarios = [f"{region}_{mode}_{compareFC if FC else 'noFC'}{scen_suffix}_{y}_{timestep}h" for y in years]
+        scenarios = [f"{region}_{flex}_{compareFC if FC else 'noFC'}{scen_suffix}_{y}_{timestep}h" for y in years]
         print("Cost_tot:", [round(data[scen]["cost_tot"], 2) for scen in scenarios])
         if indicator_string == "FR_cost":
             indicator_data = {pretty: [0. for i in range(len(scenarios))] for pretty in set}
@@ -122,12 +122,12 @@ def percent_stacked_area(data, regions, mode, timestep, indicator_string: str, s
                                             right_ylabel=right_ylabel, _ax=axes[j])
     plt.sca(axes[1])
     fig.legend(handles,labels,bbox_to_anchor=(0.5, 0.93), ncol=4, loc="lower center")
-    fig.suptitle(f"{figtitle}: {mode}", y=1.13)
+    fig.suptitle(f"{figtitle}: {flex}", y=1.13)
     plt.subplots_adjust(wspace=0.49)
     plt.savefig(filepath, dpi=600, bbox_inches="tight")
 
 
-mode = "lowFlex"
+flex = "lowFlex"
 timestep = 3
 pickle_suffix = "appended"
 if len(pickle_suffix) > 0: pickle_suffix = "_" + pickle_suffix
@@ -143,15 +143,15 @@ FR_intervals = {"FFR": 1, "5-30s": 2, "30s-5min": 3, "5-15min": 4, "15-30min": 5
 regions = ["nordic", "brit", "iberia"]
 print("________________" * 3)
 print(f" .. Making figure for {regions} .. ")
-percent_stacked_area(data, regions, mode, timestep, "FR_value_share_", reserve_technologies, secondary_y=secondary_y,
+percent_stacked_area(data, regions, flex, timestep, "FR_value_share_", reserve_technologies, secondary_y=secondary_y,
                      scen_suffix=scen_suffix, figtitle="Cost-weighted technology share, and \u0394system-cost",
-                     filepath=rf"figures\reserve_valueshare_{mode}{scen_suffix}{pickle_suffix}_{timestep}h.png")
+                     filepath=rf"figures\reserve_valueshare_{flex}{scen_suffix}{pickle_suffix}_{timestep}h.png")
 
-percent_stacked_area(data, regions, mode, timestep, "FR_share_", reserve_technologies, secondary_y=secondary_y,
+percent_stacked_area(data, regions, flex, timestep, "FR_share_", reserve_technologies, secondary_y=secondary_y,
                      scen_suffix=scen_suffix, figtitle="Technology reserve share, and \u0394system-cost",
-                     filepath=rf"figures\reserve_share_{mode}{scen_suffix}{pickle_suffix}_{timestep}h.png")
+                     filepath=rf"figures\reserve_share_{flex}{scen_suffix}{pickle_suffix}_{timestep}h.png")
 #plt.savefig(rf"figures\reserve_share_{mode}{pickle_suff}_{timestep}h.png", dpi=600, bbox_inches="tight")
-percent_stacked_area(data, regions, mode, timestep, "FR_cost", FR_intervals, secondary_y=secondary_y,
+percent_stacked_area(data, regions, flex, timestep, "FR_cost", FR_intervals, secondary_y=secondary_y,
                      scen_suffix=scen_suffix, figtitle="Interval reserve share, and \u0394system-cost",
-                     filepath=rf"figures\interval_costs_{mode}{scen_suffix}{pickle_suffix}_{timestep}h.png")
+                     filepath=rf"figures\interval_costs_{flex}{scen_suffix}{pickle_suffix}_{timestep}h.png")
 #plt.savefig(rf"figures\interval_costs_{mode}{pickle_suff}_{timestep}h.png", dpi=600, bbox_inches="tight")
