@@ -66,7 +66,7 @@ def make_plot(df, title, secondary_y_values, xlabels=None, legend=False, left_yl
 def percent_stacked_area(data, regions, flex, timestep, indicator_string: str, set: dict, years=None, FC=True,
                          secondary_y="FR_cost", scen_suffix="", bars=True,
                          figtitle="Interval share, and \u0394system-cost", filepath="test.png",
-                         baseFC = "noFC", compareFC = "fullFC"):
+                         baseFC = "fullFC", compareFC = "fullFC_noDoubleUse"):
     print_cyan(f"Starting percent_stacked_area() for {indicator_string}")
     if years is None:
         years = [2020, 2025, 2030, 2040]
@@ -129,7 +129,7 @@ def percent_stacked_area(data, regions, flex, timestep, indicator_string: str, s
 
 flex = "lowFlex"
 timestep = 3
-pickle_suffix = "appended"
+pickle_suffix = "noDoubleUse"
 if len(pickle_suffix) > 0: pickle_suffix = "_" + pickle_suffix
 data = pickle.load(open(path.relpath(rf"PickleJar\data_results_{timestep}h{pickle_suffix}.pickle"), "rb"))
 scen_suffix = ""

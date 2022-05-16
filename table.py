@@ -17,13 +17,13 @@ flexes = ["lowFlex"]
 baseFC = "fullFC"
 compare = ("FC", "fullFC_noDoubleUse")#("suffix", "correct_IE_Nminus1")  # ("FC", "fullFC")
 years = [2020, 2025, 2030, 2040]
-indicators = {"cost_tot": [], "VRE_share_total": [], "thermal_share_total": [], "curtailment": [], "bat": [], "bat_PS": [],
+indicators = {"cost_tot": [], "VRE_share_total": [], "thermal_share_total": [], "curtailment": [], "bat": [],
               "cost_flexlim": [], "FR_binding_hours": 0., "FR_hard_binding_hours": 0., "base_mid_thermal_FLHs": [],
-              "peak_thermal_FLHs": []}
+              "peak_thermal_FLHs": [], "FR_share_ESS": [], "FR_share_thermal": [], "FR_share_hydro": [], "FR_share_VRE": [], "FR_share_PtH": []}
 base_scenarios = [f"{reg}_{flex}_{baseFC}_{year}{scen_suffix}_{timestep}h" for reg in regions for flex in flexes for year in
                   years]
 print_green(f"- Comparing {baseFC} to {compare[0]}:{compare[1]} -")
-print(",".join(indicators))
+print(","+",".join(indicators))
 for scen in base_scenarios:
     if compare[0] == "FC": compscen = scen.replace(baseFC, compare[1])
     elif compare[0] == "suffix":
@@ -84,6 +84,8 @@ for scen in base_scenarios:
                 print_red(data[scen]["tot_cap"].groupby(level=0).sum())
                 print_red(data[compscen]["tot_cap"].groupby(level=0).sum())
                 raise
+        elif "FR_share" in ind:
+            indicators[ind] = [round(data[scen][ind]*100), round(data[compscen][ind]*100)]
         else:
             indicators[ind] = [data[scen][ind], data[compscen][ind]]
     # print(colored(scen, "cyan"))
@@ -106,5 +108,5 @@ for scen in base_scenarios:
     except KeyError: bat = 0
     try: bat_cap = data[comp_scen]["tot_cap"]["bat_cap_PS"].sum()
     except KeyError: bat_cap = 0
-    print(f"{round(bat, 2)} / {round(bat_cap, 2)}")
+    print(f"0 / 0 (+{round(bat, 2)} / +{round(bat_cap, 2)})")
 # data["iberia_lowFlex_fullFC_slimSpain_2025_3h"]["gen_per_eltech"]
