@@ -49,7 +49,7 @@ def make_figure(data, region, mode, timestep, suffix="", years=None, ax=None, op
         df.T.plot(kind="area", color=[color_dict[tech] for tech in df.index])
     else:
         df.T.plot(kind="area", ax=ax, color=[color_dict[tech] for tech in df.index])
-    plt.xticks(range(len(df.columns)), ["2020", "Short\n-term", "Mid\n-term", "Long\n-term"])
+    plt.xticks(range(len(df.columns)), ["2020", "Near\n-term", "Mid\n-term", "Long\n-term"])
     if optional_title:
         plt.title(f"{region.capitalize()} - {optional_title}")
     else:

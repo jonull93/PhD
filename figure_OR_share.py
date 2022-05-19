@@ -26,7 +26,7 @@ def make_plot(df, title, secondary_y_values, xlabels=None, legend=False, left_yl
     # ---- plotting
     # takes DataFrame and plots stacked area and optionally a line on secondary y axis
     if xlabels is None:
-        xlabels = ["2020", "Short-term", "Mid-term", "Long-term"]
+        xlabels = ["2020", "Near-term", "Mid-term", "Long-term"]
     if _ax is None:
         if bars is True:
             ax = df.div(df.sum(axis=1), axis=0).plot.bar(stacked=True, rot=19)
