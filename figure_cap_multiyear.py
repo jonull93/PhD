@@ -11,9 +11,11 @@ from my_utils import color_dict, order_cap, add_in_dict, tech_names, scen_names,
 
 pickleJar = ""
 h = 3
-suffix = "noGpeak"
-suffix = "_"+suffix if len(suffix)>0 else ""
-data = pickle.load(open(os.path.relpath(rf"PickleJar\data_results_{h}h{suffix}.pickle"), "rb"))
+file_suffix = "appended"
+if len(file_suffix) > 0: file_suffix = "_" + file_suffix
+scen_suffix = ""
+if len(scen_suffix) > 0: scen_suffix = "_" + scen_suffix
+data = pickle.load(open(os.path.relpath(rf"PickleJar\data_results_{h}h{file_suffix}.pickle"), "rb"))
 
 H2 = ['H2store']
 bat = ['bat']
@@ -112,7 +114,7 @@ def plot_cap_multipleyears(ax, data, scenario, years=None, new=True, patterns=No
     colors = [color_dict[tech] for tech in df.index.get_level_values(0)]
     hatches = ['//' if tech in VMS else '' for tech in df.index.get_level_values(0)]
     plot = df.T.plot(kind="bar", stacked=True, color=colors, legend=False, width=0.9, rot=0, ax=ax)
-    plot.set_xticklabels([year_names[year] for year in years*2], rotation=28, ha="right", rotation_mode='anchor')
+    plot.set_xticklabels([year_names[year].capitalize() for year in years*2], rotation=28, ha="right", rotation_mode='anchor')
     if comparison: plot.axhline(linewidth=1, color="black")
     bars = ax.patches
     #year_list = [df.columns[i][1] for i in range(len(df.columns))]*len(df.index)
@@ -152,7 +154,7 @@ for flex in separate_figures:
     print_cyan('-',flex,'-')
     for i_f, reg in enumerate(regions):
         print_cyan(reg.capitalize())
-        plot, t, df = plot_cap_multipleyears(axes[i_f][0], data, f"{reg}_{flex}_noFC_YEAR{suffix}_{h}h", patterns=patterns,
+        plot, t, df = plot_cap_multipleyears(axes[i_f][0], data, f"{reg}_{flex}_noFC_YEAR{scen_suffix}_{h}h", patterns=patterns,
                                              years=years)
         if i_f == 0: plot.set_title(scen_names["noFC"], pad=15)
 
@@ -163,7 +165,7 @@ for flex in separate_figures:
         tech_collections.append(t)
         fig.add_subplot(plot)
         for i_m, mode in enumerate(modes[1:]):
-            plot, t, df_return = plot_cap_multipleyears(axes[i_f][1+i_m], data, f"{reg}_{flex}_{mode}_YEAR{suffix}_{h}h",
+            plot, t, df_return = plot_cap_multipleyears(axes[i_f][1+i_m], data, f"{reg}_{flex}_{mode}_YEAR{scen_suffix}_{h}h",
                                                 comparison_data=df, patterns=patterns, years=years)
             if y_subplots % 2 == 1:  # if odd number of y_plots
                 if i_f % 2 == 1 and i_m == 0: plot.set_ylabel("Difference from $\it{No FC}$", fontsize=12)

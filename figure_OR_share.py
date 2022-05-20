@@ -26,7 +26,7 @@ def make_plot(df, title, secondary_y_values, xlabels=None, legend=False, left_yl
     # ---- plotting
     # takes DataFrame and plots stacked area and optionally a line on secondary y axis
     if xlabels is None:
-        xlabels = ["2020", "Near-term", "Mid-term", "Long-term"]
+        xlabels = ["2020", "Near\nterm", "Mid\nterm", "Long\nterm"]
     if _ax is None:
         if bars is True:
             ax = df.div(df.sum(axis=1), axis=0).plot.bar(stacked=True, rot=19)
@@ -66,7 +66,7 @@ def make_plot(df, title, secondary_y_values, xlabels=None, legend=False, left_yl
 def percent_stacked_area(data, regions, flex, timestep, indicator_string: str, set: dict, years=None, FC=True,
                          secondary_y="FR_cost", scen_suffix="", bars=True,
                          figtitle="Interval share, and \u0394system-cost", filepath="test.png",
-                         baseFC = "fullFC", compareFC = "fullFC_noDoubleUse"):
+                         baseFC = "noFC", compareFC = "fullFC"):
     print_cyan(f"Starting percent_stacked_area() for {indicator_string}")
     if years is None:
         years = [2020, 2025, 2030, 2040]
@@ -129,7 +129,7 @@ def percent_stacked_area(data, regions, flex, timestep, indicator_string: str, s
 
 flex = "lowFlex"
 timestep = 3
-pickle_suffix = "noDoubleUse"
+pickle_suffix = "appended"
 if len(pickle_suffix) > 0: pickle_suffix = "_" + pickle_suffix
 data = pickle.load(open(path.relpath(rf"PickleJar\data_results_{timestep}h{pickle_suffix}.pickle"), "rb"))
 scen_suffix = ""

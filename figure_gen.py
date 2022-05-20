@@ -99,14 +99,16 @@ timestep = 3
 years = [2020, 2025, 2030, 2040]
 regions = ["nordic", "iberia", "brit"]
 modes = ["lowFlex"]
-suffix = ""
-if len(suffix) > 0: suffix = "_" + suffix
-data = pickle.load(open(os.path.relpath(rf"PickleJar\data_results_{timestep}h{suffix}_base.pickle"), "rb"))
+file_suffix = "appended"
+if len(file_suffix) > 0 and file_suffix[0] != "_": file_suffix = "_" + file_suffix
+scen_suffix = ""
+if len(scen_suffix) > 0 and scen_suffix[0] != "_": scen_suffix = "_" + scen_suffix
+data = pickle.load(open(os.path.relpath(rf"PickleJar\data_results_{timestep}h{file_suffix}.pickle"), "rb"))
 
 for region in regions:
     for mode in modes:
         for year in years:
-            scenario = f"{region}_{mode}_FC_{year}{suffix}_{timestep}h"
+            scenario = f"{region}_{mode}_FC_{year}{scen_suffix}_{timestep}h"
             stripped_scenario = scenario.replace("_FC", "")
             print_cyan(stripped_scenario)
             fig_path = f"figures\\{stripped_scenario}\\"
