@@ -8,7 +8,7 @@ thermals = baseload + CCS + CHP + midload + peak + ["Fossil thermals", "Bio ther
 wind = ["Wind", 'WOFF', 'WON', 'wind_onshore', 'wind_offshore', ] + ["WON" + ab + str(dig) for ab in ["A", "B"] for dig
                                                                      in range(5, 0, -1)]
 PV = ["PVPA1", "PVPB1", "PVR1", "PV", "Solar PV"]
-VRE = wind + PV
+VRE = wind + PV + ["RR"]
 H2 = ['electrolyser', 'H2store', 'FC']
 PtH = ['HP', 'EB', ]
 bat = ['bat', 'bat_cap']

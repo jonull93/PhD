@@ -26,7 +26,7 @@ def make_plot(df, title, secondary_y_values, xlabels=None, legend=False, left_yl
     # ---- plotting
     # takes DataFrame and plots stacked area and optionally a line on secondary y axis
     if xlabels is None:
-        xlabels = ["2020", "Near\nterm", "Mid\nterm", "Long\nterm"]
+        xlabels = ["2020", "Near-\nterm", "Mid-\nterm", "Long-\nterm"]
     if _ax is None:
         if bars is True:
             ax = df.div(df.sum(axis=1), axis=0).plot.bar(stacked=True, rot=19)
@@ -66,7 +66,7 @@ def make_plot(df, title, secondary_y_values, xlabels=None, legend=False, left_yl
 def percent_stacked_area(data, regions, flex, timestep, indicator_string: str, set: dict, years=None, FC=True,
                          secondary_y="FR_cost", scen_suffix="", bars=True,
                          figtitle="Interval share, and \u0394system-cost", filepath="test.png",
-                         baseFC = "noFC", compareFC = "fullFC"):
+                         baseFC = "fullFC", compareFC = "fullFC_energyRes"):
     print_cyan(f"Starting percent_stacked_area() for {indicator_string}")
     if years is None:
         years = [2020, 2025, 2030, 2040]
@@ -75,7 +75,7 @@ def percent_stacked_area(data, regions, flex, timestep, indicator_string: str, s
     label_axes(fig, loc=(-0.1, 1.03))
     for j, region in enumerate(regions):
         print_cyan(f"- {region} -")
-        scenarios = [f"{region}_{flex}_{compareFC if FC else 'noFC'}{scen_suffix}_{y}_{timestep}h" for y in years]
+        scenarios = [f"{region}_{flex}_{compareFC if FC else 'noFC'}{scen_suffix}_{y}{timestep}" for y in years]
         print("Cost_tot:", [round(data[scen]["cost_tot"], 2) for scen in scenarios])
         if indicator_string == "FR_cost":
             indicator_data = {pretty: [0. for i in range(len(scenarios))] for pretty in set}
@@ -129,14 +129,20 @@ def percent_stacked_area(data, regions, flex, timestep, indicator_string: str, s
 
 flex = "lowFlex"
 timestep = 3
-pickle_suffix = "appended"
+pickle_suffix = "energyres"
 if len(pickle_suffix) > 0: pickle_suffix = "_" + pickle_suffix
 data = pickle.load(open(path.relpath(rf"PickleJar\data_results_{timestep}h{pickle_suffix}.pickle"), "rb"))
+
 scen_suffix = ""
 if len(scen_suffix) > 0: scen_suffix = "_" + scen_suffix
 secondary_y = "FR_syscost_per_gen"  # _per_gen
 reserve_technologies = {"Thermals": "thermal", "VRE": "VRE", "ESS": "ESS", "BEV": "BEV", "PtH": "PtH", "Hydro": "hydro"}
 FR_intervals = {"FFR": 1, "5-30s": 2, "30s-5min": 3, "5-15min": 4, "15-30min": 5, "30-60min": 6}
+
+if timestep > 1:
+    timestep = f"_{timestep}h"
+else:
+    timestep = ""
 
 # ax = percent_stacked_area("nordic", mode, timestep, "FR_value_share_", reserve_technologies, secondary_y="FR_cost_per_gen")
 # plt.show()
@@ -145,13 +151,13 @@ print("________________" * 3)
 print(f" .. Making figure for {regions} .. ")
 percent_stacked_area(data, regions, flex, timestep, "FR_value_share_", reserve_technologies, secondary_y=secondary_y,
                      scen_suffix=scen_suffix, figtitle="Cost-weighted technology share, and \u0394system-cost",
-                     filepath=rf"figures\reserve_valueshare_{flex}{scen_suffix}{pickle_suffix}_{timestep}h.png")
+                     filepath=rf"figures\reserve_valueshare_{flex}{scen_suffix}{pickle_suffix}{timestep}.png")
 
 percent_stacked_area(data, regions, flex, timestep, "FR_share_", reserve_technologies, secondary_y=secondary_y,
                      scen_suffix=scen_suffix, figtitle="Technology reserve share, and \u0394system-cost",
-                     filepath=rf"figures\reserve_share_{flex}{scen_suffix}{pickle_suffix}_{timestep}h.png")
+                     filepath=rf"figures\reserve_share_{flex}{scen_suffix}{pickle_suffix}{timestep}.png")
 #plt.savefig(rf"figures\reserve_share_{mode}{pickle_suff}_{timestep}h.png", dpi=600, bbox_inches="tight")
 percent_stacked_area(data, regions, flex, timestep, "FR_cost", FR_intervals, secondary_y=secondary_y,
                      scen_suffix=scen_suffix, figtitle="Interval reserve share, and \u0394system-cost",
-                     filepath=rf"figures\interval_costs_{flex}{scen_suffix}{pickle_suffix}_{timestep}h.png")
+                     filepath=rf"figures\interval_costs_{flex}{scen_suffix}{pickle_suffix}{timestep}.png")
 #plt.savefig(rf"figures\interval_costs_{mode}{pickle_suff}_{timestep}h.png", dpi=600, bbox_inches="tight")

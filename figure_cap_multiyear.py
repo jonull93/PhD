@@ -183,7 +183,7 @@ for flex in separate_figures:
             text.set_bbox(dict(facecolor='white', alpha=1, edgecolor='black'))
             text = axes[i_f][i_m].text(0.75, 1, "Storage [GWh]", transform=axes[i_f][i_m].transAxes, va="center", ha="center")
             text.set_bbox(dict(facecolor='white', alpha=1, edgecolor='black'))
-    axes[-1][0].text(0.5, 0.015, f"Year", transform=fig.transFigure, ha='center', ma='center', fontsize=12)
+    axes[-1][0].text(0.5, 0.015, f"Time-point", transform=fig.transFigure, ha='center', ma='center', fontsize=12)
 
 # -- Finishing off fig
     techs = []

@@ -6,7 +6,7 @@ from termcolor import colored
 
 # os.chdir(r"C:\Users\Jonathan\Box\python")  # not needed unless running line-by-line in a console
 
-file_suffix = "noDoubleUse"
+file_suffix = "energyres"
 if len(file_suffix) > 0: file_suffix = "_" + file_suffix
 scen_suffix = ""
 if len(scen_suffix) > 0: scen_suffix = "_" + scen_suffix
@@ -15,7 +15,7 @@ data = pickle.load(open(os.path.relpath(rf"PickleJar\data_results_{timestep}h{fi
 regions = ["brit", "iberia", "nordic"]
 flexes = ["lowFlex"]
 baseFC = "fullFC"
-compare = ("FC", "fullFC_noDoubleUse")#("suffix", "correct_IE_Nminus1")  # ("FC", "fullFC")
+compare = ("FC", "fullFC_energyRes")#("suffix", "correct_IE_Nminus1")  # ("FC", "fullFC")
 years = [2020, 2025, 2030, 2040]
 indicators = {"cost_tot": [], "VRE_share_total": [], "thermal_share_total": [], "curtailment": [], "bat": [],
               "cost_flexlim": [], "FR_binding_hours": 0., "FR_hard_binding_hours": 0., "base_mid_thermal_FLHs": [],

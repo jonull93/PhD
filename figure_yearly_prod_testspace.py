@@ -49,7 +49,7 @@ def make_figure(data, region, mode, timestep, suffix="", years=None, ax=None, op
         df.T.plot(kind="area", color=[color_dict[tech] for tech in df.index])
     else:
         df.T.plot(kind="area", ax=ax, color=[color_dict[tech] for tech in df.index])
-    plt.xticks(range(len(df.columns)), ["2020", "Near\n-term", "Mid\n-term", "Long\n-term"])
+    plt.xticks(range(len(df.columns)), ["2020", "Near-\nterm", "Mid-\nterm", "Long-\nterm"])
     if optional_title:
         plt.title(f"{region.capitalize()} - {optional_title}")
     else:
@@ -77,7 +77,7 @@ for i_r, reg in enumerate(regions):
 
 fig.legend(h, l, bbox_to_anchor=(0.5, -0.04), loc="lower center", ncol=6)
 fig.suptitle("Generation per technology type", y=0.97, fontsize=14)
-fig.supxlabel("Year", y=0.041)
+fig.supxlabel("Time-point", y=0.041)
 fig.supylabel("Electricity production [TWh/yr]")
 fig.tight_layout()
 plt.savefig(fig_path+f"yearly_elec_prod_{timestep}h.png", dpi=300, bbox_inches="tight")
