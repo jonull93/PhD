@@ -6,7 +6,7 @@ from termcolor import colored
 
 # os.chdir(r"C:\Users\Jonathan\Box\python")  # not needed unless running line-by-line in a console
 
-file_suffix = "energyres"
+file_suffix = "appended"
 if len(file_suffix) > 0: file_suffix = "_" + file_suffix
 scen_suffix = ""
 if len(scen_suffix) > 0: scen_suffix = "_" + scen_suffix
@@ -14,8 +14,8 @@ timestep = 3
 data = pickle.load(open(os.path.relpath(rf"PickleJar\data_results_{timestep}h{file_suffix}.pickle"), "rb"))
 regions = ["brit", "iberia", "nordic"]
 flexes = ["lowFlex"]
-baseFC = "fullFC"
-compare = ("FC", "fullFC_energyRes")#("suffix", "correct_IE_Nminus1")  # ("FC", "fullFC")
+baseFC = "noFC"
+compare = ("FC", "fullFC")#("suffix", "correct_IE_Nminus1")  # ("FC", "fullFC")
 years = [2020, 2025, 2030, 2040]
 indicators = {"cost_tot": [], "VRE_share_total": [], "thermal_share_total": [], "curtailment": [], "bat": [],
               "cost_flexlim": [], "FR_binding_hours": 0., "FR_hard_binding_hours": 0., "base_mid_thermal_FLHs": [],
@@ -99,7 +99,7 @@ for scen in base_scenarios:
         elif ind in ["FR_binding_hours", "FR_hard_binding_hours"]:
             to_print.append(f"{val*timestep}")
         else:
-            to_print.append(f"{round(val[0], 3)} ({'+' if val[1] - val[0] >= 0 else ''}{round(val[1] - val[0], 3)})")
+            to_print.append(f"{round(val[0], 2)} ({'+' if val[1] - val[0] >= 0 else ''}{round(val[1] - val[0], 2)})")
     print(",".join(to_print))
 
 for scen in base_scenarios:
