@@ -25,23 +25,11 @@ for key in data:
 size_s = pd.Series(data=size.values(), index=size.keys())
 #print(size_s.sort_values(ascending=False)[:10])
 
-total_rev = {}
-FR_rev = {}
-for region in ["nordic", "brit", "iberia"]:
-    for flex in ["lowFlex", "highFlex"]:
-        for FC in ["noFC", "fullFC"]:
-            for year in [2020, 2025, 2030, 2040]:
-                scen = f"{region}_{flex}_{FC}_{year}_{timestep}h"
-                print_cyan(scen)
-                #scen = "nordic_lowFlex_fullFC_2025_6h"
-                total_rev[scen] = data[scen]["tech_revenue"]
-                PtH = ["EB", "HP"]
-                if "fullFC" in FC:
-                    FR_rev[scen] = data[scen]["tech_revenue_FR"]
-                    #inertia_rev = data[scen]["tech_revenue_inertia"]
-                    #FC_inertia = FR_rev+inertia_rev
-                    print_green((FR_rev[scen]/(total_rev[scen])).sort_values(ascending=False)[:10])
-                #else:
-                    #print_red(total_rev[scen].sort_values(ascending=False)[:10])
-
-fig_scen = "nordic_lowFlex_fullFC_2025_6h"
+scen = "nordic_lowFlex_fullFC_2025_6h"
+total_rev = data[scen]["tech_revenue"]
+print(total_rev.sum(level=0))
+PtH = ["EB", "HP"]
+FR_rev = data[scen]["tech_revenue_FR"]
+#inertia_rev = data[scen]["tech_revenue_inertia"]
+#FC_inertia = FR_rev+inertia_rev
+#print((FR_rev/(total_rev)).sort_values(ascending=False)[:10])

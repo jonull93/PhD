@@ -20,21 +20,26 @@ scenarios = []
 fig, axs = plt.subplots(nrows=3, ncols=2, figsize=(6, 7))
 for i_r, region in enumerate(["nordic", "brit", "iberia"]):
     for i_f, flex in enumerate(["lowFlex", "highFlex"]):
-        for FC in ["noFC", "fullFC"]:
-            for year in [2020, 2025, 2030, 2040]:
+        for FC in ["fullFC"]:
+            df = pd.DataFrame()
+            for x, year in enumerate([2020, 2025, 2030, 2040]):
                 # Gathering needed data
                 scen = f"{region}_{flex}_{FC}_{year}_{timestep}h"
                 scenarios.append(scen)
                 print_cyan(scen)
                 #scen = "nordic_lowFlex_fullFC_2025_6h"
-                total_rev[scen] = data[scen]["tech_revenue"]
+                try:
+                    total_rev[scen] = data[scen]["tech_revenue"]
+                except KeyError: continue
                 PtH = ["EB", "HP"]
                 if "fullFC" in FC:
                     FR_rev[scen] = data[scen]["tech_revenue_FR"]
+                    df[year] = FR_rev[scen]
                     FR_share[scen] = FR_rev[scen]/total_rev[scen]
-                    # Plotting the data
-                    FR_rev[scen].plot(ax=axs[i_r,i_f], kind="bar")
-                    plt.show()
+        # Plotting the data
+        print(df)
+        df.T.plot.bar(ax=axs[i_r,i_f], stacked=True, legend=None)
+plt.show()
                     #inertia_rev = data[scen]["tech_revenue_inertia"]
                     #FC_inertia = FR_rev+inertia_rev
                     #print_green((FR_rev[scen]/(total_rev[scen])).sort_values(ascending=False)[:10])
