@@ -66,12 +66,14 @@ def make_plot(df, title, secondary_y_values, xlabels=None, legend=False, left_yl
 def percent_stacked_area(data, regions, flex, timestep, indicator_string: str, set: dict, years=None, FC=True,
                          secondary_y="FR_cost", scen_suffix="", bars=True,
                          figtitle="Interval share, and \u0394system-cost", filepath="test.png",
-                         baseFC = "fullFC", compareFC = "fullFC_energyRes"):
+                         baseFC = "fullFC", compareFC = "fullFC_noDoubleUse"):
     print_cyan(f"Starting percent_stacked_area() for {indicator_string}")
     if years is None:
         years = [2020, 2025, 2030, 2040]
-    if "high" not in flex and "BEV" in set: set.pop("BEV")
-    fig, axes = plt.subplots(nrows=1, ncols=len(regions), figsize=(8, 4), )
+    if "high" not in flex:
+        set.pop("BEV", None)
+        set.pop("H2", None)
+    fig, axes = plt.subplots(nrows=1, ncols=len(regions), figsize=(len(regions)+4, 4), )
     label_axes(fig, loc=(-0.1, 1.03))
     for j, region in enumerate(regions):
         print_cyan(f"- {region} -")
@@ -129,14 +131,16 @@ def percent_stacked_area(data, regions, flex, timestep, indicator_string: str, s
 
 flex = "lowFlex"
 timestep = 3
-pickle_suffix = "energyres"
+
+fig_file_suffix = "_noIberia"
+pickle_suffix = "noDoubleUse"
 if len(pickle_suffix) > 0: pickle_suffix = "_" + pickle_suffix
 data = pickle.load(open(path.relpath(rf"PickleJar\data_results_{timestep}h{pickle_suffix}.pickle"), "rb"))
 
 scen_suffix = ""
 if len(scen_suffix) > 0: scen_suffix = "_" + scen_suffix
 secondary_y = "FR_syscost_per_gen"  # _per_gen
-reserve_technologies = {"Thermals": "thermal", "VRE": "VRE", "ESS": "ESS", "BEV": "BEV", "PtH": "PtH", "Hydro": "hydro"}
+reserve_technologies = {"Thermals": "thermal", "VRE": "VRE", "Battery": "ESS", "BEV": "BEV", "Power-to-heat": "PtH", "Hydro": "hydro"}
 FR_intervals = {"FFR": 1, "5-30s": 2, "30s-5min": 3, "5-15min": 4, "15-30min": 5, "30-60min": 6}
 
 if timestep > 1:
@@ -146,18 +150,19 @@ else:
 
 # ax = percent_stacked_area("nordic", mode, timestep, "FR_value_share_", reserve_technologies, secondary_y="FR_cost_per_gen")
 # plt.show()
-regions = ["nordic", "brit", "iberia"]
+regions = ["nordic", "brit"]
+
 print("________________" * 3)
 print(f" .. Making figure for {regions} .. ")
 percent_stacked_area(data, regions, flex, timestep, "FR_value_share_", reserve_technologies, secondary_y=secondary_y,
                      scen_suffix=scen_suffix, figtitle="Cost-weighted technology share, and \u0394system-cost",
-                     filepath=rf"figures\reserve_valueshare_{flex}{scen_suffix}{pickle_suffix}{timestep}.png")
+                     filepath=rf"figures\reserve_valueshare_{flex}{scen_suffix}{pickle_suffix}{timestep}{fig_file_suffix}.png")
 
 percent_stacked_area(data, regions, flex, timestep, "FR_share_", reserve_technologies, secondary_y=secondary_y,
                      scen_suffix=scen_suffix, figtitle="Technology reserve share, and \u0394system-cost",
-                     filepath=rf"figures\reserve_share_{flex}{scen_suffix}{pickle_suffix}{timestep}.png")
+                     filepath=rf"figures\reserve_share_{flex}{scen_suffix}{pickle_suffix}{timestep}{fig_file_suffix}.png")
 #plt.savefig(rf"figures\reserve_share_{mode}{pickle_suff}_{timestep}h.png", dpi=600, bbox_inches="tight")
 percent_stacked_area(data, regions, flex, timestep, "FR_cost", FR_intervals, secondary_y=secondary_y,
                      scen_suffix=scen_suffix, figtitle="Interval reserve share, and \u0394system-cost",
-                     filepath=rf"figures\interval_costs_{flex}{scen_suffix}{pickle_suffix}{timestep}.png")
+                     filepath=rf"figures\interval_costs_{flex}{scen_suffix}{pickle_suffix}{timestep}{fig_file_suffix}.png")
 #plt.savefig(rf"figures\interval_costs_{mode}{pickle_suff}_{timestep}h.png", dpi=600, bbox_inches="tight")

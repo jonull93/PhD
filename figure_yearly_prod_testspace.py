@@ -59,7 +59,7 @@ def make_figure(data, region, mode, timestep, suffix="", years=None, ax=None, op
 timestep = 3
 fig_path = f"figures\\"
 os.makedirs(fig_path, exist_ok=True)
-regions = ["brit", "iberia", "nordic"]
+regions = ["brit", "nordic"]
 modes = ["lowFlex_noFC", "lowFlex_fullFC"]
 optional_titles = ["No FC", "Full FC"]
 file_suffix = "appended"
@@ -68,7 +68,7 @@ scen_suffix = ""
 if len(scen_suffix) > 0 and scen_suffix[0] != "_": scen_suffix = "_" + scen_suffix
 
 data = pickle.load(open(os.path.relpath(rf"PickleJar\data_results_{timestep}h{file_suffix}.pickle"), "rb"))
-fig, axes = plt.subplots(nrows=2, ncols=3, figsize=(9, 6))
+fig, axes = plt.subplots(nrows=len(modes), ncols=len(regions), figsize=(3+len(regions), len(modes)))
 for i_r, reg in enumerate(regions):
     for i_m, mode in enumerate(modes):
         ax, df = make_figure(data, reg, mode, timestep, suffix=scen_suffix, ax=axes[i_m, i_r], optional_title=optional_titles[i_m])
@@ -80,4 +80,4 @@ fig.suptitle("Generation per technology type", y=0.97, fontsize=14)
 fig.supxlabel("Time-point", y=0.041)
 fig.supylabel("Electricity production [TWh/yr]")
 fig.tight_layout()
-plt.savefig(fig_path+f"yearly_elec_prod_{timestep}h.png", dpi=300, bbox_inches="tight")
+plt.savefig(fig_path+f"yearly_elec_prod_{timestep}h_noIberia.png", dpi=300, bbox_inches="tight")

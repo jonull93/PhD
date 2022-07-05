@@ -19,7 +19,7 @@ twload = load.sum(axis=0).iloc[start_index:end_index]
 plt.plot(twload, label="Load", color="C1")
 ylim = ax1.get_ylim()
 ax1.set_ylim([0,123])
-ax1.set_xticks(ticks=range(0, 8*24, 24), labels=range(1, 9))
+ax1.set_xticks(ticks=range(0, 8*24, 24), labels=range(skip_week*7+1, skip_week*7+9))
 ax1.set_xlabel("Day")
 ax1.set_ylabel("Power [GWh/h]")
 ax1.legend()
