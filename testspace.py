@@ -26,10 +26,11 @@ size_s = pd.Series(data=size.values(), index=size.keys())
 #print(size_s.sort_values(ascending=False)[:10])
 
 scen = "nordic_lowFlex_fullFC_2025_6h"
-total_rev = data[scen]["tech_revenue"]
-print(total_rev.sum(level=0))
+total_rev = data[scen]["tech_revenue"].sum(level=0)
+print(total_rev)
 PtH = ["EB", "HP"]
-FR_rev = data[scen]["tech_revenue_FR"]
+FR_rev = data[scen]["tech_revenue_FR"].sum(level=0)
+print(FR_rev)
 #inertia_rev = data[scen]["tech_revenue_inertia"]
 #FC_inertia = FR_rev+inertia_rev
-#print((FR_rev/(total_rev)).sort_values(ascending=False)[:10])
+print((FR_rev/(total_rev)).sort_values(ascending=False)[:-1])
