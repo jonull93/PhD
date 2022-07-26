@@ -109,7 +109,7 @@ color_dict = {'wind_onshore': '#B9B9B9', 'wind_offshore': '#DADADA', 'Wind': '#B
               'HP': "#e85d04", 'EB': "#f48c06", "Fossil thermals": "#2b2d42", "Bio thermals": "#2a9d8f",
               'CHP_WG': (0, 176 / 255, 80 / 255), "Solar PV": 'xkcd:mustard', 'Hydro': 'xkcd:ocean blue',
               'HOB_WG': (128 / 255, 128 / 255, 0), 'solarheat': (204 / 255, 51 / 255, 0), 'HOB_bio': 'green',
-              'Load': 'Black', "bat_discharge": "xkcd:amber", 'bat': "#714b92",
+              'Load': 'Black', "bat_discharge": "xkcd:amber", 'bat': "#714b92", 'Battery': "#714b92",
               'bat_cap': "#8d5eb7", 'Bat. In': "#8d5eb7", 'Bat. Out': "#8d5eb7", 'bat_PS': "xkcd:deep lavender",
               'bat_cap_PS': "xkcd:deep lavender", "sync_cond": 'xkcd:aqua', "curtailment": "xkcd:slate",
               'WOFF': '#DADADA', 'WON': '#B9B9B9', "H": "#172226", "H_CHP": "#172618", "b": "#172226", "B_CHP": "#23343A",
@@ -135,7 +135,8 @@ EPODs = list(EPODreg_to_country.keys())
 scenario_shortening = {"iberia": "IB", "brit": "BR", "nordic": "NE",
                        "CO2price": "CO2p", "fullFC": "FC", }
 
-year_names = {2020: "2020", 2025: "near-term", 2030:"mid-term", 2040:"long-term"}
+year_names = {2020: "ref. year", 2025: "near-term", 2030: "mid-term", 2040: "long-term"}
+year_names_twolines = {2020: "ref.\nyear", 2025: "near-\nterm", 2030: "mid-\nterm", 2040: "long-\nterm"}
 
 def country_to_reg(dictionary, country):
     """
