@@ -30,12 +30,17 @@ FR_rev = {}
 FR_share = {}
 scenarios = []
 techs = []
-fig, axs = plt.subplots(nrows=4, ncols=3, figsize=(7, 8))
-for i_y, year in enumerate([2020, 2025, 2030, 2040]):
-    for i_r, region in enumerate(["nordic", "brit", "iberia"]):
-        df_rev = pd.DataFrame()
+fig, axs = plt.subplots(nrows=3, ncols=1, figsize=(6, 7))
+years = ["2020", "2025", "2030", "2040"]
+regions = ["nordic", "brit", "iberia"]
+flexes = ["lowFlex", "highFlex"]
+df_rev = {tech: pd.DataFrame(0,pd.MultiIndex.from_product([regions,flexes],names=["Region","Flex"]), years)
+                  for tech in ["bat", "PtH", "Thermals"]}
+for i_y, year in enumerate(years):
+    for i_r, region in enumerate(regions):
         df_share = pd.DataFrame()
-        for i_f, flex in enumerate(["lowFlex", "highFlex"]):
+        for i_f, flex in enumerate(flexes):
+            FR_rev[region] = {flex: {}}
             for FC in ["fullFC"]:
                 # Gathering needed data
                 scen = f"{region}_{flex}_{FC}_{year}_{timestep}h"
@@ -58,14 +63,17 @@ for i_y, year in enumerate([2020, 2025, 2030, 2040]):
                     FR_rev[scen] = aggregate_in_df(FR_rev[scen], wind, "Wind")
                     FR_rev[scen] = aggregate_in_df(FR_rev[scen], PV, "Solar PV")
                     FR_rev[scen] = aggregate_in_df(FR_rev[scen], thermals, "Thermals")
-                    FR_rev[scen].drop(CHP, inplace=True, errors='ignore')
+                    FR_rev[scen].drop(CHP, inplace=True, errors='ignore')  # CHP is part of thermals already
                     FR_rev[scen] = aggregate_in_df(FR_rev[scen], ["RO","RR"], "Hydro")
                     FR_rev[scen] = aggregate_in_df(FR_rev[scen], PtH, "PtH")
-                    df_rev[flex] = (FR_rev[scen] / 1000).round(1)
-                    df_rev["sort_by"] = df_rev.index.get_level_values(0).map(order_map_cap)
-                    df_rev.sort_values("sort_by", inplace=True)
-                    df_rev.drop(columns="sort_by", inplace=True)
-                    for i in df_rev.index:
+                    print(FR_rev[scen])
+                    for tech in df_rev:
+                        try: df_rev[tech].loc[(region,flex),year] = (FR_rev[scen][tech] / 1000).round(1)
+                        except KeyError: continue
+                    # df_rev["sort_by"] = df_rev.index.get_level_values(0).map(order_map_cap)
+                    # df_rev.sort_values("sort_by", inplace=True)
+                    # df_rev.drop(columns="sort_by", inplace=True)
+                    for i in FR_rev[scen].index:
                         if i not in techs:
                             techs.append(i)
                     print(techs)
@@ -81,22 +89,19 @@ for i_y, year in enumerate([2020, 2025, 2030, 2040]):
                     df_share[flex] = (FR_rev[scen]/total_rev[scen]).round(4)
                     print_green(df_share[flex])
         # Plotting the data
-        df_rev.T.plot.bar(ax=axs[i_y, i_r], stacked=True, legend=None, color=[color_dict[tech] for tech in df_rev.index], zorder=-1)
-        axs[i_y, i_r].set_xticklabels(df_rev.T.index, rotation=20, ha="center", va="top", rotation_mode='anchor')
-        ax2 = axs[i_y, i_r].twinx()
-        ax2.scatter(x=[0 for i in range(len(df_share))], y=df_share["lowFlex"], marker='d', edgecolors='black', linewidths=0.5,
-                    c=[color_dict[tech] for tech in df_share.index], zorder=1)
-        if "highFlex" in df_share.keys():
-            ax2.scatter(x=[1 for i in range(len(df_share))], y=df_share["highFlex"], marker='d', edgecolors='black', linewidths=0.5,
-                        c=[color_dict[tech] for tech in df_share.index], zorder=1)
-        ax2.set_ylim([0, 1])
-        ax2.set_yticks([i/5 for i in range(6)])
-        #df_share.T.plot.scatter(ax=axs[i_y, i_r], c=[color_dict[tech] for tech in df_rev.index],)
-        if year == 2020: axs[i_y,i_r].set_title(region.capitalize(), fontsize=13)
-        if i_r == 0:
-            axs[i_y,i_r].text(-1, 0.5, year_names_twolines[year].capitalize(), transform=axs[i_y, i_r].transAxes,
-                                       ha="center", va="center", fontsize=12)
-        if year != 2040: axs[i_y,i_r].xaxis.set_ticklabels([])
+for i_t, tech in enumerate(["bat","PtH","Thermals"]):
+    print_cyan(tech)
+    print(df_rev[tech].T)
+    df_rev[tech].T.plot(ax=axs[i_t], legend=None, color=['teal', 'teal', 'purple', 'purple', 'orange', 'orange'], marker='o', zorder=-1) #, color=color_dict["Battery"]
+    for i_r, region in enumerate(regions):
+        axs[i_t].fill_between(years,df_rev[tech].loc[(region,"lowFlex")],df_rev[tech].loc[(region,"highFlex")], alpha=0.3, color=['teal', 'purple','orange'][i_r])
+    axs[i_t].set_title(tech.title(), fontsize=13)
+    axs[i_t].set_xticks([0,1,2,3])
+    axs[i_t].set_xticklabels([year_names[int(year)].capitalize() for year in years]) #, rotation=20, ha="center", va="top", rotation_mode='anchor'
+if i_r == 0:
+    axs[i_r].text(0.1, 0.5, year_names_twolines[year].capitalize(), transform=axs[i_r].transAxes,
+                               ha="center", va="center", fontsize=12)
+# if year != 2040: axs[i_y,i_r].xaxis.set_ticklabels([])
 
 for i, tech in enumerate(techs):
     if tech in tech_names.keys():
@@ -106,13 +111,13 @@ for tech in order_cap:
     if tech in techs:
         sorted_techs.append(tech)
 
-plt.figtext(0.21, 0.5, "Revenue from reserves [M€/yr]", ha="center", va="center", rotation=90)
-plt.figtext(1.02, 0.5, "Reserve share of total revenue [-]", ha="right", va="center", rotation=90)
+#plt.figtext(0.21, 0.5, "Revenue from reserves [M€/yr]", ha="center", va="center", rotation=90)
+#plt.figtext(1.02, 0.5, "Reserve share of total revenue [-]", ha="right", va="center", rotation=90)
 lines = [Line2D([0], [0], color=color_dict[tech], lw=6) for tech in sorted_techs]
 plt.tight_layout()
-legend = fig.legend(lines, sorted_techs, loc="lower center", bbox_transform=axs[0, 1].transAxes, bbox_to_anchor=(0.5, 1.17), ncol=3)
+legend = fig.legend(lines, sorted_techs, loc="lower center", bbox_transform=axs[0].transAxes, bbox_to_anchor=(0.5, 1.17), ncol=3)
 fig_path = f"figures\\"
-plt.savefig(fig_path+f"FR_revenue_{timestep}h.png", dpi=400, bbox_inches="tight")
+plt.savefig(fig_path+f"FR_revenue_lines_{timestep}h.png", dpi=400, bbox_inches="tight")
 plt.show()
                     #inertia_rev = data[scen]["tech_revenue_inertia"]
                     #FC_inertia = FR_rev+inertia_rev
