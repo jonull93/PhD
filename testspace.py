@@ -34,15 +34,20 @@ def aggregate_in_df(df, index_list: list, new_index: str):
     df.loc[new_index] = temp
     return df
 
-scen = "nordic_lowFlex_fullFC_2030_3h"
-#gen = data[scen]["gen"]
-#gen = aggregate_in_df(gen,wind,"Wind")
-#for key in data[scen].keys():
-#    print(key)
-#print(data[scen]["FR_demand"]["total"])
-FR_demand_6 = pd.DataFrame()
-FR_demand_6 = data[scen]["FR_demand"]["total"].loc[:, '6', :].sum(axis=0)
-print(FR_demand_6)
+years = [2020,2025,2030,2040]
+regions = ["nordic", "brit", "iberia"]
+#fig, axes = plt.subplots(nrows=1, ncols=4, figsize=(8, 3))
+FR_demand_6 = pd.DataFrame(columns=pd.MultiIndex(levels=[[],[]],
+                      codes=[[],[]],
+                      names=['Year','Region']))
+for i_y, year in enumerate(years):
+    for region in regions:
+        scen = f"{region}_lowFlex_fullFC_{year}_3h"
+        FR_demand_6[year, region] = data[scen]["FR_demand"]["total"].loc[:, '6', :].sum(axis=0)
+    print(FR_demand_6)
+#    plt.sca(axes[i_y])
+#    plt.ylim([0,30])
 plt.boxplot(FR_demand_6)
-#plt.xticks(range(1,len(FR_demand_6.index)+1), FR_demand_6.index)
+plt.xticks(range(1,len(FR_demand_6.columns)+1), FR_demand_6.columns)
 plt.show()
+print(data[scen]["FR_demand"]["other"].loc[:,'6',:].median(axis=1))
