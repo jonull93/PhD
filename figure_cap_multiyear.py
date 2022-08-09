@@ -7,7 +7,7 @@ import matplotlib.gridspec as gridspec
 import os
 #os.chdir(r"C:\Users\Jonathan\Box\python")  # not needed unless running line-by-line in a console
 
-from my_utils import color_dict, order_cap, add_in_dict, tech_names, scen_names, print_cyan, print_red, print_green, year_names
+from my_utils import color_dict, order_cap, add_in_dict, tech_names, scen_names, print_cyan, print_red, print_green, year_names, regions_corrected
 
 pickleJar = ""
 h = 3
@@ -174,7 +174,7 @@ for flex in separate_figures:
             if i_f == 0: plot.set_title(scen_names[mode], pad=15)
             tech_collections.append(t)
             fig.add_subplot(plot)
-        axes[i_f][0].text(-0.35, 0.5, f"{reg.capitalize()}:", transform=axes[i_f][0].transAxes, ha='right', ma='center', fontsize=14)
+        axes[i_f][0].text(-0.39, 0.5, f"{regions_corrected[reg]}:", transform=axes[i_f][0].transAxes, ha='center', ma='center', fontsize=14)
         for i_m in range(len(modes)):
             ylim = axes[i_f][i_m].get_ylim()
             axes[i_f][i_m].set_ylim([i*1.15 for i in ylim])
@@ -198,10 +198,11 @@ for flex in separate_figures:
     #axes[0][0].text(-0.35, 0.5, "Low\nFlex:", transform=axes[0][0].transAxes, ha='right', ma='center', fontsize=14)
     #axes[1][0].text(-0.35, 0.5, "High\nFlex:", transform=axes[1][0].transAxes, ha='right', ma='center', fontsize=14)
     #axes[2][0].text(-0.35, 0.5, "High\nFlex:", transform=axes[1][0].transAxes, ha='right', ma='center', fontsize=14)
-    fig.suptitle(f"Investments, {flex.capitalize()}",fontsize=16)
+    fig.suptitle(f"Investments, {flex[0].upper()}{flex[1:]}",fontsize=16)
     fig.legend(handles=handles, loc="center left", bbox_to_anchor=(0.91, 0.5), )
     fig.show()
-    fig.savefig(f"figures/cap_{flex}_{h}h.png",bbox_inches="tight", dpi=600)
+    fig.savefig(f"figures/cap_{flex}_{h}h.png",bbox_inches="tight", dpi=600, )
+    fig.savefig(f"figures/cap_{flex}_{h}h.eps",bbox_inches="tight", format='eps')
 # plot_cap(data,first_case)
 # plt.show()
 # cap.unstack().plot(kind="bar",stacked=True)

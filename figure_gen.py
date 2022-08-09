@@ -115,7 +115,7 @@ for region in regions:
             os.makedirs(fig_path, exist_ok=True)
             for day in range(1, 358, 28):
                 fig, axes = plt.subplots(nrows=2, ncols=1, figsize=(6, 7))
-                fig.suptitle(f"{region.capitalize()}{', HighFlex' if 'high' in mode else ''}, {year_names[year]}")
+                fig.suptitle(f"{region.capitalize()}{', HighFlex' if 'high' in mode else ''}, {year_names[year].capitalize()}")
                 handles = []
                 labels = []
                 for i, FC in enumerate(["noFC", "fullFC"]):
@@ -147,4 +147,5 @@ for region in regions:
                 fig.tight_layout()
                 fig.legend(handles_to_legend,labels_to_legend,bbox_to_anchor=(1, 0.5), ncol=1, loc="center left")
                 plt.savefig(fig_path+f"week {int(np.ceil(day/7))}.png", dpi=300, bbox_inches='tight')
+                plt.savefig(fig_path+f"week {int(np.ceil(day/7))}.eps", bbox_inches="tight", format="eps")
                 plt.close(fig)

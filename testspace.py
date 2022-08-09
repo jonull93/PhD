@@ -3,6 +3,8 @@ import os
 import pickle
 import order_cap
 import pandas as pd
+import matplotlib.pyplot as plt
+from order_cap import wind
 from my_utils import print_red, print_green, print_cyan
 
 # os.chdir(r"C:\Users\Jonathan\Box\python")  # not needed unless running line-by-line in a console
@@ -11,7 +13,7 @@ file_suffix = ""
 if len(file_suffix) > 0: file_suffix = "_" + file_suffix
 scen_suffix = ""
 if len(scen_suffix) > 0: scen_suffix = "_" + scen_suffix
-timestep = 6
+timestep = 3
 data = pickle.load(open(os.path.relpath(rf"PickleJar\data_results_{timestep}h{file_suffix}.pickle"), "rb"))
 
 size = {}
@@ -25,12 +27,22 @@ for key in data:
 size_s = pd.Series(data=size.values(), index=size.keys())
 #print(size_s.sort_values(ascending=False)[:10])
 
-scen = "nordic_lowFlex_fullFC_2025_6h"
-total_rev = data[scen]["tech_revenue"].sum(level=0)
-print(total_rev)
-PtH = ["EB", "HP"]
-FR_rev = data[scen]["tech_revenue_FR"].sum(level=0)
-print(FR_rev)
-#inertia_rev = data[scen]["tech_revenue_inertia"]
-#FC_inertia = FR_rev+inertia_rev
-print((FR_rev/(total_rev)).sort_values(ascending=False)[:-1])
+
+def aggregate_in_df(df, index_list: list, new_index: str):
+    temp = df.loc[df.index.intersection(index_list)].sum()
+    df.drop(index_list, inplace=True, errors='ignore')
+    df.loc[new_index] = temp
+    return df
+
+scen = "nordic_lowFlex_fullFC_2030_3h"
+#gen = data[scen]["gen"]
+#gen = aggregate_in_df(gen,wind,"Wind")
+#for key in data[scen].keys():
+#    print(key)
+#print(data[scen]["FR_demand"]["total"])
+FR_demand_6 = pd.DataFrame()
+FR_demand_6 = data[scen]["FR_demand"]["total"].loc[:, '6', :].sum(axis=0)
+print(FR_demand_6)
+plt.boxplot(FR_demand_6)
+#plt.xticks(range(1,len(FR_demand_6.index)+1), FR_demand_6.index)
+plt.show()

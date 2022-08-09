@@ -51,7 +51,7 @@ def make_figure(data, region, mode, timestep, suffix="", years=None, ax=None, op
         df.T.plot(kind="area", color=[color_dict[tech] for tech in df.index])
     else:
         df.T.plot(kind="area", ax=ax, color=[color_dict[tech] for tech in df.index])
-    plt.xticks(range(len(df.columns)), ["2020", "Near-\nterm", "Mid-\nterm", "Long-\nterm"])
+    plt.xticks(range(len(df.columns)), ["Ref.\n2020", "Near-\nterm", "Mid-\nterm", "Long-\nterm"])
     if optional_title:
         plt.title(f"{regions_corrected[region]}, {optional_title}")
     else:
@@ -61,7 +61,7 @@ def make_figure(data, region, mode, timestep, suffix="", years=None, ax=None, op
 timestep = 1
 fig_path = f"figures\\"
 os.makedirs(fig_path, exist_ok=True)
-regions = ["brit", "iberia", "nordic"]
+regions = ["nordic", "brit", "iberia"]
 regions_corrected = {"brit": "Brit", "nordic": "Nordic+", "iberia": "Iberia"}
 modes = ["lowFlex_noFC", "highFlex_noFC"]
 optional_titles = ["LowFlex", "HighFlex"]
@@ -88,4 +88,5 @@ fig.suptitle("Generation per technology type", y=0.97, fontsize=14)
 fig.supxlabel("Time-point", y=0.041)
 fig.supylabel("Electricity production [TWh/yr]")
 fig.tight_layout()
-plt.savefig(fig_path+f"yearly_elec_prod_{timestep}h_updated.png", dpi=300, bbox_inches="tight")
+plt.savefig(fig_path+f"yearly_elec_prod_{timestep}h_old.png", dpi=300, bbox_inches="tight")
+plt.savefig(fig_path+f"yearly_elec_prod_{timestep}h_old.svg", bbox_inches="tight")

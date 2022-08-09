@@ -134,8 +134,8 @@ EPODs = list(EPODreg_to_country.keys())
 
 scenario_shortening = {"iberia": "IB", "brit": "BR", "nordic": "NE",
                        "CO2price": "CO2p", "fullFC": "FC", }
-
-year_names = {2020: "ref. year", 2025: "near-term", 2030: "mid-term", 2040: "long-term"}
+regions_corrected = {"brit": "Brit", "nordic": "Nordic+", "iberia": "Iberia"}
+year_names = {2020: "ref. 2020", 2025: "near-term", 2030: "mid-term", 2040: "long-term"}
 year_names_twolines = {2020: "ref.\nyear", 2025: "near-\nterm", 2030: "mid-\nterm", 2040: "long-\nterm"}
 
 def country_to_reg(dictionary, country):
