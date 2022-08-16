@@ -11,7 +11,7 @@ from my_utils import color_dict, order_cap, add_in_dict, tech_names, scen_names,
 
 pickleJar = ""
 h = 3
-file_suffix = "appended"
+file_suffix = ""
 if len(file_suffix) > 0: file_suffix = "_" + file_suffix
 scen_suffix = ""
 if len(scen_suffix) > 0: scen_suffix = "_" + scen_suffix
@@ -129,7 +129,7 @@ def plot_cap_multipleyears(ax, data, scenario, years=None, new=True, patterns=No
 
 
 # -- All modelled cases
-separate_figures = ["lowFlex",]
+separate_figures = ["lowFlex","highFlex"]
 for flex in separate_figures:
     cases = []
     regions = ["nordic", "brit", "iberia"]
