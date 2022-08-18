@@ -12,7 +12,7 @@ file_suffix = ""
 if len(file_suffix) > 0: file_suffix = "_" + file_suffix
 scen_suffix = ""
 if len(scen_suffix) > 0: scen_suffix = "_" + scen_suffix
-timestep = 6
+timestep = 3
 data = pickle.load(open(os.path.relpath(rf"PickleJar\data_results_{timestep}h{file_suffix}.pickle"), "rb"))
 print([i for i in data.keys() if "nordic" in i and "highFlex" in i])
 
@@ -30,12 +30,12 @@ FR_rev = {}
 FR_share = {}
 scenarios = []
 techs = []
-fig, axs = plt.subplots(nrows=3, ncols=1, figsize=(6, 7))
+fig, axs = plt.subplots(nrows=3, ncols=1, figsize=(7, 6))
 years = ["2020", "2025", "2030", "2040"]
 regions = ["nordic", "brit", "iberia"]
 flexes = ["lowFlex", "highFlex"]
 df_rev = {tech: pd.DataFrame(0,pd.MultiIndex.from_product([regions,flexes],names=["Region","Flex"]), years)
-                  for tech in ["bat", "PtH", "Thermals"]}
+                  for tech in ["bat", "PtH", "thermals"]}
 for i_y, year in enumerate(years):
     for i_r, region in enumerate(regions):
         df_share = pd.DataFrame()
@@ -62,11 +62,11 @@ for i_y, year in enumerate(years):
                     FR_rev[scen] = data[scen]["tech_revenue_FR"].sum(level=0)
                     FR_rev[scen] = aggregate_in_df(FR_rev[scen], wind, "Wind")
                     FR_rev[scen] = aggregate_in_df(FR_rev[scen], PV, "Solar PV")
-                    FR_rev[scen] = aggregate_in_df(FR_rev[scen], thermals, "Thermals")
+                    FR_rev[scen] = aggregate_in_df(FR_rev[scen], thermals, "thermals")
                     FR_rev[scen].drop(CHP, inplace=True, errors='ignore')  # CHP is part of thermals already
                     FR_rev[scen] = aggregate_in_df(FR_rev[scen], ["RO","RR"], "Hydro")
                     FR_rev[scen] = aggregate_in_df(FR_rev[scen], PtH, "PtH")
-                    print(FR_rev[scen])
+                    #print(FR_rev[scen])
                     for tech in df_rev:
                         try: df_rev[tech].loc[(region,flex),year] = (FR_rev[scen][tech] / 1000).round(1)
                         except KeyError: continue
@@ -76,10 +76,10 @@ for i_y, year in enumerate(years):
                     for i in FR_rev[scen].index:
                         if i not in techs:
                             techs.append(i)
-                    print(techs)
+                    #print(techs)
                     total_rev[scen] = aggregate_in_df(total_rev[scen], wind, "Wind")
                     total_rev[scen] = aggregate_in_df(total_rev[scen], PV, "Solar PV")
-                    total_rev[scen] = aggregate_in_df(total_rev[scen], thermals, "Thermals")
+                    total_rev[scen] = aggregate_in_df(total_rev[scen], thermals, "thermals")
                     total_rev[scen].drop(CHP, inplace=True, errors='ignore')
                     total_rev[scen] = aggregate_in_df(total_rev[scen], ["RO","RR"], "Hydro")
                     total_rev[scen] = aggregate_in_df(total_rev[scen], PtH, "PtH")
@@ -89,33 +89,31 @@ for i_y, year in enumerate(years):
                     df_share[flex] = (FR_rev[scen]/total_rev[scen]).round(4)
                     print_green(df_share[flex])
         # Plotting the data
-for i_t, tech in enumerate(["bat","PtH","Thermals"]):
+for i_t, tech in enumerate(["bat","PtH","thermals"]):
     print_cyan(tech)
     print(df_rev[tech].T)
-    df_rev[tech].T.plot(ax=axs[i_t], legend=None, color=['teal', 'teal', 'purple', 'purple', 'orange', 'orange'], marker='o', zorder=-1) #, color=color_dict["Battery"]
+    df_rev[tech].T.plot(ax=axs[i_t], legend=None, color=['teal', 'teal', 'purple', 'purple', 'orange', 'orange'],
+                        marker='o', zorder=-1, style=['-','--','-','--','-','--']) #, color=color_dict["Battery"]
+    markers = ['$L$','$H$','$L$','$H$','$L$','$H$']
+    for i_l, line in enumerate(axs[i_t].get_lines()):
+        line.set_marker(markers[i_l])
     for i_r, region in enumerate(regions):
         axs[i_t].fill_between(years,df_rev[tech].loc[(region,"lowFlex")],df_rev[tech].loc[(region,"highFlex")], alpha=0.3, color=['teal', 'purple','orange'][i_r])
-    axs[i_t].set_title(tech.title(), fontsize=13)
+    axs[i_t].set_title(tech_names[tech], fontsize=13)
     axs[i_t].set_xticks([0,1,2,3])
     axs[i_t].set_xticklabels([year_names[int(year)].capitalize() for year in years]) #, rotation=20, ha="center", va="top", rotation_mode='anchor'
 if i_r == 0:
     axs[i_r].text(0.1, 0.5, year_names_twolines[year].capitalize(), transform=axs[i_r].transAxes,
                                ha="center", va="center", fontsize=12)
-# if year != 2040: axs[i_y,i_r].xaxis.set_ticklabels([])
 
-for i, tech in enumerate(techs):
-    if tech in tech_names.keys():
-        techs[i] = tech_names[tech]
-sorted_techs = []
-for tech in order_cap:
-    if tech in techs:
-        sorted_techs.append(tech)
+axs[1].set_ylabel("Revenue [M€/yr]", fontsize=12)
 
 #plt.figtext(0.21, 0.5, "Revenue from reserves [M€/yr]", ha="center", va="center", rotation=90)
 #plt.figtext(1.02, 0.5, "Reserve share of total revenue [-]", ha="right", va="center", rotation=90)
-lines = [Line2D([0], [0], color=color_dict[tech], lw=6) for tech in sorted_techs]
+lines = [Line2D([0], [0], color=['teal','purple','orange'][i_r], lw=5) for i_r in range(3)]
 plt.tight_layout()
-legend = fig.legend(lines, sorted_techs, loc="lower center", bbox_transform=axs[0].transAxes, bbox_to_anchor=(0.5, 1.17), ncol=3)
+legend = fig.legend(lines, ["Nordic+","Brit","Iberia"], loc="lower center", bbox_transform=axs[0].transAxes, bbox_to_anchor=(0.5, 1.18), ncol=3)
+fig.suptitle("Reserve supply revenue", y=1.08)
 fig_path = f"figures\\"
 plt.savefig(fig_path+f"FR_revenue_lines_{timestep}h.png", dpi=400, bbox_inches="tight")
 plt.show()
