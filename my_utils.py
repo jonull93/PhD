@@ -95,7 +95,7 @@ tech_names = {'RO': 'Hydro', 'RR': 'Run-of-river', 'U': 'Nuclear', "b": "Lignite
               'Load': 'Load', 'bat_PS': "Battery (PS)", 'bat_cap_PS': "Battery cap (PS)", 'bat_cap': "Battery power",
               "electrolyser": "Electrolyser", "H": "Coal ST", "W": "Biomass ST",
               "G": "N. Gas CCGT", "G_peak": "N. Gas GT", "PV": "Solar PV", "FC": "Fuel cell",
-              "H2store": "H2 storage", "PtH":"Power-to-Heat", "thermals":"Thermal power"
+              "H2store": "H2 storage", "PtH":"Power-to-Heat", "thermals":"Thermal power", "Hydro":"Hydro power"
               }
 scen_names = {"_pre": "Base case", "_leanOR": "Lean OR", "_OR": "OR", "_OR_fixed": "OR", "_OR_inertia": "OR + Inertia",
               "_OR+inertia_fixed": "OR + Inertia", "_inertia": "Inertia", "_inertia_2x": "2x Inertia",

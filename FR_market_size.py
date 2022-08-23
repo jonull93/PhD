@@ -27,5 +27,6 @@ for flex in flexes:
         for year in years:
             scen = f"{region}_{flex}_fullFC_{year}_{timestep}h"
             reserve_prices = data[scen]["FR_cost"]
-            l.append(round(reserve_prices.sum().sum()))
+            reserve_amount = data[scen]["FR_demand"]
+            l.append(round((reserve_amount["total"]*reserve_prices).sum().sum()))
         print(f"{region:<7}{l[0]:7}{l[1]:7}{l[2]:7}{l[3]:7}")

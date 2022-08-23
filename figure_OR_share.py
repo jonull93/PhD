@@ -1,6 +1,6 @@
 import pickle
 from os import path
-from my_utils import label_axes, print_cyan, regions_corrected
+from my_utils import label_axes, print_cyan, regions_corrected, print_red
 import matplotlib.pyplot as plt
 import matplotlib.text as mpltext
 import pandas as pd
@@ -29,12 +29,12 @@ def make_plot(df, title, secondary_y_values, xlabels=None, legend=False, left_yl
         xlabels = ["Ref.\n2020", "Near-\nterm", "Mid-\nterm", "Long-\nterm"]
     if _ax is None:
         if bars is True:
-            ax = df.div(df.sum(axis=1), axis=0).plot.bar(stacked=True, rot=15)
+            ax = df.div(df.sum(axis=1), axis=0).plot.bar(stacked=True, rot=15, width=0.7)
         else:
             ax = df.div(df.sum(axis=1), axis=0).plot(kind="area", linewidth=0)
     else:
         if bars is True:
-            ax = df.div(df.sum(axis=1), axis=0).plot.bar(stacked=True, rot=15, ax=_ax)
+            ax = df.div(df.sum(axis=1), axis=0).plot.bar(stacked=True, rot=15, ax=_ax, width=0.7)
         else:
             ax = df.div(df.sum(axis=1), axis=0).plot(kind="area", linewidth=0, ax=_ax)
 
@@ -63,18 +63,18 @@ def make_plot(df, title, secondary_y_values, xlabels=None, legend=False, left_yl
     return ax, ax2, (handles, labels)
 
 
-def percent_stacked_area(data, regions, flex, timestep, indicator_string: str, set: dict, years=None, FC=True,
+def percent_stacked_area(axes, fig, data, regions, flex, timestep, indicator_string: str, set: dict, years=None,
+                         FC=True,
                          secondary_y="FR_cost", scen_suffix="", bars=True,
                          figtitle="Interval share, and \u0394system-cost", filepath="test.png",
-                         baseFC = "noFC", compareFC = "fullFC"):
+                         baseFC="noFC", compareFC="fullFC"):
     print_cyan(f"Starting percent_stacked_area() for {indicator_string}")
     if years is None:
         years = [2020, 2025, 2030, 2040]
     set.pop("BEV", None)
     if "high" not in flex:
         set.pop("H2", None)
-    fig, axes = plt.subplots(nrows=1, ncols=len(regions), figsize=(len(regions)+4.7, 3), )
-    #label_axes(fig, loc=(-0.1, 1.03))
+    # label_axes(fig, loc=(-0.1, 1.03))
     for j, region in enumerate(regions):
         print_cyan(f"- {region} -")
         scenarios = [f"{region}_{flex}_{compareFC if FC else 'noFC'}{scen_suffix}_{y}{timestep}" for y in years]
@@ -86,6 +86,10 @@ def percent_stacked_area(data, regions, flex, timestep, indicator_string: str, s
                     try:
                         indicator_data[pretty][i] = data[scen]["FR_cost"].sum(axis=1).groupby(level=1).sum()[str(name)]
                     except KeyError:
+                        print_red("! Failed to get", name, "in", region, scen)
+                        print_red(data[scen]["FR_cost"])
+                        print_red(data[scen]["FR_cost"].sum(axis=1).groupby(level=1).sum())
+                        raise
                         indicator_data[pretty][i] = 0
                     except ValueError:
                         print("!! weird formatting in FR_cost !!")
@@ -99,40 +103,44 @@ def percent_stacked_area(data, regions, flex, timestep, indicator_string: str, s
         if secondary_y == "FR_cost":
             secondary_y_values = [data[scen][secondary_y].sum().sum().round() / 1000 for scen in scenarios]
         elif secondary_y == "FR_cost_per_gen":
-            secondary_y_values = [data[scen]["FR_cost"].sum().sum().round() * 1000 *100
+            secondary_y_values = [data[scen]["FR_cost"].sum().sum().round() * 1000 * 100
                                   / data[scen]["gen_per_eltech"].sum().round() for scen in scenarios]
         elif secondary_y == "FR_syscost":
-            secondary_y_values = [(data[scen]["cost_tot"]-data[scen.replace(compareFC, baseFC)]["cost_tot"]).round(4) for scen in scenarios]
+            secondary_y_values = [(data[scen]["cost_tot"] - data[scen.replace(compareFC, baseFC)]["cost_tot"]).round(4)
+                                  for scen in scenarios]
         elif secondary_y == "FR_syscost_per_gen":
-            secondary_y_values = [((data[scen]["cost_tot"]-data[scen.replace(compareFC, baseFC)]["cost_tot"])*1e6*100/data[scen]["gen_per_eltech"].sum()).round(4) for scen in scenarios]
+            secondary_y_values = [((data[scen]["cost_tot"] - data[scen.replace(compareFC, baseFC)][
+                "cost_tot"]) * 1e6 * 100 / data[scen]["gen_per_eltech"].sum()).round(4) for scen in scenarios]
 
         df = pd.DataFrame(data=
                           {pretty_name: indicator_data[pretty_name] for pretty_name in indicator_data}
                           , index=years).round(decimals=4)
-        #print(indicator_string)
-        #print(df)
+        # print(indicator_string)
+        # print(df)
         print(f"{secondary_y}: {secondary_y_values}")
         if indicator_string == "FR_cost":
             title = f"{regions_corrected[region]}"
         else:
             title = f"{regions_corrected[region]}"
-        if j == 0: left_ylabel="Reserve share"
-        else: left_ylabel=False
-        if j == len(regions)-1: right_ylabel="System cost increase [€ cent/MWh]"
-        else: right_ylabel=False
+        if j == 0:
+            left_ylabel = "Reserve share"
+        else:
+            left_ylabel = False
+        if j == len(regions) - 1:
+            right_ylabel = "System cost increase [€ cent/MWh]"
+        else:
+            right_ylabel = False
         _, _, (handles, labels) = make_plot(df, title, secondary_y_values, left_ylabel=left_ylabel,
                                             right_ylabel=right_ylabel, _ax=axes[j])
     plt.sca(axes[1])
-    fig.legend(handles,labels,bbox_to_anchor=(0.5, 0.95), ncol=4, loc="lower center")
-    fig.suptitle(f"{figtitle}: {flex}", y=1.2)
-    plt.subplots_adjust(wspace=0.49)
-    plt.savefig(filepath, dpi=600, bbox_inches="tight")
-    plt.savefig(filepath.replace(".png", ".eps"), bbox_inches="tight", format="eps")
+    #    fig.legend(handles,labels,bbox_to_anchor=(0.5, 0.92), ncol=4, loc="lower center")
+    fig.suptitle(f"{figtitle}: {flex}", y=1.05)
+    plt.subplots_adjust(wspace=0.49, hspace=0.4)
+    return handles, labels
 
-flex = "highFlex"
+
 timestep = 3
-
-fig_file_suffix = "highFlex"
+fig_file_suffix = "duoflex"
 if len(fig_file_suffix) > 0: fig_file_suffix = "_" + fig_file_suffix
 pickle_suffix = ""
 if len(pickle_suffix) > 0: pickle_suffix = "_" + pickle_suffix
@@ -141,7 +149,8 @@ data = pickle.load(open(path.relpath(rf"PickleJar\data_results_{timestep}h{pickl
 scen_suffix = ""
 if len(scen_suffix) > 0: scen_suffix = "_" + scen_suffix
 secondary_y = "FR_syscost_per_gen"  # _per_gen
-reserve_technologies = {"Thermals": "thermal", "VRE": "VRE", "Storage": "ESS", "Power-to-heat": "PtH", "Hydro": "hydro", "BEV": "BEV"}
+reserve_technologies = {"Thermals": "thermal", "VRE": "VRE", "Storage": "ESS", "Power-to-heat": "PtH", "Hydro": "hydro",
+                        "BEV": "BEV"}
 FR_intervals = {"FFR": 1, "5-30s": 2, "30s-5min": 3, "5-15min": 4, "15-30min": 5, "30-60min": 6}
 
 if timestep > 1:
@@ -152,18 +161,30 @@ else:
 # ax = percent_stacked_area("nordic", mode, timestep, "FR_value_share_", reserve_technologies, secondary_y="FR_cost_per_gen")
 # plt.show()
 regions = ["nordic", "brit", "iberia"]
-
+flexes = ["lowFlex", "highFlex"]
 print("________________" * 3)
 print(f" .. Making figure for {regions} .. ")
-percent_stacked_area(data, regions, flex, timestep, "FR_value_share_", reserve_technologies, secondary_y=secondary_y,
-                     scen_suffix=scen_suffix, figtitle="Cost-weighted technology share and \u0394system-cost",
-                     filepath=rf"figures\reserve_valueshare_{flex}{scen_suffix}{pickle_suffix}{timestep}{fig_file_suffix}.png")
-
-percent_stacked_area(data, regions, flex, timestep, "FR_share_", reserve_technologies, secondary_y=secondary_y,
-                     scen_suffix=scen_suffix, figtitle="Technology reserve share and \u0394system-cost",
-                     filepath=rf"figures\reserve_share_{flex}{scen_suffix}{pickle_suffix}{timestep}{fig_file_suffix}.png")
-#plt.savefig(rf"figures\reserve_share_{mode}{pickle_suff}_{timestep}h.png", dpi=600, bbox_inches="tight")
-percent_stacked_area(data, regions, flex, timestep, "FR_cost", FR_intervals, secondary_y=secondary_y,
-                     scen_suffix=scen_suffix, figtitle="Interval reserve share and \u0394system-cost",
-                     filepath=rf"figures\interval_costs_{flex}{scen_suffix}{pickle_suffix}{timestep}{fig_file_suffix}.png")
-#plt.savefig(rf"figures\interval_costs_{mode}{pickle_suff}_{timestep}h.png", dpi=600, bbox_inches="tight")
+# -- info about the three figures:
+indicator_strings = ["FR_cost", "FR_value_share_", "FR_share_", ]
+figtitles = {"FR_cost": "Interval reserve share and \u0394system-cost",
+             "FR_value_share_": "Cost-weighted technology share and \u0394system-cost",
+             "FR_share_": "Technology reserve share and \u0394system-cost", }
+filenames = {"FR_cost": "interval_costs",
+             "FR_value_share_": "reserve_valueshare",
+             "FR_share_": "reserve_share"}
+label_sets = {"FR_cost": FR_intervals,
+              "FR_value_share_": reserve_technologies,
+              "FR_share_": reserve_technologies}
+# --
+for i_t, type in enumerate(indicator_strings):
+    fig, axes = plt.subplots(nrows=len(flexes), ncols=len(regions), figsize=(len(regions) + 4.7, 3 * len(flexes)), )
+    for i_f, flex in enumerate(flexes):
+        (handles, labels) = percent_stacked_area(axes[i_f], fig, data, regions, flex, timestep, indicator_strings[i_t],
+                                                 label_sets[type], secondary_y=secondary_y,
+                                                 scen_suffix=scen_suffix, figtitle=figtitles[type])
+        axes[i_f][0].annotate(flex[0].upper()+flex[1:], xy=(-0.45, 0.5), xycoords='axes fraction', va="center", ha="right", fontsize=12)
+    fig.legend(handles, labels, bbox_to_anchor=(0.5, 0.92), ncol=4, loc="lower center")
+    plt.savefig(rf"figures\{filenames[type]}{scen_suffix}{pickle_suffix}{timestep}{fig_file_suffix}.png", dpi=600,
+                bbox_inches="tight")
+    plt.savefig(rf"figures\{filenames[type]}{scen_suffix}{pickle_suffix}{timestep}{fig_file_suffix}.eps",
+                bbox_inches="tight", format="eps")
