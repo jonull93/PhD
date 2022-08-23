@@ -27,13 +27,15 @@ def make_df_from_year(scen,data,year):
     return df.iloc[::-1]
 
 
-def make_figure(data, region, mode, timestep, suffix="", years=None, ax=None):
+def make_figure(data, region, mode, timestep, suffix="", years=None, ax=None, optional_title=False):
     plt.sca(ax)
     if years is None:
         years = [2020, 2025, 2030, 2040]
     dfs = {y: 0. for y in years}
     for year in years:
-        scenario = f"{region}_{mode}_noFC_{year}{suffix}_{timestep}h"
+        scenario = f"{region}_{mode}_{year}{suffix}_{timestep}h"
+        if timestep==1:
+            scenario = f"{region}_{mode}_{year}{suffix}"
         dfs[year] = make_df_from_year(scenario,data,year)/1000
     # some ancillary code
     stripped_scenario = scenario.replace("_noFC", "").replace(f"_{year}", "")
@@ -49,29 +51,42 @@ def make_figure(data, region, mode, timestep, suffix="", years=None, ax=None):
         df.T.plot(kind="area", color=[color_dict[tech] for tech in df.index])
     else:
         df.T.plot(kind="area", ax=ax, color=[color_dict[tech] for tech in df.index])
-    plt.xticks(range(len(df.columns)), ["2020", "Short\n-term", "Mid\n-term", "Long\n-term"])
-    plt.title(f"{region.capitalize()} - {mode[0].upper() + mode[1:]}")
+    plt.xticks(range(len(df.columns)), ["Ref.\n2020", "Near-\nterm", "Mid-\nterm", "Long-\nterm"])
+    if optional_title:
+        plt.title(f"{regions_corrected[region]}, {optional_title}")
+    else:
+        plt.title(f"{region.capitalize()}, {mode[0].upper() + mode[1:]}") #"$\it{"+region.capitalize()+"}$"+f"
     return ax,df
 
-timestep = 6
+timestep = 1
 fig_path = f"figures\\"
 os.makedirs(fig_path, exist_ok=True)
-regions = ["brit", "iberia", "nordic"]
-modes = ["lowFlex", "highFlex"]
-suffix = "noGpeak"
-if len(suffix) > 0: suffix = "_" + suffix
+regions = ["nordic", "brit", "iberia"]
+regions_corrected = {"brit": "Brit", "nordic": "Nordic+", "iberia": "Iberia"}
+modes = ["lowFlex_noFC", "highFlex_noFC"]
+optional_titles = ["LowFlex", "HighFlex"]
+file_suffix = "old"
+if len(file_suffix) > 0 and file_suffix[0] != "_": file_suffix = "_" + file_suffix
+scen_suffix = ""
+if len(scen_suffix) > 0 and scen_suffix[0] != "_": scen_suffix = "_" + scen_suffix
 
-data = pickle.load(open(os.path.relpath(rf"PickleJar\data_results_{timestep}h{suffix}.pickle"), "rb"))
-fig, axes = plt.subplots(nrows=2, ncols=3, figsize=(9, 6))
+data = pickle.load(open(os.path.relpath(rf"PickleJar\data_results_{timestep}h{file_suffix}.pickle"), "rb"))
+#data2 = pickle.load(open(os.path.relpath(rf"PickleJar\data_results_{timestep}h_highFlex.pickle"), "rb"))
+#for scen in data2:
+#    print(scen)
+#    if scen not in data:
+#        data[scen] = data2[scen]
+fig, axes = plt.subplots(nrows=len(modes), ncols=len(regions), figsize=(6+len(regions), 4+len(modes)))
 for i_r, reg in enumerate(regions):
     for i_m, mode in enumerate(modes):
-        ax, df = make_figure(data, reg, mode, timestep, suffix=suffix, ax=axes[i_m, i_r])
+        ax, df = make_figure(data, reg, mode, timestep, suffix=scen_suffix, ax=axes[i_m, i_r], optional_title=optional_titles[i_m])
         if i_r+i_m > 0: h,l = axes[0][0].get_legend_handles_labels()
         ax.get_legend().remove()
 
 fig.legend(h, l, bbox_to_anchor=(0.5, -0.04), loc="lower center", ncol=6)
 fig.suptitle("Generation per technology type", y=0.97, fontsize=14)
+fig.supxlabel("Time-point", y=0.041)
 fig.supylabel("Electricity production [TWh/yr]")
-fig.supxlabel("Year", y=0.041)
 fig.tight_layout()
-plt.savefig(fig_path+f"yearly_elec_prod_{timestep}h.png", dpi=300, bbox_inches="tight")
+plt.savefig(fig_path+f"yearly_elec_prod_{timestep}h_old.png", dpi=300, bbox_inches="tight")
+plt.savefig(fig_path+f"yearly_elec_prod_{timestep}h_old.svg", bbox_inches="tight")

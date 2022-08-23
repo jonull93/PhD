@@ -95,7 +95,7 @@ tech_names = {'RO': 'Hydro', 'RR': 'Run-of-river', 'U': 'Nuclear', "b": "Lignite
               'Load': 'Load', 'bat_PS': "Battery (PS)", 'bat_cap_PS': "Battery cap (PS)", 'bat_cap': "Battery power",
               "electrolyser": "Electrolyser", "H": "Coal ST", "W": "Biomass ST",
               "G": "N. Gas CCGT", "G_peak": "N. Gas GT", "PV": "Solar PV", "FC": "Fuel cell",
-              "H2store": "H2 storage",
+              "H2store": "H2 storage", "PtH":"Power-to-Heat", "thermals":"Thermal power"
               }
 scen_names = {"_pre": "Base case", "_leanOR": "Lean OR", "_OR": "OR", "_OR_fixed": "OR", "_OR_inertia": "OR + Inertia",
               "_OR+inertia_fixed": "OR + Inertia", "_inertia": "Inertia", "_inertia_2x": "2x Inertia",
@@ -104,17 +104,18 @@ scen_names = {"_pre": "Base case", "_leanOR": "Lean OR", "_OR": "OR", "_OR_fixed
               "fullFC": "Full FC", "OR": "FR", "inertia": "Inertia"}
 color_dict = {'wind_onshore': '#B9B9B9', 'wind_offshore': '#DADADA', 'Wind': '#B9B9B9', 'RO': 'xkcd:ocean blue',
               'U': 'xkcd:grape', 'Nuclear': 'xkcd:grape', 'GWGCCS': 'xkcd:dark peach', 'WA_CHP': 'xkcd:deep lavender',
-              'CHP_bio': 'xkcd:tree green', 'WG': '#a4be20', 'WG_peak': '#b6cb4d', "WG_CHP": "#83981a",
+              'CHP_bio': 'xkcd:tree green', 'WG': '#a4be20', 'WG_peak': '#d00000', "WG_CHP": "#83981a",
               'PV_cSiOPT': 'xkcd:mustard', 'CHP_WG_L': 'xkcd:mid green', 'RR': 'xkcd:ocean blue',
               'HP': "#e85d04", 'EB': "#f48c06", "Fossil thermals": "#2b2d42", "Bio thermals": "#2a9d8f",
               'CHP_WG': (0, 176 / 255, 80 / 255), "Solar PV": 'xkcd:mustard', 'Hydro': 'xkcd:ocean blue',
               'HOB_WG': (128 / 255, 128 / 255, 0), 'solarheat': (204 / 255, 51 / 255, 0), 'HOB_bio': 'green',
-              'Load': 'Black', "bat_discharge": "xkcd:amber", 'bat': "#714b92",
+              'Load': 'Black', "bat_discharge": "xkcd:amber", 'bat': "#714b92", 'Battery': "#714b92",
               'bat_cap': "#8d5eb7", 'Bat. In': "#8d5eb7", 'Bat. Out': "#8d5eb7", 'bat_PS': "xkcd:deep lavender",
               'bat_cap_PS': "xkcd:deep lavender", "sync_cond": 'xkcd:aqua', "curtailment": "xkcd:slate",
               'WOFF': '#DADADA', 'WON': '#B9B9B9', "H": "#172226", "H_CHP": "#172618", "b": "#172226", "B_CHP": "#23343A",
               "W": "#014421", "W_CHP": "#016421", "G": "#5B90F6", "G_peak": "#7209b7", "G_CHP": "#5BB0F6",
               "PV": "#FDC12A", "FC": "#c65082", "H2store": "#ad054d", "electrolyser": "#68032e", "BECCS": "#5b9aa0",
+              "Base":"#2b2d42", "Peak": "#5B90F6", "PtH": "#e85d04", "CHP": "#5BB0F6", "Thermals": "#5BB0F6",
               "offset": "white"}
 
 EPODreg_to_country = {  # dictionary for going between EPODreg to country
@@ -133,8 +134,9 @@ EPODs = list(EPODreg_to_country.keys())
 
 scenario_shortening = {"iberia": "IB", "brit": "BR", "nordic": "NE",
                        "CO2price": "CO2p", "fullFC": "FC", }
-
-year_names = {2020: "2020", 2025: "Short-term", 2030:"Mid-term", 2040:"Long-term"}
+regions_corrected = {"brit": "Brit", "nordic": "Nordic+", "iberia": "Iberia"}
+year_names = {2020: "ref. 2020", 2025: "near-term", 2030: "mid-term", 2040: "long-term"}
+year_names_twolines = {2020: "ref.\nyear", 2025: "near-\nterm", 2030: "mid-\nterm", 2040: "long-\nterm"}
 
 def country_to_reg(dictionary, country):
     """

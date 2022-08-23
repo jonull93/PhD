@@ -7,13 +7,15 @@ import matplotlib.gridspec as gridspec
 import os
 #os.chdir(r"C:\Users\Jonathan\Box\python")  # not needed unless running line-by-line in a console
 
-from my_utils import color_dict, order_cap, add_in_dict, tech_names, scen_names, print_cyan, print_red, print_green, year_names
+from my_utils import color_dict, order_cap, add_in_dict, tech_names, scen_names, print_cyan, print_red, print_green, year_names, regions_corrected
 
 pickleJar = ""
 h = 3
-suffix = "noGpeak"
-suffix = "_"+suffix if len(suffix)>0 else ""
-data = pickle.load(open(os.path.relpath(rf"PickleJar\data_results_{h}h{suffix}.pickle"), "rb"))
+file_suffix = ""
+if len(file_suffix) > 0: file_suffix = "_" + file_suffix
+scen_suffix = ""
+if len(scen_suffix) > 0: scen_suffix = "_" + scen_suffix
+data = pickle.load(open(os.path.relpath(rf"PickleJar\data_results_{h}h{file_suffix}.pickle"), "rb"))
 
 H2 = ['H2store']
 bat = ['bat']
@@ -112,7 +114,7 @@ def plot_cap_multipleyears(ax, data, scenario, years=None, new=True, patterns=No
     colors = [color_dict[tech] for tech in df.index.get_level_values(0)]
     hatches = ['//' if tech in VMS else '' for tech in df.index.get_level_values(0)]
     plot = df.T.plot(kind="bar", stacked=True, color=colors, legend=False, width=0.9, rot=0, ax=ax)
-    plot.set_xticklabels([year_names[year] for year in years*2], rotation=28, ha="right", rotation_mode='anchor')
+    plot.set_xticklabels([year_names[year].capitalize() for year in years*2], rotation=28, ha="right", rotation_mode='anchor')
     if comparison: plot.axhline(linewidth=1, color="black")
     bars = ax.patches
     #year_list = [df.columns[i][1] for i in range(len(df.columns))]*len(df.index)
@@ -127,7 +129,7 @@ def plot_cap_multipleyears(ax, data, scenario, years=None, new=True, patterns=No
 
 
 # -- All modelled cases
-separate_figures = ["lowFlex",]
+separate_figures = ["lowFlex","highFlex"]
 for flex in separate_figures:
     cases = []
     regions = ["nordic", "brit", "iberia"]
@@ -152,7 +154,7 @@ for flex in separate_figures:
     print_cyan('-',flex,'-')
     for i_f, reg in enumerate(regions):
         print_cyan(reg.capitalize())
-        plot, t, df = plot_cap_multipleyears(axes[i_f][0], data, f"{reg}_{flex}_noFC_YEAR{suffix}_{h}h", patterns=patterns,
+        plot, t, df = plot_cap_multipleyears(axes[i_f][0], data, f"{reg}_{flex}_noFC_YEAR{scen_suffix}_{h}h", patterns=patterns,
                                              years=years)
         if i_f == 0: plot.set_title(scen_names["noFC"], pad=15)
 
@@ -163,7 +165,7 @@ for flex in separate_figures:
         tech_collections.append(t)
         fig.add_subplot(plot)
         for i_m, mode in enumerate(modes[1:]):
-            plot, t, df_return = plot_cap_multipleyears(axes[i_f][1+i_m], data, f"{reg}_{flex}_{mode}_YEAR{suffix}_{h}h",
+            plot, t, df_return = plot_cap_multipleyears(axes[i_f][1+i_m], data, f"{reg}_{flex}_{mode}_YEAR{scen_suffix}_{h}h",
                                                 comparison_data=df, patterns=patterns, years=years)
             if y_subplots % 2 == 1:  # if odd number of y_plots
                 if i_f % 2 == 1 and i_m == 0: plot.set_ylabel("Difference from $\it{No FC}$", fontsize=12)
@@ -172,7 +174,7 @@ for flex in separate_figures:
             if i_f == 0: plot.set_title(scen_names[mode], pad=15)
             tech_collections.append(t)
             fig.add_subplot(plot)
-        axes[i_f][0].text(-0.35, 0.5, f"{reg.capitalize()}:", transform=axes[i_f][0].transAxes, ha='right', ma='center', fontsize=14)
+        axes[i_f][0].text(-0.39, 0.5, f"{regions_corrected[reg]}:", transform=axes[i_f][0].transAxes, ha='center', ma='center', fontsize=14)
         for i_m in range(len(modes)):
             ylim = axes[i_f][i_m].get_ylim()
             axes[i_f][i_m].set_ylim([i*1.15 for i in ylim])
@@ -181,7 +183,7 @@ for flex in separate_figures:
             text.set_bbox(dict(facecolor='white', alpha=1, edgecolor='black'))
             text = axes[i_f][i_m].text(0.75, 1, "Storage [GWh]", transform=axes[i_f][i_m].transAxes, va="center", ha="center")
             text.set_bbox(dict(facecolor='white', alpha=1, edgecolor='black'))
-    axes[-1][0].text(0.5, 0.015, f"Year", transform=fig.transFigure, ha='center', ma='center', fontsize=12)
+    axes[-1][0].text(0.5, 0.015, f"Time-point", transform=fig.transFigure, ha='center', ma='center', fontsize=12)
 
 # -- Finishing off fig
     techs = []
@@ -196,10 +198,11 @@ for flex in separate_figures:
     #axes[0][0].text(-0.35, 0.5, "Low\nFlex:", transform=axes[0][0].transAxes, ha='right', ma='center', fontsize=14)
     #axes[1][0].text(-0.35, 0.5, "High\nFlex:", transform=axes[1][0].transAxes, ha='right', ma='center', fontsize=14)
     #axes[2][0].text(-0.35, 0.5, "High\nFlex:", transform=axes[1][0].transAxes, ha='right', ma='center', fontsize=14)
-    fig.suptitle(f"Investments, {flex.capitalize()}",fontsize=16)
+    fig.suptitle(f"Investments, {flex[0].upper()}{flex[1:]}",fontsize=16)
     fig.legend(handles=handles, loc="center left", bbox_to_anchor=(0.91, 0.5), )
     fig.show()
-    fig.savefig(f"figures/cap_{flex}_{h}h.png",bbox_inches="tight", dpi=600)
+    fig.savefig(f"figures/cap_{flex}_{h}h.png",bbox_inches="tight", dpi=600, )
+    fig.savefig(f"figures/cap_{flex}_{h}h.eps",bbox_inches="tight", format='eps')
 # plot_cap(data,first_case)
 # plt.show()
 # cap.unstack().plot(kind="bar",stacked=True)

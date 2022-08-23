@@ -1,6 +1,6 @@
 import pickle
 from os import path
-from my_utils import label_axes, print_cyan
+from my_utils import label_axes, print_cyan, regions_corrected
 import matplotlib.pyplot as plt
 import matplotlib.text as mpltext
 import pandas as pd
@@ -26,15 +26,15 @@ def make_plot(df, title, secondary_y_values, xlabels=None, legend=False, left_yl
     # ---- plotting
     # takes DataFrame and plots stacked area and optionally a line on secondary y axis
     if xlabels is None:
-        xlabels = ["2020", "Short-term", "Mid-term", "Long-term"]
+        xlabels = ["Ref.\n2020", "Near-\nterm", "Mid-\nterm", "Long-\nterm"]
     if _ax is None:
         if bars is True:
-            ax = df.div(df.sum(axis=1), axis=0).plot.bar(stacked=True, rot=19)
+            ax = df.div(df.sum(axis=1), axis=0).plot.bar(stacked=True, rot=15)
         else:
             ax = df.div(df.sum(axis=1), axis=0).plot(kind="area", linewidth=0)
     else:
         if bars is True:
-            ax = df.div(df.sum(axis=1), axis=0).plot.bar(stacked=True, rot=19, ax=_ax)
+            ax = df.div(df.sum(axis=1), axis=0).plot.bar(stacked=True, rot=15, ax=_ax)
         else:
             ax = df.div(df.sum(axis=1), axis=0).plot(kind="area", linewidth=0, ax=_ax)
 
@@ -63,20 +63,21 @@ def make_plot(df, title, secondary_y_values, xlabels=None, legend=False, left_yl
     return ax, ax2, (handles, labels)
 
 
-def percent_stacked_area(regions, mode, timestep, indicator_string: str, set: dict, years=None, FC=True,
-                         secondary_y="FR_cost", pickle_suffix="", bars=True,
-                         figtitle="Interval share, and \u0394system-cost", filepath="test.png"):
+def percent_stacked_area(data, regions, flex, timestep, indicator_string: str, set: dict, years=None, FC=True,
+                         secondary_y="FR_cost", scen_suffix="", bars=True,
+                         figtitle="Interval share, and \u0394system-cost", filepath="test.png",
+                         baseFC = "noFC", compareFC = "fullFC"):
     print_cyan(f"Starting percent_stacked_area() for {indicator_string}")
-    if len(pickle_suffix) > 0 and pickle_suffix[0] != "_":
-        pickle_suffix = "_" + pickle_suffix
     if years is None:
         years = [2020, 2025, 2030, 2040]
-    data = pickle.load(open(path.relpath(rf"PickleJar\data_results_{timestep}h{pickle_suffix}.pickle"), "rb"))
-    fig, axes = plt.subplots(nrows=1, ncols=len(regions), figsize=(8, 4), )
-    label_axes(fig, loc=(-0.1, 1.03))
+    set.pop("BEV", None)
+    if "high" not in flex:
+        set.pop("H2", None)
+    fig, axes = plt.subplots(nrows=1, ncols=len(regions), figsize=(len(regions)+4.7, 3), )
+    #label_axes(fig, loc=(-0.1, 1.03))
     for j, region in enumerate(regions):
         print_cyan(f"- {region} -")
-        scenarios = [f"{region}_{mode}_{'fullFC' if FC else 'noFC'}_{y}{pickle_suffix}_{timestep}h" for y in years]
+        scenarios = [f"{region}_{flex}_{compareFC if FC else 'noFC'}{scen_suffix}_{y}{timestep}" for y in years]
         print("Cost_tot:", [round(data[scen]["cost_tot"], 2) for scen in scenarios])
         if indicator_string == "FR_cost":
             indicator_data = {pretty: [0. for i in range(len(scenarios))] for pretty in set}
@@ -101,9 +102,9 @@ def percent_stacked_area(regions, mode, timestep, indicator_string: str, set: di
             secondary_y_values = [data[scen]["FR_cost"].sum().sum().round() * 1000 *100
                                   / data[scen]["gen_per_eltech"].sum().round() for scen in scenarios]
         elif secondary_y == "FR_syscost":
-            secondary_y_values = [(data[scen]["cost_tot"]-data[scen.replace("fullFC", "noFC")]["cost_tot"]).round(4) for scen in scenarios]
+            secondary_y_values = [(data[scen]["cost_tot"]-data[scen.replace(compareFC, baseFC)]["cost_tot"]).round(4) for scen in scenarios]
         elif secondary_y == "FR_syscost_per_gen":
-            secondary_y_values = [((data[scen]["cost_tot"]-data[scen.replace("fullFC", "noFC")]["cost_tot"])*1e6*100/data[scen]["gen_per_eltech"].sum()).round(4) for scen in scenarios]
+            secondary_y_values = [((data[scen]["cost_tot"]-data[scen.replace(compareFC, baseFC)]["cost_tot"])*1e6*100/data[scen]["gen_per_eltech"].sum()).round(4) for scen in scenarios]
 
         df = pd.DataFrame(data=
                           {pretty_name: indicator_data[pretty_name] for pretty_name in indicator_data}
@@ -112,9 +113,9 @@ def percent_stacked_area(regions, mode, timestep, indicator_string: str, set: di
         #print(df)
         print(f"{secondary_y}: {secondary_y_values}")
         if indicator_string == "FR_cost":
-            title = f"{region.capitalize()}"
+            title = f"{regions_corrected[region]}"
         else:
-            title = f"{region.capitalize()}"
+            title = f"{regions_corrected[region]}"
         if j == 0: left_ylabel="Reserve share"
         else: left_ylabel=False
         if j == len(regions)-1: right_ylabel="System cost increase [€ cent/MWh]"
@@ -122,34 +123,47 @@ def percent_stacked_area(regions, mode, timestep, indicator_string: str, set: di
         _, _, (handles, labels) = make_plot(df, title, secondary_y_values, left_ylabel=left_ylabel,
                                             right_ylabel=right_ylabel, _ax=axes[j])
     plt.sca(axes[1])
-    fig.legend(handles,labels,bbox_to_anchor=(0.5, 0.93), ncol=4, loc="lower center")
-    fig.suptitle(f"{figtitle}: {mode}", y=1.13)
+    fig.legend(handles,labels,bbox_to_anchor=(0.5, 0.95), ncol=4, loc="lower center")
+    fig.suptitle(f"{figtitle}: {flex}", y=1.2)
     plt.subplots_adjust(wspace=0.49)
     plt.savefig(filepath, dpi=600, bbox_inches="tight")
+    plt.savefig(filepath.replace(".png", ".eps"), bbox_inches="tight", format="eps")
 
-
-mode = "lowFlex"
-pickle_suff = "noGpeak"
-secondary_y = "FR_syscost_per_gen"  # _per_gen
-if len(pickle_suff) > 0: pickle_suff = "_" + pickle_suff
+flex = "highFlex"
 timestep = 3
-reserve_technologies = {"Thermals": "thermal", "VRE": "VRE", "ESS": "ESS", "BEV": "BEV", "PtH": "PtH", "Hydro": "hydro"}
+
+fig_file_suffix = "highFlex"
+if len(fig_file_suffix) > 0: fig_file_suffix = "_" + fig_file_suffix
+pickle_suffix = ""
+if len(pickle_suffix) > 0: pickle_suffix = "_" + pickle_suffix
+data = pickle.load(open(path.relpath(rf"PickleJar\data_results_{timestep}h{pickle_suffix}.pickle"), "rb"))
+
+scen_suffix = ""
+if len(scen_suffix) > 0: scen_suffix = "_" + scen_suffix
+secondary_y = "FR_syscost_per_gen"  # _per_gen
+reserve_technologies = {"Thermals": "thermal", "VRE": "VRE", "Storage": "ESS", "Power-to-heat": "PtH", "Hydro": "hydro", "BEV": "BEV"}
 FR_intervals = {"FFR": 1, "5-30s": 2, "30s-5min": 3, "5-15min": 4, "15-30min": 5, "30-60min": 6}
+
+if timestep > 1:
+    timestep = f"_{timestep}h"
+else:
+    timestep = ""
 
 # ax = percent_stacked_area("nordic", mode, timestep, "FR_value_share_", reserve_technologies, secondary_y="FR_cost_per_gen")
 # plt.show()
 regions = ["nordic", "brit", "iberia"]
+
 print("________________" * 3)
 print(f" .. Making figure for {regions} .. ")
-percent_stacked_area(regions, mode, timestep, "FR_value_share_", reserve_technologies,secondary_y=secondary_y,
-                     pickle_suffix=pickle_suff, figtitle="Cost-weighted technology share, and \u0394system-cost",
-                     filepath=rf"figures\reserve_valueshare_{mode}{pickle_suff}_{timestep}h.png")
+percent_stacked_area(data, regions, flex, timestep, "FR_value_share_", reserve_technologies, secondary_y=secondary_y,
+                     scen_suffix=scen_suffix, figtitle="Cost-weighted technology share and \u0394system-cost",
+                     filepath=rf"figures\reserve_valueshare_{flex}{scen_suffix}{pickle_suffix}{timestep}{fig_file_suffix}.png")
 
-percent_stacked_area(regions, mode, timestep, "FR_share_", reserve_technologies, secondary_y=secondary_y,
-                     pickle_suffix=pickle_suff, figtitle="Technologies' reserve share, and \u0394system-cost",
-                     filepath=rf"figures\reserve_share_{mode}{pickle_suff}_{timestep}h.png")
+percent_stacked_area(data, regions, flex, timestep, "FR_share_", reserve_technologies, secondary_y=secondary_y,
+                     scen_suffix=scen_suffix, figtitle="Technology reserve share and \u0394system-cost",
+                     filepath=rf"figures\reserve_share_{flex}{scen_suffix}{pickle_suffix}{timestep}{fig_file_suffix}.png")
 #plt.savefig(rf"figures\reserve_share_{mode}{pickle_suff}_{timestep}h.png", dpi=600, bbox_inches="tight")
-percent_stacked_area(regions, mode, timestep, "FR_cost", FR_intervals, secondary_y=secondary_y,
-                     pickle_suffix=pickle_suff, figtitle="Interval reserve share, and \u0394system-cost",
-                     filepath=rf"figures\interval_costs_{mode}{pickle_suff}_{timestep}h.png")
+percent_stacked_area(data, regions, flex, timestep, "FR_cost", FR_intervals, secondary_y=secondary_y,
+                     scen_suffix=scen_suffix, figtitle="Interval reserve share and \u0394system-cost",
+                     filepath=rf"figures\interval_costs_{flex}{scen_suffix}{pickle_suffix}{timestep}{fig_file_suffix}.png")
 #plt.savefig(rf"figures\interval_costs_{mode}{pickle_suff}_{timestep}h.png", dpi=600, bbox_inches="tight")
