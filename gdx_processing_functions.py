@@ -56,7 +56,7 @@ def print_cap(writer, num, sheet, row, col, ind):
     num_df.to_excel(writer, sheet_name=sheet, startcol=col, startrow=row)
 
 
-def run_case(scen_name, data, gdxpath, indicators, print_FR_summary=False):
+def run_case(scen_name, gdxpath, indicators, print_FR_summary=False):
     def get_from_cap(tech_name, round=False):
         try:
             if round:
@@ -120,7 +120,7 @@ def run_case(scen_name, data, gdxpath, indicators, print_FR_summary=False):
                 print(" ! ! Found capped investment at",index)
         gen = gdx(f, "o_generation")
         gen_per_eltech = gdx(f, "o_generation_el")
-        el_price = gdx(f, "o_el_cost")
+        el_price = gdx(f, "o_el_price")
         load_profile = gdx(f, "demandprofile_average")
         net_load = gdx(f, "o_net_load")
         gams_timestep = gdx(f, "timestep")  # "h0001" or "d001a"
@@ -159,7 +159,7 @@ def run_case(scen_name, data, gdxpath, indicators, print_FR_summary=False):
         cost_flexlim = gdx(f, "o_cost_flexlim")
         allthermal = gdx(f, "allthermal")
         thermal_share_total = gen_per_eltech[gen_per_eltech.index.isin(allthermal)].sum()/gen_per_eltech.sum()
-        print(f"thermal_share_total = {round(thermal_share_total,2)}")
+        print(f"thermal_share_total = {round(thermal_share_total,2)}   ({scen_name})")
         if np.isnan(thermal_share_total):
             print(scen_name,gen_per_eltech)
         allstorage = gdx(f, "allwind")
@@ -168,11 +168,17 @@ def run_case(scen_name, data, gdxpath, indicators, print_FR_summary=False):
         FLH_regional = gdx(f, "o_full_load_hours_regional").rename("FLH_regional")
         PV_FLH = gdx(f, "o_full_load_PV")
         wind_FLH = gdx(f, "o_full_load_wind")
-        el_price = gdx(f, "o_el_cost")
+        heat_price = gdx(f, "o_heat_price")
         discharge = gdx(f, "v_discharge")
         charge = gdx(f, "v_charge")
         demand = gdx(f, "o_load")
         inv_cost = gdx(f, "inv_cost")
+        tech_revenue = gdx(f, "o_tech_revenue")
+        tech_revenue_el = gdx(f, "o_tech_revenue_el")
+        tech_revenue_inertia = gdx(f, "o_tech_revenue_inertia")
+        tech_revenue_FR = gdx(f, "o_tech_revenue_FR")
+        tech_revenue_FR_lowercap = gdx(f, "o_tech_revenue_FR_lowercap")
+        tech_variable_expenses = gdx(f, "o_tech_variable_expenses")
         try:
             ESS_available = gdx(f, "o_PS_ESS_available")
             inertia_available = gdx(f, "o_PS_inertia_available")
@@ -190,6 +196,14 @@ def run_case(scen_name, data, gdxpath, indicators, print_FR_summary=False):
             except AttributeError: FR_deficiency = gdx(f, "v_PS_OR_deficiency").level
             try: FR_cost = gdx(f, "EQU_PS_FR_loadbalance").marginal.clip(upper=0)*-1e6/TT
             except AttributeError: FR_cost = gdx(f, "EQU_PS_FR_supply").marginal.clip(upper=0) * -1e6 / TT
+            try:
+                FR_cost_per_tech = (FR_available*FR_cost).sum(axis=1).sum(level="tech")
+                FR_cost_series_per_tech = (FR_available * FR_cost).sum(axis=0, level="tech")
+                FR_cost_series_per_tech_lowercap = (FR_available * FR_cost.mask(FR_cost < 10, other=0)).sum(axis=0, level="tech")
+            except ValueError:
+                FR_cost_per_tech = FR_available.sum(axis=1).sum(level="tech")*0
+                FR_cost_series_per_tech = FR_available.sum(axis=0, level="tech")*0
+                FR_cost_series_per_tech_lowercap = FR_available.sum(axis=0, level="tech")*0
             FR_period_cost = gdx(f, "o_PS_FR_cost_perPeriod")
             FR_FFR_cost_share = gdx(f, "o_PS_FR_cost_FFRshare")
             FR_available_thermal = gdx(f, "o_PS_FR_available_thermal", dud_df_return=_empty_FR_df)
@@ -242,18 +256,18 @@ def run_case(scen_name, data, gdxpath, indicators, print_FR_summary=False):
                 elif type(FR_net_import) == type(pd.Series()):
                     FR_net_import = FR_net_import.unstack("", fill_value=0).reindex(index=_empty_FR_df.index, columns=_empty_FR_df.columns, fill_value=0)
             FR_VRE_timetable = gdx(f, "PS_timetable_VREramping")
-            FR_demand = {"wind": FR_demand_VRE.filter(like="WO", axis=0).groupby(level=[1]).sum(),
-                         "PV": FR_demand_VRE.filter(like="PV", axis=0).groupby(level=[1]).sum(),
+            FR_demand = {"wind": FR_demand_VRE.filter(like="WO", axis=0).groupby(level=[1]).sum().reindex(columns=_empty_FR_df.columns).fillna(0),
+                         "PV": FR_demand_VRE.filter(like="PV", axis=0).groupby(level=[1]).sum().reindex(columns=_empty_FR_df.columns).fillna(0),
                          "other": FR_demand_other,
-                         "total": FR_demand_other*0  # *0 to discard all values but get index and header
+                         "total": gdx(f, "o_PS_FR_demand_total" ,dud_df_return=FR_demand_other*0)  # *0 to discard all values but get index and header
                          }
-            for index, val in FR_available_total.iterrows():
-                if int(index[1]) > 2:
-                    _to_add = FR_demand_other.loc[index] + FR_demand_VRE.groupby(level=[1]).sum().loc[index[0]]
-                    FR_demand["total"].loc[index] = _to_add
-                else:
-                    _to_add = FR_demand_other.loc[index]
-                    FR_demand["total"].loc[index] = _to_add
+            #for index, val in FR_available_total.iterrows():
+            #    if int(index[1]) > 2:
+            #        _to_add = FR_demand_other.loc[index] + FR_demand_VRE.groupby(level=[1]).sum().loc[index[0]]
+            #        FR_demand["total"].loc[index] = _to_add
+            #    else:
+            #        _to_add = FR_demand_other.loc[index]
+            #        FR_demand["total"].loc[index] = _to_add
             if "noFC" not in scen_name:
                 try: FR_supply_excess = FR_available_total - FR_demand["total"] + FR_net_import
                 except:
@@ -378,7 +392,8 @@ def excel(scen:str, data, row, writer, indicators):
         cappy.filter(like=reg,axis=0).to_excel(writer, sheet_name=shortened_scen, startcol=5+6*i, startrow=1)
     scen_row += cap_len+1
     print_df(writer, data["curtailment_profile_total"].round(decimals=3), "Curtailment", shortened_scen)
-    print_df(writer, data["el_price"].round(decimals=3), "Elec. price", shortened_scen, row_inc=2)
+    try: print_df(writer, data["el_price"].round(decimals=3), "Elec. price", shortened_scen, row_inc=2)
+    except AttributeError: print(f"could not print elec price for {shortened_scen}")
 
     if data["PS"]: print_df(writer, data["FR_period_cost"].round(decimals=3), "FR period cost", shortened_scen, row_inc=2)
     print_gen(writer, shortened_scen, gen, data["gamsTimestep"])

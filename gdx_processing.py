@@ -15,10 +15,11 @@ import gdx_processing_functions as gpf
 from my_utils import print_red, print_cyan, print_green
 from termcolor import colored
 from glob import glob
+
 start_time_script = tm.time()
 print("Excel-writing script started at", datetime.now().strftime('%H:%M:%S'))
 
-excel = True  # will only make a .pickle if excel == False
+excel = False  # will only make a .pickle if excel == False
 run_output = "w"  # 'w' to (over)write or 'rw' to only add missing scenarios
 overwrite = []  # names of scenarios to overwrite regardless of existence in pickled data
 #overwrite = [reg+"_inertia_0.1x" for reg in ["ES3", "HU", "IE", "SE2"]]+\
@@ -27,7 +28,7 @@ overwrite = []  # names of scenarios to overwrite regardless of existence in pic
 h = 3  # time resolution
 suffix = ""  # Optional suffix for the run, e.g. "test" or "highBioCost"
 suffix = '_'+suffix if len(suffix) > 0 else ''
-name = f"results_{h}h{suffix}_noDoubleUse"  # this will be the name of the output excel file
+name = f"results_{h}h{suffix}"  # this will be the name of the output excel and pickle files
 
 # indicators are shown in a summary first page to give an overview of all scenarios in one place
 # the name of an indicator should preferably match the name of a variable from the gdx, requires extra code if not
@@ -59,7 +60,7 @@ indicators = ["cost_tot",
 
 cases = []
 systemFlex = ["lowFlex", "highFlex"]
-modes = ["noFC", "fullFC", "fullFC_noDoubleUse"]  # , "fullFC", "inertia", "OR"]# "noFC",
+modes = ["noFC", "fullFC"]   # , "fullFC", "inertia", "OR"]# "noFC",
 replace_with_alternative_solver_if_missing = True
 alternative_solutions = ["NCO"]  # to replace with if replace_with_alternative_solver_if_missing
 for reg in ["brit", "iberia","nordic"]:
@@ -77,7 +78,7 @@ if "PLIA" in comp_name:
 elif "QGTORT8" in comp_name:
     path = "C:\\Users\\Jonathan\\git\\python\\output\\"
     gdxpath = "C:\\Users\\Jonathan\\git\\multinode\\results\\"  # where to find gdx files
-elif "DAJ99D7" in comp_name:
+elif "DAJ99D7" in comp_name: #.22
     path = "C:\\Users\\Jonathan\\git\\python\\output\\"
     gdxpath = "C:\\Users\\Jonathan\\git\\multinode\\results\\"  # where to find gdx files
 else:
@@ -99,7 +100,15 @@ for j in cases:
     if j not in old_data or j in overwrite:
         todo_gdx.append(j)
 
-print("GDX files:", todo_gdx, "(" + str(len(todo_gdx)) + " items)")
+print("To do:", todo_gdx, "(" + str(len(todo_gdx)) + " items)")
+files = []
+for file in glob(gdxpath + "*.gdx"):
+    files.append(file.split("\\")[-1].replace(".gdx", ""))
+alt_files = []
+for file in files:
+    for alt in alternative_solutions:
+        if alt in file: alt_files.append(file)
+print("Alternative files found:",alt_files)
 
 errors = 0
 isgdxdone = False
@@ -134,11 +143,8 @@ except Exception as e:
         print_red("OBS: EXCEL FILE MAY BE OPEN - PLEASE CLOSE IT BEFORE SCRIPT FINISHES ", e)
 
 # Unfortunately, global variables can only be used within the same file, so not all functions can be imported
-def crawl_gdx(q_gdx, old_data, gdxpath, thread_nr, overwrite, todo_gdx_len):
+def crawl_gdx(q_gdx, old_data, gdxpath, thread_nr, overwrite, todo_gdx_len, files = files):
     thread_nr[threading.get_ident()] = len(thread_nr) + 1
-    files = []
-    for file in glob(gdxpath + "*.gdx"):
-        files.append(file.split("\\")[-1].replace(".gdx",""))
     while not q_gdx.empty():
         scen_i, scen_name = q_gdx.get()  # fetch new work from the Queue
         if run_output == "rw" and scen_name not in overwrite and scen_name in old_data:
@@ -149,7 +155,7 @@ def crawl_gdx(q_gdx, old_data, gdxpath, thread_nr, overwrite, todo_gdx_len):
             if scen_name not in files:
                 raise FileNotFoundError
             start_time_thread = tm.time()
-            success, new_data[scen_name] = gpf.run_case(scen_name, old_data, gdxpath, indicators)
+            success, new_data[scen_name] = gpf.run_case(scen_name, gdxpath, indicators)
             print_green("Finished " + scen_name.ljust(20) + " after " + str(round(tm.time() - start_time_thread,
                                                                           1)) + f" seconds")
             if success and excel:
@@ -159,11 +165,13 @@ def crawl_gdx(q_gdx, old_data, gdxpath, thread_nr, overwrite, todo_gdx_len):
             print_cyan("! Could not find file for", scen_name)
             if replace_with_alternative_solver_if_missing:
                 for replacer in alternative_solutions:
-                    alternative = scen.split("_")
+                    alternative = scen_name.split("_")
                     alternative.insert(-1, replacer)
+                    alternative = "_".join(alternative)
+                    print_cyan("Looking for", alternative)
                     if alternative in files:
-                        print_cyan("Found and added to the queue an alternative file:","_".join(alternative))
-                        q_gdx.put((scen_i, "_".join(alternative)))
+                        print_cyan("Found and added to the queue an alternative file:",alternative)
+                        q_gdx.put((scen_i, alternative))
         except:
             identifier = thread_nr[threading.get_ident()]
             global errors
@@ -219,7 +227,7 @@ for i in range(num_threads):
                               daemon=False)
     # setting threads as "daemon" allows main program to exit eventually even if these dont finish correctly
     worker.start()
-    tm.sleep(0.1+3*excel)  # staggering gdx threads shouldnt matter as long as the excel process has something to work on
+    tm.sleep(0.1+1*excel)  # staggering gdx threads shouldnt matter as long as the excel process has something to work on
 # now we wait until the queue has been processed
 q_gdx.join()  # first we make sure there are no gdx files waiting to get processed
 isgdxdone = True
@@ -237,6 +245,7 @@ for scen in todo_gdx:
         print("! Could not add", scen, "to the pickle jar because",str(e))
 
 pickle.dump(old_data, open("PickleJar\\data_" + name + ".pickle", "wb"))
+print("Successfully pickled")
 # for scen in file_list: run_case([0,scen], data, path, io_lock, True)
 
 q_excel.join()  # and then we make sure the excel queue is also empty
@@ -248,7 +257,7 @@ if excel:
         f.close()
     except PermissionError:
         opened_file = True
-        print("OBS: EXCEL FILE IS OPEN - PLEASE CLOSE IT TO RESUME SCRIPT")
+        for i in range(3): print_red("OBS: EXCEL FILE IS OPEN - PLEASE CLOSE IT TO RESUME SCRIPT")
         while opened_file:
             try:
                 f = open(excel_name, "r+")
