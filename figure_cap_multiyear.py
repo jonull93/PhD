@@ -21,6 +21,9 @@ H2 = ['H2store']
 bat = ['bat']
 VMS = [tech_names[i] for i in H2 + bat] + [i for i in H2 + bat]
 exclude = ["electrolyser"]
+comparison = True
+right_ylabel = "Difference from $\it{No FC}$"
+if not comparison: right_ylabel = "New capacity"
 
 position = 0
 
@@ -70,7 +73,6 @@ def plot_cap_multipleyears(ax, data, scenario, years=None, new=True, patterns=No
             cap[y] = foo[foo != 0].swaplevel(i=0, j=1).groupby(level=1).sum()
         else:
             cap[y] = data[scen]["tot_cap"].swaplevel(i=0, j=1).groupby(level=1).sum()
-
     cap_summed = {}
     for tech in order_cap:
         for year in years:
@@ -129,12 +131,12 @@ def plot_cap_multipleyears(ax, data, scenario, years=None, new=True, patterns=No
 
 
 # -- All modelled cases
-separate_figures = ["lowFlex","highFlex"]
-for flex in separate_figures:
+separate_figures = ["fullFC"]
+for sep_fig in separate_figures:
     cases = []
     regions = ["nordic", "brit", "iberia"]
-    modes = ["noFC", "fullFC"]  # , "FCnoPTH", "FCnoH2", "FCnoWind", "FCnoBat", "FCnoSynth"]
-    nr_comparisons = len(modes)-1
+    left_right = ["lowFlex", "highFlex"]  # , "FCnoPTH", "FCnoH2", "FCnoWind", "FCnoBat", "FCnoSynth"]
+    nr_comparisons = len(left_right)-1
     y_subplots = len(regions)
 
     # -- Building figure axes
@@ -151,12 +153,12 @@ for flex in separate_figures:
     tech_collections = []
     patterns = ['X', '/', '.', '']
     years = [2020, 2025, 2030, 2040]
-    print_cyan('-',flex,'-')
+    print_cyan('-', sep_fig, '-')
     for i_f, reg in enumerate(regions):
         print_cyan(reg.capitalize())
-        plot, t, df = plot_cap_multipleyears(axes[i_f][0], data, f"{reg}_{flex}_noFC_YEAR{scen_suffix}_{h}h", patterns=patterns,
+        plot, t, df = plot_cap_multipleyears(axes[i_f][0], data, f"{reg}_{left_right[0]}_{sep_fig}_YEAR{scen_suffix}_{h}h", patterns=patterns,
                                              years=years)
-        if i_f == 0: plot.set_title(scen_names["noFC"], pad=15)
+        if i_f == 0: plot.set_title(scen_names[left_right[0]], pad=15)
 
         if y_subplots % 2 == 1:  # if odd number of y_plots
             if i_f % 2 == 1: plot.set_ylabel("New capacity", fontsize=12)
@@ -164,25 +166,29 @@ for flex in separate_figures:
             plot.set_ylabel("New capacity", fontsize=12)
         tech_collections.append(t)
         fig.add_subplot(plot)
-        for i_m, mode in enumerate(modes[1:]):
-            plot, t, df_return = plot_cap_multipleyears(axes[i_f][1+i_m], data, f"{reg}_{flex}_{mode}_YEAR{scen_suffix}_{h}h",
-                                                comparison_data=df, patterns=patterns, years=years)
+        for i_m, mode in enumerate(left_right[1:]):
+            plot, t, df_return = plot_cap_multipleyears(axes[i_f][1+i_m], data, f"{reg}_{mode}_{sep_fig}_YEAR{scen_suffix}_{h}h",
+                                                        comparison_data=df*comparison, patterns=patterns, years=years)
             if y_subplots % 2 == 1:  # if odd number of y_plots
-                if i_f % 2 == 1 and i_m == 0: plot.set_ylabel("Difference from $\it{No FC}$", fontsize=12)
+                if i_f % 2 == 1 and i_m == 0: plot.set_ylabel(right_ylabel, fontsize=12)
             elif i_m == 0:
-                plot.set_ylabel("Difference from $\it{No FC}$", fontsize=12)
+                plot.set_ylabel(right_ylabel, fontsize=12)
             if i_f == 0: plot.set_title(scen_names[mode], pad=15)
             tech_collections.append(t)
             fig.add_subplot(plot)
         axes[i_f][0].text(-0.39, 0.5, f"{regions_corrected[reg]}:", transform=axes[i_f][0].transAxes, ha='center', ma='center', fontsize=14)
-        for i_m in range(len(modes)):
-            ylim = axes[i_f][i_m].get_ylim()
-            axes[i_f][i_m].set_ylim([i*1.15 for i in ylim])
+        ylim = []
+        for i_m in range(len(left_right)):
+            ylim += axes[i_f][i_m].get_ylim()
             axes[i_f][i_m].axvline(x=3.5, color='k', linewidth=1)
             text = axes[i_f][i_m].text(0.25, 1, "Power [GW]", transform=axes[i_f][i_m].transAxes, va="center", ha="center")
             text.set_bbox(dict(facecolor='white', alpha=1, edgecolor='black'))
             text = axes[i_f][i_m].text(0.75, 1, "Storage [GWh]", transform=axes[i_f][i_m].transAxes, va="center", ha="center")
             text.set_bbox(dict(facecolor='white', alpha=1, edgecolor='black'))
+        ysort = list(ylim)
+        ysort.sort()
+        axes[i_f][0].set_ylim([0, max(ylim) * 1.15])
+        axes[i_f][1].set_ylim([min(ylim)*1.1, ysort[-1-1*comparison] * 1.15])
     axes[-1][0].text(0.5, 0.015, f"Time-point", transform=fig.transFigure, ha='center', ma='center', fontsize=12)
 
 # -- Finishing off fig
@@ -198,11 +204,11 @@ for flex in separate_figures:
     #axes[0][0].text(-0.35, 0.5, "Low\nFlex:", transform=axes[0][0].transAxes, ha='right', ma='center', fontsize=14)
     #axes[1][0].text(-0.35, 0.5, "High\nFlex:", transform=axes[1][0].transAxes, ha='right', ma='center', fontsize=14)
     #axes[2][0].text(-0.35, 0.5, "High\nFlex:", transform=axes[1][0].transAxes, ha='right', ma='center', fontsize=14)
-    fig.suptitle(f"Investments, {flex[0].upper()}{flex[1:]}",fontsize=16)
+    fig.suptitle(f"Investments, difference in system flexibility", fontsize=16)
     fig.legend(handles=handles, loc="center left", bbox_to_anchor=(0.91, 0.5), )
     fig.show()
-    fig.savefig(f"figures/cap_{flex}_{h}h.png",bbox_inches="tight", dpi=600, )
-    fig.savefig(f"figures/cap_{flex}_{h}h.eps",bbox_inches="tight", format='eps')
+    fig.savefig(f"figures/cap_{sep_fig}_{h}h.png", bbox_inches="tight", dpi=600, )
+    fig.savefig(f"figures/cap_{sep_fig}_{h}h.eps", bbox_inches="tight", format='eps')
 # plot_cap(data,first_case)
 # plt.show()
 # cap.unstack().plot(kind="bar",stacked=True)

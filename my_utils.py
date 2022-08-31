@@ -101,7 +101,7 @@ scen_names = {"_pre": "Base case", "_leanOR": "Lean OR", "_OR": "OR", "_OR_fixed
               "_OR+inertia_fixed": "OR + Inertia", "_inertia": "Inertia", "_inertia_2x": "2x Inertia",
               "_inertia_noSyn": "Inertia (noSyn)", "_OR_inertia_3xCost": "OR + Inertia (3x)",
               "_inertia_3xCost": "Inertia (3x)", "_inertia_noSyn_3xCost": "Inertia (noSyn) (3x)", "noFC": "No FC",
-              "fullFC": "Full FC", "OR": "FR", "inertia": "Inertia"}
+              "fullFC": "Full FC", "OR": "FR", "inertia": "Inertia", "lowFlex":"LowFlex", "highFlex":"HighFlex"}
 color_dict = {'wind_onshore': '#B9B9B9', 'wind_offshore': '#DADADA', 'Wind': '#B9B9B9', 'RO': 'xkcd:ocean blue',
               'U': 'xkcd:grape', 'Nuclear': 'xkcd:grape', 'GWGCCS': 'xkcd:dark peach', 'WA_CHP': 'xkcd:deep lavender',
               'CHP_bio': 'xkcd:tree green', 'WG': '#a4be20', 'WG_peak': '#d00000', "WG_CHP": "#83981a",
