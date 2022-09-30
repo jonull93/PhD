@@ -122,7 +122,7 @@ for i_t, tech in enumerate(technologies_to_show):
     print_cyan(tech)
     print(df_rev[tech].T)
     df_rev[tech].T.plot(ax=axs[i_t], legend=None, color=['teal', 'teal', 'purple', 'purple', 'orange', 'orange'],
-                        marker='o', zorder=-1, style=['-','--']*len(regions)) #, color=color_dict["Battery"]
+                        marker='o', zorder=-1, style=['-','--']*len(regions), logy=False) #, color=color_dict["Battery"]
     markers = ['$L$', '$H$']*len(regions)
     for i_l, line in enumerate(axs[i_t].get_lines()):
         line.set_marker(markers[i_l])

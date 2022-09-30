@@ -22,7 +22,7 @@ bat = ['bat']
 VMS = [tech_names[i] for i in H2 + bat] + [i for i in H2 + bat]
 exclude = ["electrolyser"]
 comparison = True
-right_ylabel = "Difference from $\it{No FC}$"
+right_ylabel = "Difference from $\it{LowFlex}$"
 if not comparison: right_ylabel = "New capacity"
 
 position = 0
@@ -188,7 +188,8 @@ for sep_fig in separate_figures:
         ysort = list(ylim)
         ysort.sort()
         axes[i_f][0].set_ylim([0, max(ylim) * 1.15])
-        axes[i_f][1].set_ylim([min(ylim)*1.1, ysort[-1-1*comparison] * 1.15])
+        #axes[i_f][1].set_ylim([-20, 20])
+        axes[i_f][1].set_ylim([min(ylim) * 1.1, ysort[-1 - 1 * comparison] * 1.15])
     axes[-1][0].text(0.5, 0.015, f"Time-point", transform=fig.transFigure, ha='center', ma='center', fontsize=12)
 
 # -- Finishing off fig

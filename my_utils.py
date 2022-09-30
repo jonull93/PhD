@@ -106,7 +106,7 @@ color_dict = {'wind_onshore': '#B9B9B9', 'wind_offshore': '#DADADA', 'Wind': '#B
               'U': 'xkcd:grape', 'Nuclear': 'xkcd:grape', 'GWGCCS': 'xkcd:dark peach', 'WA_CHP': 'xkcd:deep lavender',
               'CHP_bio': 'xkcd:tree green', 'WG': '#a4be20', 'WG_peak': '#d00000', "WG_CHP": "#83981a",
               'PV_cSiOPT': 'xkcd:mustard', 'CHP_WG_L': 'xkcd:mid green', 'RR': 'xkcd:ocean blue',
-              'HP': "#e85d04", 'EB': "#f48c06", "Fossil thermals": "#2b2d42", "Bio thermals": "#2a9d8f",
+              'HP': "#59A5B1", 'EB': "#ACD2D8", "Fossil thermals": "#2b2d42", "Bio thermals": "#2a9d8f",
               'CHP_WG': (0, 176 / 255, 80 / 255), "Solar PV": 'xkcd:mustard', 'Hydro': 'xkcd:ocean blue',
               'HOB_WG': (128 / 255, 128 / 255, 0), 'solarheat': (204 / 255, 51 / 255, 0), 'HOB_bio': 'green',
               'Load': 'Black', "bat_discharge": "xkcd:amber", 'bat': "#714b92", 'Battery': "#714b92",
@@ -115,7 +115,7 @@ color_dict = {'wind_onshore': '#B9B9B9', 'wind_offshore': '#DADADA', 'Wind': '#B
               'WOFF': '#DADADA', 'WON': '#B9B9B9', "H": "#172226", "H_CHP": "#172618", "b": "#172226", "B_CHP": "#23343A",
               "W": "#014421", "W_CHP": "#016421", "G": "#5B90F6", "G_peak": "#7209b7", "G_CHP": "#5BB0F6",
               "PV": "#FDC12A", "FC": "#c65082", "H2store": "#ad054d", "electrolyser": "#68032e", "BECCS": "#5b9aa0",
-              "Base":"#2b2d42", "Peak": "#5B90F6", "PtH": "#e85d04", "CHP": "#5BB0F6", "Thermals": "#5BB0F6",
+              "Base":"#2b2d42", "Peak": "#5B90F6", "PtH": "#59A5B1", "CHP": "#5BB0F6", "Thermals": "#5BB0F6",
               "offset": "white"}
 
 EPODreg_to_country = {  # dictionary for going between EPODreg to country
