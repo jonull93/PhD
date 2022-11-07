@@ -74,6 +74,8 @@ def which_set(iterable):
                              [f"d{d:03}{h}" for d in range(1,366) for h in string.ascii_lowercase[:24]],  # d001a etc
                              [str(i) for i in range(1, 9)],
                              ['2020', '2025', '2030', '2035', '2040', '2045', '2050'],
+                             [str(y) for y in range(2010,2020)],
+                             ['sy1_'+str(year) for year in range(2010,2020)],
                              ['OHAC', 'SCDC'],
                              ['life', 'heat_type', 'd-cost', 'OM_var', 'OM_fix', 'LF', 'd', 'fuel']
                              ]):
@@ -81,7 +83,7 @@ def which_set(iterable):
         for item in set:
             # print("checking item", item)
             if item in iterable:
-                return ["I_reg", "tech", "timestep", "FR_period", "year", "tech_con", "tech_prop"][i]
+                return ["I_reg", "tech", "timestep", "FR_period", "year", "profile_year", "tech_con", "tech_prop"][i]
     if len(iterable) > 0: print("found no match for", iterable)
     return ''
 

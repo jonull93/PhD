@@ -158,7 +158,7 @@ def run_case(scen_name, gdxpath, indicators, print_FR_summary=False):
         cost_partload = gdx(f, "o_cost_partload")
         cost_flexlim = gdx(f, "o_cost_flexlim")
         allthermal = gdx(f, "allthermal")
-        thermal_share_total = gen_per_eltech[gen_per_eltech.index.isin(allthermal)].sum()/gen_per_eltech.sum()
+        thermal_share_total = gen_per_eltech[gen_per_eltech.index.isin(allthermal, level="tech")].sum()/gen_per_eltech.sum()
         print(f"thermal_share_total = {round(thermal_share_total,2)}   ({scen_name})")
         if np.isnan(thermal_share_total):
             print(scen_name,gen_per_eltech)
@@ -329,15 +329,20 @@ def run_case(scen_name, gdxpath, indicators, print_FR_summary=False):
 
     return True, new_data
 
-
-def excel(scen:str, data, row, writer, indicators):
-    global scen_row
-    stripped_scen = "_".join(scen.split("_")[:5])  # stripping unnecessary name components, like "6h"
-    shortened_scen = stripped_scen.replace("iberia","ib")
+def short_scen(scen):
+    shortened_scen = scen.replace("iberia", "ib")
     shortened_scen = shortened_scen.replace("nordic", "no")
     shortened_scen = shortened_scen.replace("brit", "br")
     shortened_scen = shortened_scen.replace("Flex", "F")
     shortened_scen = shortened_scen.replace("fullFC", "FC")
+    shortened_scen = shortened_scen.replace("noTransport", "noTrsp")
+    shortened_scen = shortened_scen.replace("Flex", "Flx")
+    return shortened_scen
+
+def excel(scen:str, data, row, writer, indicators):
+    global scen_row
+    stripped_scen = "_".join(scen.split("_")[:5])  # stripping unnecessary name components, like "6h"
+    shortened_scen = short_scen(stripped_scen)
     if len(shortened_scen)>30: print_red("scen name is too long!", shortened_scen)
     scen_row = 0
     cap = data["tot_cap"].rename("Cap").round(decimals=3)
@@ -386,6 +391,7 @@ def excel(scen:str, data, row, writer, indicators):
     cappy["sort_by"] = cappy.index.get_level_values(0).map(order_map_cap)
     cappy.sort_values("sort_by", inplace=True)
     cappy.drop(columns="sort_by", inplace=True)
+    print(cappy)
     cappy = cappy.reorder_levels(["I_reg", "tech"]).sort_index(level=0, sort_remaining=False)
     cappy[["New cap","Cap"]].groupby(level=[1]).sum().to_excel(writer, sheet_name=shortened_scen, startcol=1, startrow=1)
     for i, reg in enumerate(cappy.index.get_level_values(0).unique()):

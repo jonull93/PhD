@@ -19,14 +19,14 @@ from glob import glob
 start_time_script = tm.time()
 print("Excel-writing script started at", datetime.now().strftime('%H:%M:%S'))
 
-excel = False  # will only make a .pickle if excel == False
+excel = True  # will only make a .pickle if excel == False
 run_output = "w"  # 'w' to (over)write or 'rw' to only add missing scenarios
 overwrite = []  # names of scenarios to overwrite regardless of existence in pickled data
 #overwrite = [reg+"_inertia_0.1x" for reg in ["ES3", "HU", "IE", "SE2"]]+\
 #            [reg+"_inertia" for reg in ["ES3", "HU", "IE", "SE2"]]+\
 #            [reg+"_inertia_noSyn" for reg in ["ES3", "HU", "IE", "SE2"]]
-h = 3  # time resolution
-suffix = ""  # Optional suffix for the run, e.g. "test" or "highBioCost"
+h = 6  # time resolution
+suffix = "noTransportnoFlex"  # Optional suffix for the run, e.g. "test" or "highBioCost"
 suffix = '_'+suffix if len(suffix) > 0 else ''
 name = f"results_{h}h{suffix}"  # this will be the name of the output excel and pickle files
 
@@ -59,16 +59,19 @@ indicators = ["cost_tot",
               ]
 
 cases = []
-systemFlex = ["lowFlex", "highFlex"]
-modes = ["noFC", "fullFC"]   # , "fullFC", "inertia", "OR"]# "noFC",
+systemFlex = ["highFlex"]
+modes = ["noFC"]   # , "fullFC", "inertia", "OR"]# "noFC",
+hedging_scenarios = ['']#,'base1'
+years = [2040] #[2020,2025,2030,2040]
 replace_with_alternative_solver_if_missing = True
 alternative_solutions = ["NCO"]  # to replace with if replace_with_alternative_solver_if_missing
-for reg in ["brit", "iberia","nordic"]:
+for reg in ["brit"]:#, "iberia","nordic"]:
     for flex in systemFlex:
         for mode in modes:
-            for year in [2020,2025,2030,2040]:
-                #if f"{reg}_{flex}_{mode}_{year}{suffix}{'_'+str(h)+'h' if h>1 else ''}" != "iberia_lowFlex_fullFC_2030_noGpeak_6h": continue
-                cases.append(f"{reg}_{flex}_{mode}_{year}{suffix}{'_'+str(h)+'h' if h>1 else ''}")
+            for year in years:
+                for hedging_scenario in hedging_scenarios:
+                    #if f"{reg}_{flex}_{mode}_{year}{suffix}{'_'+str(h)+'h' if h>1 else ''}" != "iberia_lowFlex_fullFC_2030_noGpeak_6h": continue
+                    cases.append(f"{reg}_{flex}_{mode}_{year}{'_'+hedging_scenario if hedging_scenario else ''}{suffix}{'_'+str(h)+'h' if h>1 else ''}")
 
 
 comp_name = os.environ['COMPUTERNAME']
