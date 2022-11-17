@@ -64,10 +64,9 @@ def make_plot(df, title, secondary_y_values, xlabels=None, legend=False, left_yl
 
 
 def percent_stacked_area(axes, fig, data, regions, flex, timestep, indicator_string: str, set: dict, years=None,
-                         FC=True,
-                         secondary_y="FR_cost", scen_suffix="", bars=True,
+                         FC=True, secondary_y="FR_cost", scen_suffix="", bars=True,
                          figtitle="Interval share, and \u0394system-cost", filepath="test.png",
-                         baseFC="noFC", compareFC="fullFC"):
+                         baseFC="noFC", compareFC="fullFC", right_ylabel="System cost increase [€ cent/MWh]"):
     print_cyan(f"Starting percent_stacked_area() for {indicator_string}")
     if years is None:
         years = [2020, 2025, 2030, 2040]
@@ -103,11 +102,15 @@ def percent_stacked_area(axes, fig, data, regions, flex, timestep, indicator_str
         if secondary_y == "FR_cost":
             secondary_y_values = [data[scen][secondary_y].sum().sum().round() / 1000 for scen in scenarios]
         elif secondary_y == "FR_cost_per_gen":
-            secondary_y_values = [data[scen]["FR_cost"].sum().sum().round() * 1000 * 100
-                                  / data[scen]["gen_per_eltech"].sum().round() for scen in scenarios]
+            secondary_y_values = [data[scen]["FR_cost"].sum().sum().round() * 100
+                              / data[scen]["gen_per_eltech"].sum().round() for scen in scenarios]
+        elif secondary_y == "FR_cost_average":
+            secondary_y_values = [data[scen]["FR_cost"].mean().mean() for scen in scenarios]
+        elif secondary_y == "FR_market_size":
+            secondary_y_values = [(data[scen]["FR_cost"]*data[scen]["FR_demand"]["total"]).sum().sum().round()/1000 for scen in scenarios]
         elif secondary_y == "FR_syscost":
             secondary_y_values = [(data[scen]["cost_tot"] - data[scen.replace(compareFC, baseFC)]["cost_tot"]).round(4)
-                                  for scen in scenarios]
+                              for scen in scenarios]
         elif secondary_y == "FR_syscost_per_gen":
             secondary_y_values = [((data[scen]["cost_tot"] - data[scen.replace(compareFC, baseFC)][
                 "cost_tot"]) * 1e6 * 100 / data[scen]["gen_per_eltech"].sum()).round(4) for scen in scenarios]
@@ -127,11 +130,11 @@ def percent_stacked_area(axes, fig, data, regions, flex, timestep, indicator_str
         else:
             left_ylabel = False
         if j == len(regions) - 1:
-            right_ylabel = "System cost increase [€ cent/MWh]"
+            right_ylabel_ = right_ylabel
         else:
-            right_ylabel = False
+            right_ylabel_ = False
         _, _, (handles, labels) = make_plot(df, title, secondary_y_values, left_ylabel=left_ylabel,
-                                            right_ylabel=right_ylabel, _ax=axes[j])
+                                            right_ylabel=right_ylabel_, _ax=axes[j])
     plt.sca(axes[1])
     #    fig.legend(handles,labels,bbox_to_anchor=(0.5, 0.92), ncol=4, loc="lower center")
     fig.suptitle(f"{figtitle}: {flex}", y=1.05)
@@ -139,16 +142,17 @@ def percent_stacked_area(axes, fig, data, regions, flex, timestep, indicator_str
     return handles, labels
 
 
-timestep = 3
-fig_file_suffix = "duoflex"
+timestep = 1
+fig_file_suffix = "old"
 if len(fig_file_suffix) > 0: fig_file_suffix = "_" + fig_file_suffix
-pickle_suffix = ""
+pickle_suffix = "old"
 if len(pickle_suffix) > 0: pickle_suffix = "_" + pickle_suffix
 data = pickle.load(open(path.relpath(rf"PickleJar\data_results_{timestep}h{pickle_suffix}.pickle"), "rb"))
 
 scen_suffix = ""
 if len(scen_suffix) > 0: scen_suffix = "_" + scen_suffix
-secondary_y = "FR_syscost_per_gen"  # _per_gen
+secondary_y = "FR_market_size"  # _per_gen
+right_ylabel = "Reserve market size [M€/yr]"
 reserve_technologies = {"Thermals": "thermal", "VRE": "VRE", "Storage": "ESS", "Power-to-heat": "PtH", "Hydro": "hydro",
                         "BEV": "BEV"}
 FR_intervals = {"FFR": 1, "5-30s": 2, "30s-5min": 3, "5-15min": 4, "15-30min": 5, "30-60min": 6}
@@ -180,7 +184,7 @@ for i_t, type in enumerate(indicator_strings):
     fig, axes = plt.subplots(nrows=len(flexes), ncols=len(regions), figsize=(len(regions) + 4.7, 3 * len(flexes)), )
     for i_f, flex in enumerate(flexes):
         (handles, labels) = percent_stacked_area(axes[i_f], fig, data, regions, flex, timestep, indicator_strings[i_t],
-                                                 label_sets[type], secondary_y=secondary_y,
+                                                 label_sets[type], secondary_y=secondary_y, right_ylabel=right_ylabel,
                                                  scen_suffix=scen_suffix, figtitle=figtitles[type])
         axes[i_f][0].annotate(flex[0].upper()+flex[1:], xy=(-0.45, 0.5), xycoords='axes fraction', va="center", ha="right", fontsize=12)
     fig.legend(handles, labels, bbox_to_anchor=(0.5, 0.92), ncol=4, loc="lower center")

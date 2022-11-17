@@ -1,10 +1,10 @@
-from my_utils import write_inc
+from my_utils import write_inc, print_red, print_cyan, print_green
 
 # To run this file, edit the paths below and make sure you have the GIS capacity_Windonshore.inc in the inc_path
 # And to import from my_utils.py, just make sure it exists in the same folder as this script
 
-destination_path = "C:\\git\\multinode\\Include\\existingCapacity\\"
-inc_path = "C:\\git\\multinode\\Include\\"
+destination_path = "C:\\Users\\jonull\\Downloads\\"
+inc_path = "C:\\Users\\jonull\\git\\multinode\\Include\\"
 
 gdp = {  # EPODreg: GDPs, from some model include file I found
     'AT': 283085, 'BE': 345005, 'BO': 1, 'BG': 35431, 'CR': 1, 'CY': 17287, 'CZ': 147878, 'DE1': 805132, 'DE2': 136621,
@@ -18,7 +18,7 @@ gdp = {  # EPODreg: GDPs, from some model include file I found
 
 EPODreg_to_country = {  # dictionary for going between EPODreg to country
     'AT': 'Austria', 'BE': 'Belgium', 'BO': 'Bosnia', 'BG': 'Bulgaria', 'CR': 'Croatia', 'CY': 'Cyprus',
-    'CZ': 'Czech_Republic', 'DK1': 'Denmark', 'DK2': 'Denmark', 'EE': 'Estonia', 'FI': 'Finland', 'FR1': 'France',
+    'CZ': 'Czech', 'DK1': 'Denmark', 'DK2': 'Denmark', 'EE': 'Estonia', 'FI': 'Finland', 'FR1': 'France',
     'FR2': 'France', 'FR3': 'France', 'FR4': 'France', 'FR5': 'France', 'DE1': 'Germany', 'DE2': 'Germany',
     'DE3': 'Germany', 'DE4': 'Germany', 'DE5': 'Germany', 'GR': 'Greece', 'HU': 'Hungary', 'IS': 'Iceland',
     'IE': 'Ireland', 'IT1': 'Italy', 'IT2': 'Italy', 'IT3': 'Italy', 'LV': 'Latvia', 'LT': 'Lithuania',
@@ -29,19 +29,19 @@ EPODreg_to_country = {  # dictionary for going between EPODreg to country
     'SE2': 'Sweden', 'SE3': 'Sweden', 'SE4': 'Sweden', 'CH': 'Switzerland', 'UK1': 'UK', 'UK2': 'UK', 'UK3': 'UK'
 }
 
-national_cap_WON = {  # data emailed from Jan on 2021-03-23
-    'Austria': 3159, 'Belgium': 2323, 'Bulgaria': 691, 'Croatia': 652, 'Cyprus': 158, 'Czech': 337, 'Denmark': 4426,
-    'Estonia': 320, 'Finland': 2213, 'France': 16644, 'Germany': 53912, 'Greece': 3576, 'Hungary': 329, 'Ireland': 4130,
-    'Italy': 10512, 'Latvia': 66, 'Lithuania': 548, 'Luxemb': 136, 'Malta': 0, 'Netherlands': 3482, 'Poland': 5917,
-    'Portugal': 5429, 'Romania': 3029, 'Slovakia': 3, 'Slovenia': 3, 'Spain': 25803, 'Sweden': 8794, 'UK': 13570,
-    'Norway': 2442, 'Switzerland': 75
+national_cap_WON = {  # data for 2021 from https://web.archive.org/web/20221019142356/https://proceedings.windeurope.org/biplatform/rails/active_storage/disk/eyJfcmFpbHMiOnsibWVzc2FnZSI6IkJBaDdDRG9JYTJWNVNTSWhORFJ0ZDJJMWVUbG9OMll6TVRaaGEza3lkamgxZG1aM056WnZZZ1k2QmtWVU9oQmthWE53YjNOcGRHbHZia2tpQVk1cGJteHBibVU3SUdacGJHVnVZVzFsUFNKWGFXNWtaWFZ5YjNCbExWZHBibVF0Wlc1bGNtZDVMV2x1TFVWMWNtOXdaUzB5TURJeExYTjBZWFJwYzNScFkzTXVjR1JtSWpzZ1ptbHNaVzVoYldVcVBWVlVSaTA0SnlkWGFXNWtaWFZ5YjNCbExWZHBibVF0Wlc1bGNtZDVMV2x1TFVWMWNtOXdaUzB5TURJeExYTjBZWFJwYzNScFkzTXVjR1JtQmpzR1ZEb1JZMjl1ZEdWdWRGOTBlWEJsU1NJVVlYQndiR2xqWVhScGIyNHZjR1JtQmpzR1ZBPT0iLCJleHAiOiIyMDIyLTEwLTE5VDE0OjI4OjQ5LjM0NFoiLCJwdXIiOiJibG9iX2tleSJ9fQ==--44e68980d582b9078ca3e9467c9f891971a042aa/Windeurope-Wind-energy-in-Europe-2021-statistics.pdf?content_type=application%2Fpdf&disposition=inline%3B+filename%3D%22Windeurope-Wind-energy-in-Europe-2021-statistics.pdf%22%3B+filename%2A%3DUTF-8%27%27Windeurope-Wind-energy-in-Europe-2021-statistics.pdf
+    'Austria': 3300, 'Belgium': 2741, 'Bulgaria': 707, 'Croatia': 990, 'Cyprus': 158, 'Czech': 337, 'Denmark': 4870,
+    'Estonia': 320, 'Finland': 3257, 'France': 19079, 'Germany': 56130, 'Greece': 4452, 'Hungary': 329, 'Ireland': 4380,
+    'Italy': 11108, 'Latvia': 66, 'Lithuania': 668, 'Luxembourg': 168, 'Malta': 0, 'Netherlands': 5179, 'Poland': 6347,
+    'Portugal': 5587, 'Romania': 3029, 'Slovakia': 3, 'Slovenia': 3, 'Spain': 28191, 'Sweden': 11905, 'UK': 14073,
+    'Norway': 4649, 'Switzerland': 87
 }
 
 national_cap_WOFF = {  # data emailed from Jan on 2021-03-23
-    'Austria': 0, 'Belgium': 1556, 'Bulgaria': 0, 'Croatia': 0, 'Cyprus': 0, 'Czech Rep': 0, 'Denmark': 1703,
-    'Estonia': 0, 'Finland': 71, 'France': 2, 'Germany': 7445, 'Greece': 0, 'Hungary': 0, 'Ireland': 25, 'Italy': 0,
-    'Latvia': 0, 'Lithuania': 0, 'Luxemb': 0, 'Malta': 0, 'Netherlands': 1118, 'Poland': 0, 'Portugal': 8, 'Romania': 0,
-    'Slovakia': 0, 'Slovenia': 0, 'Spain': 5, 'Sweden': 192, 'UK': 9945, 'Norway': 2, 'Switzerland': 0
+    'Austria': 0, 'Belgium': 2261, 'Bulgaria': 0, 'Croatia': 0, 'Cyprus': 0, 'Czech': 0, 'Denmark': 2308,
+    'Estonia': 0, 'Finland': 71, 'France': 2, 'Germany': 7713, 'Greece': 0, 'Hungary': 0, 'Ireland': 25, 'Italy': 0,
+    'Latvia': 0, 'Lithuania': 0, 'Luxembourg': 0, 'Malta': 0, 'Netherlands': 2986, 'Poland': 0, 'Portugal': 25, 'Romania': 0,
+    'Slovakia': 0, 'Slovenia': 0, 'Spain': 5, 'Sweden': 192, 'UK': 12739, 'Norway': 6, 'Switzerland': 0
 
 }
 ratio_gdp = {reg: 1 for reg in gdp}  # EPODreg: ratio, such that sum of ratios for each subregion equals 1
@@ -53,24 +53,25 @@ for reg, reg_gdp in gdp.items():
     except:
         None
 
-techs = ["WON" + ab + str(dig) for dig in range(5, 0, -1) for ab in ["A", "B"]]
-WON_pot = {reg: {tech: 0 for tech in techs} for reg in gdp}
-WOFF_pot = {reg: {'WOFF': 0} for reg in gdp}
+WON_techs = ["WON" + ab + str(dig) for dig in range(5, 0, -1) for ab in ["A"]]
+WOFF_techs = ['WOFF'+str(d) for d in range(3,0,-1)]
+WON_pot = {reg: {tech: 0 for tech in WON_techs} for reg in gdp}
+WOFF_pot = {reg: {tech: 0 for tech in WOFF_techs} for reg in gdp}
 cap_density_WON = 0.1  # area utility factor, almost completely arbitrary numbers ¯\_(ツ)_/¯
 cap_density_WOFF = 0.33
 
-with open(inc_path+"capacity_Windonshore.inc") as reader:
+with open(inc_path+"weather_data\\Capacity_WONA.inc") as reader:
     for line in reader:
-        reg, foobar = line.split(" .")
+        reg, other = line.split(" . ")
         reg = reg.split()[0]
-        tech, pot = foobar.split()
+        tech, pot = other.split()
         WON_pot[reg][tech] = float(pot) * cap_density_WON
 
-with open(inc_path+"capacity_Windoffshore.inc") as reader:
+with open(inc_path+"weather_data\\Capacity_WOFF.inc") as reader:  # "capacity_Windoffshore.inc"
     for line in reader:
-        reg, foobar = line.split(" .")
+        reg, other = line.split(" .")
         reg = reg.split()[0]
-        tech, pot = foobar.split()
+        tech, pot = other.split()
         WOFF_pot[reg][tech] = float(pot) * cap_density_WOFF
 
 
@@ -88,24 +89,27 @@ def newWeights(numbers):
     return {key: val / sum(numbers.values()) for key, val in numbers.items()}
 
 
-def filler(amount, destinations, weights, limits):
+def filler(amount, destinations, weights, limits, vocal=False):
     """
     Takes a number 'amount' and fills it in a 2-layered 'destinations' where the first layer has 'weights' and the
     second layer has 'limits'. For wind capacity allocation, it spreads out investments in the best available wind sites
     in a country while taking gdp into account for subregions
     """
     regs = list(limits.keys())
-    print(f"Starting to allocate {amount} in {regs}")
+    print_cyan(f" - Starting to allocate {amount} in {regs} - ")
     old_cap = sum(x for counter in destinations.values() for x in counter.values())
     to_fill = amount
     techs = list(limits[regs[0]].keys())
+    return_dict = {reg:{tech:0 for tech in techs} for reg in regs}
     spareRoomTech = {reg: {tech: limits[reg][tech] for tech in techs} for reg in regs}
+    if vocal: print_green(f"{techs=}", f"{amount=}",  f"{weights=}", f"{limits=}",)
+
     while to_fill > 0:  # while there still is to_fill left to allocate
         for tech in techs:  # first, prioritize filling the first tech in each region before moving on to next tech
             if to_fill <= 0: continue  # no need to do anything if we've already used up 'to_fill' in previous tech
             loopRegs = regs
             print(
-                f"-- Starting to fill {tech} with {to_fill} and spare room {round(sum([spareRoomTech[reg][tech] for reg in loopRegs]), ndigits=3)}")
+                f"Starting to fill {tech} with {to_fill} and spare room {round(sum([spareRoomTech[reg][tech] for reg in loopRegs]), ndigits=3)}")
             while sum([spareRoomTech[reg][tech] for reg in loopRegs]) > 0 and to_fill > 0:
                 # we use another while-loop since we allocate according to gdp ratios (weights)
                 # this may result in some regs hitting their lim while others didnt
@@ -128,12 +132,15 @@ def filler(amount, destinations, weights, limits):
                         filled += lim
                         spareRoomTech[reg][tech] = 0
                 to_fill -= filled
+        if sum([spareRoomTech[reg][tech] for reg in loopRegs]) == 0 and to_fill > 0:
+            print(f"!! ran out of space in {loopRegs} for {tech}")
+            raise ArithmeticError
     diff = round(sum(x for counter in destinations.values() for x in counter.values()) - old_cap,4)
     error = diff-amount > 0.01
     if error:
         print(old_cap,sum(x for counter in destinations.values() for x in counter.values()),amount)
         raise ArithmeticError
-    print(f"Finished {regs}")
+    #print(f"Finished {regs}")
     return destinations
 
 
@@ -153,7 +160,7 @@ def country_to_reg(dictionary, country):
     return {reg: dictionary[reg] for reg in dictionary if country in EPODreg_to_country[reg]}
 
 
-existingCapacity = {reg: {tech: 0 for tech in techs + ['WOFF']} for reg in gdp}
+existingCapacity = {reg: {tech: 0 for tech in WON_techs + WOFF_techs} for reg in gdp}
 for country, cap in national_cap_WON.items():
     if cap <= 0:
         continue
@@ -164,6 +171,25 @@ for country, cap in national_cap_WOFF.items():
     if cap <= 0:
         continue
     else:
-        filler(cap / 1000, existingCapacity, country_to_reg(ratio_gdp, country), country_to_reg(WOFF_pot, country))
+        filler(cap / 1000, existingCapacity, country_to_reg(ratio_gdp, country), country_to_reg(WOFF_pot, country), vocal=True)
 
-write_inc(destination_path, "existingCap_VRE.inc", existingCapacity)
+existingCapacity2 = {reg: {tech: 0 for tech in WON_techs + WOFF_techs} for reg in gdp}
+if list(national_cap_WON.keys()).sort() != list(national_cap_WON.keys()).sort():
+    print_red("! The countries for WON and for WOFF are different !")
+"""existingCapacity2 = {}
+for country in national_cap_WON:
+    regs = [reg for reg,_country in EPODreg_to_country.items() if _country==country]
+    {reg: {tech: 0 for tech in WON_techs + WOFF_techs} for reg in regs}
+#    print_cyan(f" - Starting {country}: {regs}")
+    WON_cap = national_cap_WON[country]
+    WOFF_cap = national_cap_WOFF[country]
+    if WON_cap > 0:
+        filler(WON_cap / 1000, existingCapacity2, country_to_reg(ratio_gdp, country), country_to_reg(WON_pot, country))
+    if WOFF_cap > 0:
+        filler(WOFF_cap / 1000, existingCapacity2, country_to_reg(ratio_gdp, country), country_to_reg(WOFF_pot, country),
+               vocal=True)
+
+print(existingCapacity2)
+if existingCapacity!=existingCapacity2: print_red(f"Mismatch between\n{existingCapacity=}\nand\n{existingCapacity2=}")"""
+
+write_inc(destination_path, "existingCap_VRE_3.inc", existingCapacity)
