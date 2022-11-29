@@ -64,11 +64,24 @@ def export():
         print_green(f" -- {flex} --")
         for region in ["nordic","brit","iberia"]:
             for year in [2020,2025,2030,2040]:
-                print_cyan(f"{region}_{flex}_{year}")
+                print_cyan(f"{region.capitalize()} - {year}")
                 scenarios = [f"{region}_{flex}_{FC}_{year}_6h" for FC in ["noFC","fullFC"]]
                 export = [data[scenario]["export_regional"] for scenario in scenarios]
                 diff = 100*(export[1]-export[0])/export[0]
-                df = pd.DataFrame({"noFC":export[0], "fullFC":export[1], "diff":diff.round(3)})
-                print(df)
+                FR_net_import = data[scenarios[1]]["FR_net_import"]
+                FR_price = data[scenarios[1]]["FR_cost"]
+                net_import_value = FR_net_import * FR_price
+                all_import_value = FR_net_import[FR_net_import>0].fillna(value=0) * FR_price
+                #print(FR_net_import.iloc[:,:7])
+                #print(FR_price.iloc[:, :7])
+                #print(net_import_value.iloc[:, :7])
+                df = pd.DataFrame({"noFC":export[0], "fullFC":export[1], "diff":diff,
+                                   "value_net":net_import_value.sum(axis='columns').sum(level='I_reg'),
+                                  "value_all":all_import_value.sum(axis='columns').sum(level='I_reg')})
+                df.loc["total"] = df.loc[:].sum()
+                df.loc["total","diff"] = ((df.loc["total","fullFC"]-df.loc["total","noFC"])/df.loc["total","noFC"])*100
+                #   print(f"FR import value: {export_revenue.sum(axis='columns').sum(level='I_reg')}")
+                print(df.round(2))
+
 
 export()
