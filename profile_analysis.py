@@ -1,4 +1,4 @@
-
+import mat73
 """
 
 - VRE profile analysis -
@@ -28,14 +28,10 @@ def get_FLH(profile, weights=False):
     return the sum of profile, or a weighted sum if profile is a list of profiles
 
     """
-    if type(profile[0]) == list:
-        FLH = [sum(tech) for tech in profile]
-        if not weights:
-            weights = [1 for i in profile]
-        return sum([FLH[i]*weights[i] for i in range(len(weights))])/sum(weights)
+    if weights:
+        return profile.sum(axis=0)*weights
     else:
-        FLH = sum(profile)
-        return FLH
+        return profile.sum(axis=0)
 
 
 def get_sorted(profile):
@@ -45,7 +41,7 @@ def get_sorted(profile):
 
 def get_accumulated_deficiency(profile):
     """
-
+    takes a single profile and returns an accumulated deficiency profile
     Parameters
     ----------
     profile
@@ -55,10 +51,38 @@ def get_accumulated_deficiency(profile):
     accumulated deficiency
     """
 
-    mean = sum(profile)/[1 for i in profile]
-    diff = [mean-i for i in profile]
-    accumulated = [diff[0]]
-    for val in diff:
-        accumulated.append(accumulated[-1]+val)
+    mean = profile.mean()
+    diff = mean-profile
+    accumulated = diff.cumsum()
     return accumulated
 
+
+years = range(1987,1988)
+region = "nordic_L"
+VRE = ["wind", "solar"]
+profile_keys= {"wind": 'CFtime_windonshoreA', 'solar': 'CFtime_pvplantA'}
+capacity_keys = {"wind": 'capacity_onshoreA', 'solar': 'capacity_pvplantA'}
+for year in years:
+    print(f"Year {year}")
+    for VRE in ["wind", "solar"]:
+        print(f"- {VRE} -")
+        filename = f"D:\GISdata\output\GISdata_{VRE}{year}_{region}.mat"
+        # [site,region]
+        # if there is a time dimension, the dimensions are [time,region,site]
+        mat = mat73.loadmat(filename)
+        profiles = mat[profile_keys[VRE]]
+        capacities = mat[capacity_keys[VRE]]
+        print(capacities)
+        for site in range(len(capacities[0,:])):
+            caps = capacities[:,-site-1]
+            caps.sort()
+            print(f"Testing site {5-site} where cap is {caps}")
+            if caps[0]>1:
+                viable_site = 5-site
+                break
+        print(f"first viable site is {viable_site}")
+        FLHs = get_FLH(profiles[:,:,:])
+        print(FLHs)
+        print(profiles[:,:,viable_site])
+        accumulated = get_accumulated_deficiency(profiles[:,:,viable_site])
+        print(accumulated) #not working for solar??
