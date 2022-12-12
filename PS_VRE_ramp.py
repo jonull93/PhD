@@ -18,7 +18,7 @@ regions = ['AT', 'BE', 'BO', 'BG', 'CR', 'CY', 'CZ', 'DE1', 'DE2', 'DE3', 'DE4',
 WON = ['WONA1', 'WONA2', 'WONA3', 'WONA4', 'WONA5', 'WONB1', 'WONB2', 'WONB3', 'WONB4', 'WONB5']
 WOFF = ["WOFF1", "WOFF2", "WOFF3"]
 PV = ['PVPA1', 'PVPB1', 'PVR1']
-allhours = [f"h{str(i).rjust(4,'0')}" for i in range(1, 8785)]
+allhours = [f"h{str(i).rjust(4, '0')}" for i in range(1, 8785)]
 WON_profiles = {reg: {tech: {hour: 0 for hour in allhours} for tech in WON} for reg in regions}
 WOFF_profiles = {reg: {tech: {hour: 0 for hour in allhours} for tech in WOFF} for reg in regions}
 PV_profiles = {reg: {tech: {hour: 0 for hour in allhours} for tech in PV} for reg in regions}
@@ -36,10 +36,11 @@ def clean_file(filename, new_filename):
 
 
 def read_file(filename, profiles):
-    with open(path+filename, "r") as reader:
+    with open(path + filename, "r") as reader:
         for i_l, line in enumerate(reader):
             data = list(filter(None, re.split('\s\.\s|\s', line)))
-            try: reg = data[0]
+            try:
+                reg = data[0]
             except:
                 print("Ran into error at", i_l, line)
                 exit()
@@ -75,17 +76,18 @@ def build_ramp(profiles):
                 ramp[reg][tech][timestep] = np.round(limited_by_prod, decimals=5)
     return ramp
 
-#for year in range(2010,2020):
+
+# for year in range(2010,2020):
 #    filename = f"_profile_PV_{year}.inc"
 #    clean_file(path + filename, path + filename.replace("_profile", "profile"))
 #    filename = f"_profile_WONA_{year}.inc"
 #    clean_file(path + filename, path + filename.replace("_profile", "profile"))
 #    filename = f"_profile_WOFF_{year}.inc"
 #    clean_file(path + filename, path + filename.replace("_profile", "profile"))
+# cf_Windonshore.INC
 
-#cf_Windonshore.INC
 
-for year in range(2010,2020):
+for year in range(2010, 2020):
     print_cyan(year)
     WON_profiles = read_file(f"Profile_WONA_{year}.inc", WON_profiles)
     print("-- Read WON_profiles --")
@@ -97,15 +99,15 @@ for year in range(2010,2020):
     PV_profiles = read_file(f"Profile_PV_{year}.inc", PV_profiles)
     print("-- Built PV_profiles --")
     PV_ramp = build_ramp(PV_profiles)
-    VRE_ramp = {reg: {tech: {} for tech in WON+WOFF+PV} for reg in regions}
+    VRE_ramp = {reg: {tech: {year: {}} for tech in WON + WOFF + PV} for reg in regions}
     for reg in regions:
         for tech in WON:
-            VRE_ramp[reg][tech] = WON_ramp[reg][tech]
+            VRE_ramp[reg][tech][year] = WON_ramp[reg][tech]
         for tech in WOFF:
-            VRE_ramp[reg][tech] = WOFF_ramp[reg][tech]
+            VRE_ramp[reg][tech][year] = WOFF_ramp[reg][tech]
         for tech in PV:
-            VRE_ramp[reg][tech] = PV_ramp[reg][tech]
+            VRE_ramp[reg][tech][year] = PV_ramp[reg][tech]
 
     print("-- Combined ramps --")
-    write_inc(out_path, f"VRE_ramp_{year}.inc", VRE_ramp)
+    write_inc(out_path, f"VRE_ramp_{year}.inc", VRE_ramp, fliplast=True)
     print("-- Wrote ramps to .inc file --")

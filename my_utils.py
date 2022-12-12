@@ -185,14 +185,14 @@ def label_axes(fig, labels=None, loc=None, **kwargs):
                     **kwargs)
 
 
-def write_inc(path, filename, var, flip=True):
+def write_inc(path, filename, data: dict, flip=True, fliplast=False):
     """
 
     Parameters
     ----------
     path
     filename
-    var
+    data
     flip
 
     Returns
@@ -200,24 +200,41 @@ def write_inc(path, filename, var, flip=True):
     nothing, but creates path/filename.inc containing a variable with 2 or 3 sets, e.g. tech + reg (+ opt. timestep)
     """
     with open(path + filename, "w") as writer:
-        for reg in var:
-            if type(var[reg]) == dict:
-                for tech in var[reg]:
-                    try:
-                        for timestep, value in var[reg][tech].items():
-                            if flip:
-                                writer.write(f"{tech} . {reg} . {timestep}  {value}\n")
-                            else:
-                                writer.write(f"{reg} . {tech} . {timestep}  {value}\n")
-                    except:
-                        value = var[reg][tech]
+        for key1, val1 in data.items():
+            if type(val1) == dict:  # key1: {..}
+                for key2, val2 in val1.items():
+                    if type(val2) == dict:  # key1: {key2: {}}
+                        for key3, val3 in val2.items():
+                            if type(val3) == dict:  # key1: {key2: {key3: {}}}
+                                for key4, val4 in val3.items():
+                                    if flip:
+                                        if fliplast:
+                                            writer.write(f"{key2:4} . {key1:6} . {key4:6} . {key3:6} {val4}\n")
+                                        else:
+                                            writer.write(f"{key2:4} . {key1:6} . {key3:6} . {key4:6} {val4}\n")
+                                    else:
+                                        writer.write(f"{key1:4} . {key2:6} . {key3:6} . {key4:6} {val4}\n")
+                            elif type(val3) == list:  # key1: {key2: {key3: [values]}}
+                                for i, val4 in enumerate(val3):
+                                    writer.write(f"{key1:4} . {key2:4} . {key3:4} . {'h' + str(i + 1).zfill(4)}  {val4}\n")
+                            else:  # key1: {key2: {key3:val3}}
+                                if flip:
+                                    writer.write(f"{key2:4} . {key1:6} . {key3:4}  {val3}\n")
+                                else:
+                                    writer.write(f"{key1:4} . {key2:6} . {key3:4}  {val3}\n")
+                    elif type(val2) == list:  # key1: {key2: [values]}
+                            for i, val3 in enumerate(val2):
+                                writer.write(f"{key1:4} . {key2:4} . {'h' + str(i + 1).zfill(4)}  {val3}\n")
+                    else:  # key1: {key2:val2}
                         if flip:
-                            writer.write(f"{tech} . {reg}  {value}\n")
+                            writer.write(f"{key2:4} . {key1:6} {val2}\n")
                         else:
-                            writer.write(f"{reg} . {tech}  {value}\n")
-            elif type(var[reg]) == list:
-                for i, value in enumerate(var[reg]):
-                    writer.write(f"{reg} . {'h' + str(i + 1).zfill(4)}  {value}\n")
+                            writer.write(f"{key1:4} . {key2:6} {val2}\n")
+            elif type(val1) == list:   # key1: [values]
+                for i, val2 in enumerate(val1):
+                    writer.write(f"{key1:4} . {'h' + str(i + 1).zfill(4)}  {val2}\n")
+            else:  # key1: val1
+                writer.write(f"{key1:6} {val1}\n")
     return None
 
 
