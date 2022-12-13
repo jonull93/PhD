@@ -1,4 +1,6 @@
 import mat73
+import matplotlib.pyplot as plt
+
 """
 
 - VRE profile analysis -
@@ -51,9 +53,10 @@ def get_accumulated_deficiency(profile):
     accumulated deficiency
     """
 
-    mean = profile.mean()
+    mean = profile.mean(axis=0)
+    print(f"mean is {mean}")
     diff = mean-profile
-    accumulated = diff.cumsum()
+    accumulated = diff.cumsum(axis=0)
     return accumulated
 
 
@@ -82,7 +85,18 @@ for year in years:
                 break
         print(f"first viable site is {viable_site}")
         FLHs = get_FLH(profiles[:,:,:])
-        print(FLHs)
-        print(profiles[:,:,viable_site])
-        accumulated = get_accumulated_deficiency(profiles[:,:,viable_site])
-        print(accumulated) #not working for solar??
+        print(FLHs[:,viable_site-1])
+        print(profiles[:,:,viable_site-1])
+        accumulated = get_accumulated_deficiency(profiles[:,:,viable_site-1])
+        print(accumulated)
+        plt.plot(accumulated)
+        plt.title(f"Deficiency of {VRE} in Year {year}")
+        plt.legend(labels=["SE_NO_N", "SE_S", "NO_S", "FI", "DE_N", "DE_S"])
+        plt.tight_layout()
+        plt.show()
+
+# accumulated * potential cap
+# accumulated * "cost-optimal" cap mix
+# - one line per subregion
+# - one line for wind and one for solar
+# - one total per year
