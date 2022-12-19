@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 import pickle
 import pandas as pd
 import numpy as np
+from statistics import mean
 
 """
 
@@ -14,10 +15,26 @@ profiles per cluster region
 - OUTPUT
 FLHs
 generation duration curves
-accumulated deficiency
-    deficiency = mean generation - hourly generation
+accumulated net-load deficiency
+    deficiency = mean netload - hourly netload
+CFD-plots for 40-year period and for individual years
 
 """
+
+
+def make_pickles(year, VRE_profiles, cap, load):
+    total_VRE_prod = (VRE_profiles * cap).sum(axis=1)
+    net_load = load - total_VRE_prod
+    leap_year = year%4 == 0
+    mi = pd.MultiIndex.from_product([[year], range(1,8761+24*leap_year)], names=["year", "hour"])
+    df_small = pd.DataFrame(index=mi)
+    df_small["net_load"] = list(net_load)
+    small = {"netload":df_small, "cap":cap}
+    small_name = f"netload_{year}.pickle"
+    pickle.dump(small, open("PickleJar\\"+small_name,'wb'))
+    large = {"VRE_profiles":VRE_profiles, "cap":cap, "load":load}
+    large_name = f"netload_components_{year}.pickle"
+    pickle.dump(large, open("PickleJar\\"+large_name,'wb'))
 
 
 def get_FLH(profile, weights=False):
@@ -113,12 +130,13 @@ def get_high_netload(threshold, rolling_average_days, VRE_profiles, all_cap, dem
     else:
         demand += extra_demand / 8760
     net_load = demand - total_VRE_prod
-    net_load = rolling_average(net_load, rolling_average_days * 24)
-    print(f"Max net-load: {max(net_load)}")
-    print(f"Min net-load: {min(net_load)}")
+    net_load_RA = rolling_average(net_load, rolling_average_days * 24)
+    print(f"Max RA net-load: {max(net_load_RA)}")
+    print(f"Min RA net-load: {min(net_load_RA)}")
+    print(f"Mean net-load: {mean(net_load_RA)}")
     threshold_to_beat = threshold * max(rolling_average(demand, rolling_average_days * 24))
     print(f"Threshold to beat: {threshold_to_beat}")
-    high_netload = [i > threshold_to_beat for i in net_load]  # list of True and False
+    high_netload = [i > threshold_to_beat for i in net_load_RA]  # list of True and False
     high_netload_durations = []
     high_netload_event_starts = []
     counter = 0
@@ -129,15 +147,21 @@ def get_high_netload(threshold, rolling_average_days, VRE_profiles, all_cap, dem
             high_netload_durations.append(counter)
             high_netload_event_starts.append(i - counter)
             counter = 0
+    if len(high_netload_durations)==0:
+        high_netload_durations.append(0)
+        high_netload_event_starts.append(0)
     return net_load, high_netload_durations, high_netload_event_starts, threshold_to_beat
 
 
 pickle_file = "PickleJar\\data_results_3h.pickle"
+mat_folder = f"C:\GISdata\output\\"
 initial_results = pickle.load(open(pickle_file, "rb"))
 scenario_name = "nordic_lowFlex_noFC_2040_3h"
 print(initial_results[scenario_name].keys())
 all_cap = initial_results[scenario_name]["tot_cap"]
 all_cap["WOFF3","DE_N"]=60
+all_cap["WONA4","DE_S"]=45
+
 regions = ["SE_NO_N", "SE_S", "NO_S", "FI", "DE_N", "DE_S"]
 
 # non_traditional_load = initial_results[scenario_name]["o_yearly_nontraditional_load"]
@@ -156,7 +180,7 @@ PV = ["PVPA" + str(i) for i in range(1, 6)]
 VRE_tech = WON + WOFF + PV
 all_cap = all_cap[all_cap.index.isin(VRE_tech, level=0)]
 print(all_cap)
-years = range(1987, 1988)
+years = range(1980, 1983)
 sites = range(1, 6)
 region_name = "nordic_L"
 VREs = ["WON", "WOFF", "solar"]
@@ -170,14 +194,15 @@ capacity = {"WON": all_cap[all_cap.index.isin(WON, level=0)], "WOFF": all_cap[al
             'solar': all_cap[all_cap.index.isin(PV, level=0)]}
 for year in years:
     print(f"Year {year}")
-    VRE_profiles = pd.DataFrame(index=range(8760),columns=pd.MultiIndex.from_product([VRE_tech, regions], names=["tech", "I_reg"]))
+    leap = year%4==0
+    VRE_profiles = pd.DataFrame(index=range(8760+leap*24),columns=pd.MultiIndex.from_product([VRE_tech, regions], names=["tech", "I_reg"]))
     FLHs = {}
     for VRE in VREs:
         print(f"- {VRE} -")
         filename = filenames[VRE].replace("YEAR", str(year))
         # [site,region]
         # if there is a time dimension, the dimensions are [time,region,site]
-        VRE_mat = mat73.loadmat(f"D:\GISdata\output\\" + filename)
+        VRE_mat = mat73.loadmat(mat_folder + filename)
         profiles = VRE_mat[profile_keys[VRE]]
         # VRE_cap = capacity[VRE]
         capacities = VRE_mat[capacity_keys[VRE]]
@@ -199,24 +224,40 @@ for year in years:
             VRE_profiles[tech_name] = profiles[:, :, site - 1]
             # pot_cap = pd.DataFrame(capacities.T, index=sites, columns=regions, )
         FLHs[VRE] = get_FLH(profiles[:, :, :])
-        print(FLHs)#[:, viable_site - 1])
+        #print(FLHs)#[:, viable_site - 1])
         # print(profiles[:, :, viable_site - 1])
     demand_filename = f'SyntheticDemand_nordic_L_ssp2-26-2050_{year}.mat'
-    mat_demand = mat73.loadmat(f"D:\GISdata\output\\" + demand_filename)
+    mat_demand = mat73.loadmat(mat_folder + demand_filename)
     demand = mat_demand["demand"]
-    threshold = 0.6
-    net_load, high_netload_durations, high_netload_event_starts, threshold_to_beat = get_high_netload(threshold, 3,
-                                                                                    VRE_profiles, all_cap,
+    prepped_demand = demand.sum(axis=1)/1000
+    prepped_demand += non_traditional_load.sum()/len(prepped_demand)
+    threshold = 0.5
+    mod = 1.5
+    window_size_days = 3
+    net_load, high_netload_durations, high_netload_event_starts, threshold_to_beat = get_high_netload(threshold, window_size_days,
+                                                                                    VRE_profiles, all_cap*mod,
                                                                                     demand, sum(non_traditional_load))
+    max_val = max(high_netload_durations)
+    max_val_start = high_netload_event_starts[high_netload_durations.index(max_val)]
+
     print(f"These are the high_netload_durations: {high_netload_durations}")
+    print(f"These are the start times: {high_netload_event_starts}")
     # accumulated = get_accumulated_deficiency(VRE_profiles,all_cap,demand)
     # print(net_load)
-    plt.plot(net_load)
-    plt.axhline(y=threshold_to_beat)
+    plt.plot(rolling_average(net_load,24*window_size_days))
+    plt.plot(prepped_demand, color="gray", linestyle="--")
+    plt.axhline(y=mean(net_load),color="black", linestyle="-.")
+    plt.axhline(y=threshold_to_beat, color="red")
+    plt.axvline(x=max_val_start, color="red")
+    plt.xticks(range(0,8760,730), labels=["1 Jan.", "1 Feb.", "1 Mar.", "1 Apr.", "1 May", "1 Jun.", "1 Jul.", "1 Aug.",
+                                          "1 Sep.", "1 Oct.", "1 Nov.", "1 Dec."])
     # plt.legend(labels=regions)
+    plt.title(f"Longest event in Year {year} is: {round(max(high_netload_durations)/24)} days and starts day {round(max_val_start/24)}")
+    #plt.title(f"Year {year}, mean is {round(mean(net_load))} with mod={mod}")
+    #plt.xlim([0,168*3])
     plt.tight_layout()
     plt.show()
-    plt.title(f"Longest high net-load event in Year {year} is: {max(high_netload_durations)}")
+    make_pickles(year,VRE_profiles,all_cap,prepped_demand)
 
 # accumulated * potential cap
 # accumulated * "cost-optimal" cap mix
