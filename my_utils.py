@@ -185,7 +185,7 @@ def label_axes(fig, labels=None, loc=None, **kwargs):
                     **kwargs)
 
 
-def write_inc(path, filename, data: dict, flip=True, fliplast=False):
+def write_inc(path, filename, data: dict, flip=True, fliplast=False, comment=False):
     """
 
     Parameters
@@ -200,6 +200,19 @@ def write_inc(path, filename, data: dict, flip=True, fliplast=False):
     nothing, but creates path/filename.inc containing a variable with 2 or 3 sets, e.g. tech + reg (+ opt. timestep)
     """
     with open(path + filename, "w") as writer:
+        if comment:
+           writer.write(f"* ---\n")
+           if type(comment) == list:
+               for c in comment: writer.write(f"* {c}\n")
+           else:
+               writer.write(f"* ---\n* {comment}\n* ---")
+           writer.write(f"* ---\n")
+        if type(data) not in [list, dict]:
+            print("! Wrong data type given to write_inc()")
+            return
+        elif type(data)==list:
+            for i, val in enumerate(data):
+                writer.write(f"{'h' + str(i + 1).zfill(4)}  {vald}\n")
         for key1, val1 in data.items():
             if type(val1) == dict:  # key1: {..}
                 for key2, val2 in val1.items():
@@ -233,23 +246,26 @@ def write_inc(path, filename, data: dict, flip=True, fliplast=False):
             elif type(val1) == list:   # key1: [values]
                 for i, val2 in enumerate(val1):
                     writer.write(f"{key1:4} . {'h' + str(i + 1).zfill(4)}  {val2}\n")
+                    if val1 == "":
+                        writer.write(f"{'h' + str(i + 1).zfill(4)}  {val2}\n")
             else:  # key1: val1
                 writer.write(f"{key1:6} {val1}\n")
     return None
 
 
-def write_inc_from_df_columns(path, filename, var: pandas.DataFrame):
+def write_inc_from_df_columns(path, filename, df: pandas.DataFrame, comment=False):
     """
 
     Parameters
     ----------
     path
     filename
-    var
+    df, where index layers are the parameter sets, and the only column is the values
+    comment, text to be put in the top of the inc file (commented out with *..)
 
     Returns
     -------
-    nothing, but creates path/filename.inc containing a variable with 2 or 3 sets, e.g. tech + reg (+ opt. timestep)
+    nothing, but creates path/filename.inc
     """
     try:
         os.mkdir(path)
@@ -257,9 +273,16 @@ def write_inc_from_df_columns(path, filename, var: pandas.DataFrame):
         None
 
     with open(path + filename, "w") as writer:
-        dim = len(var.columns)
-        for ind, row in var.iterrows():
-            line = " . ".join(row[:-1]) + f"  {row[-1]}\n"
+        if comment:
+           writer.write(f"* ---\n")
+           if type(comment) == list:
+               for c in comment: writer.write(f"* {c}\n")
+           else:
+               writer.write(f"* ---\n* {comment}\n* ---")
+           writer.write(f"* ---\n")
+        #dim = len(df.columns)
+        for index, value in df.iterrows():
+            line = " . ".join(index) + f"  {value[0]}\n"
             writer.write(line)
     return None
 
