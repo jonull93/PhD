@@ -4,6 +4,7 @@ import pickle
 import pandas as pd
 import numpy as np
 from statistics import mean
+from my_utils import print_red, print_green, print_cyan
 
 """
 
@@ -37,15 +38,15 @@ def make_pickles(year, VRE_profiles, cap, load):
     pickle.dump(large, open("PickleJar\\" + large_name, 'wb'))
 
 
-def make_gams_profiles(year, VRE_profiles, load, pot_cap):
+def make_gams_profiles(year, VRE_profiles, load, pot_cap,):
     """
 
     Parameters
     ----------
-    year, int
+    year, str
     VRE_profiles, dataframe with tech and reg in the header, and time as the index
     load, list or array/series that list() can be used on
-    pot_cap
+    pot_cap, series with (cap,reg) multiindex
 
     Returns
     -------
@@ -53,7 +54,7 @@ def make_gams_profiles(year, VRE_profiles, load, pot_cap):
     """
     from datetime import datetime
     from my_utils import write_inc_from_df_columns, write_inc
-    leap = year%4 == 0
+    leap = len(load)>8761
     timestamp = datetime.now().strftime("%d-%m-%Y, %H:%M:%S")
     comment = [f"Made by Jonathan Ullmark at {timestamp}"] +\
               [f"Through profile_analysis.py (quality-of-life scripts repo) with data gathered from globalenergygis\\dev"]
@@ -189,8 +190,13 @@ def get_high_netload(threshold, rolling_average_days, VRE_profiles, all_cap, dem
     return net_load, high_netload_durations, high_netload_event_starts, threshold_to_beat
 
 
+def shift_year_seam(profile, years, seam_index=4464):
+    return
+
+
+
 pickle_file = "PickleJar\\data_results_3h.pickle"
-mat_folder = f"D:\GISdata\output\\"
+mat_folder = f"input\\"
 # initial_results = pickle.load(open(pickle_file, "rb"))
 # scenario_name = "nordic_lowFlex_noFC_2040_3h"
 # print(initial_results[scenario_name].keys())
@@ -219,7 +225,7 @@ PVR = ["PVR" + str(i) for i in range(1, 6)]
 VRE_tech = WON + WOFF + PV + PVR
 all_cap = all_cap[all_cap.index.isin(VRE_tech, level=0)]
 print(all_cap)
-years = range(1980, 1983)
+years = range(1990, 1992)
 sites = range(1, 6)
 region_name = "nordic_L"
 VREs = ["WON", "WOFF", "solar", "solar_rooftop"]
@@ -235,6 +241,7 @@ capacity = {"WON": all_cap[all_cap.index.isin(WON, level=0)], "WOFF": all_cap[al
             'solar': all_cap[all_cap.index.isin(PV, level=0)],
             'solar_rooftop': all_cap[all_cap.index.isin(PVR, level=0)]}
 for year in years:
+    continue
     print(f"Year {year}")
     leap = year % 4 == 0
     VRE_profiles = pd.DataFrame(index=range(8760 + leap * 24),
@@ -273,8 +280,9 @@ for year in years:
     demand_filename = f'SyntheticDemand_nordic_L_ssp2-26-2050_{year}.mat'
     mat_demand = mat73.loadmat(mat_folder + demand_filename)
     demand = mat_demand["demand"]
-    prepped_demand = demand.sum(axis=1) / 1000
-    prepped_demand += non_traditional_load.sum() / len(prepped_demand)
+    prepped_tot_demand = demand.sum(axis=1) / 1000
+    prepped_tot_demand += non_traditional_load.sum() / len(prepped_tot_demand)
+    prepped_demand = demand/1000 + non_traditional_load
     threshold = 0.5
     mod = 1
     window_size_days = 3
@@ -302,8 +310,26 @@ for year in years:
     # plt.xlim([0,168*3])
     plt.tight_layout()
     plt.show()
-    make_pickles(year, VRE_profiles, all_cap, prepped_demand)
-    make_gams_profiles(year,VRE_profiles,prepped_demand,all_cap)
+    print_cyan(VRE_profiles)
+    print_green(all_cap)
+    print_red(prepped_tot_demand)
+    make_pickles(year, VRE_profiles, all_cap, prepped_tot_demand)
+    make_gams_profiles(year,VRE_profiles,prepped_tot_demand,all_cap)
+
+VRE_profile_dict = {}
+load_dict = {}
+for i_y, year in enumerate(years):
+    print(f"Year {year}")
+    netload_components = pickle.load(open(f"PickleJar\\netload_components_{year}.pickle","rb"))
+    VRE_profile_dict[year] = netload_components["VRE_profiles"]
+    load_dict[year] = netload_components["load"]
+    if year != years[0]:  # make new VRE_profiles with seam in summer
+        VRE_profile = pd.concat([VRE_profile_dict[years[i_y-1]].loc[:4464], VRE_profile_dict[years[i_y]].loc[4465:]])
+        print_cyan(VRE_profile)
+        print(load_dict[years[i_y - 1]])
+        load = np.append(load_dict[years[i_y - 1]][:4464], load_dict[years[i_y]][4465:])
+        make_gams_profiles(f"{years[i_y-1]}-{year}",VRE_profile,load,all_cap)
+
 
 # accumulated * potential cap
 # accumulated * "cost-optimal" cap mix
