@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 import pickle
 import pandas as pd
 import numpy as np
+from os import mkdir
 from statistics import mean
 from my_utils import print_red, print_green, print_cyan
 
@@ -27,8 +28,8 @@ def make_pickles(year, VRE_profiles, cap, load, non_traditional_load):
     total_VRE_prod = (VRE_profiles * cap).sum(axis=1)
     # net_load = load - total_VRE_prod
     leap_year = year % 4 == 0
-    mi = pd.MultiIndex.from_product([[year], range(1, 8761 + 24 * leap_year)], names=["year", "hour"])
-    df_small = pd.DataFrame(index=mi)
+    #mi = pd.MultiIndex.from_product([[year], range(1, 8761 + 24 * leap_year)], names=["year", "hour"])
+    #df_small = pd.DataFrame(index=mi)
     # df_small["net_load"] = list(net_load)
     # small = {"netload": df_small, "cap": cap}
     # small_name = f"netload_{year}.pickle"
@@ -201,9 +202,15 @@ def get_high_netload(threshold, rolling_average_days, VRE_profiles, all_cap, dem
     return net_load, high_netload_durations, high_netload_event_starts, threshold_to_beat
 
 
-def shift_year_seam(profile, years, seam_index=4464):
-    return
-
+def find_year_and_hour(index, start_year = 1980):
+    year = start_year
+    previous_hours = 0
+    while True:
+        hours_in_this_year = 8760 + 24 * (year % 4 == 0)
+        if index < hours_in_this_year + previous_hours:
+            return year, hours_in_this_year + previous_hours - index
+        previous_hours += hours_in_this_year
+        year += 1
 
 
 pickle_file = "PickleJar\\data_results_3h.pickle"
@@ -235,7 +242,7 @@ PV = ["PVPA" + str(i) for i in range(1, 6)]
 PVR = ["PVR" + str(i) for i in range(1, 6)]
 VRE_tech = WON + WOFF + PV + PVR
 all_cap = all_cap[all_cap.index.isin(VRE_tech, level=0)]
-print(all_cap)
+#print(all_cap)
 years = range(1980, 2020)
 sites = range(1, 6)
 # instead of switching to a new year at Jan 1st, a seam in summer gives a whole winter period
@@ -253,113 +260,193 @@ capacity_keys = {"WON": 'capacity_onshoreA', "WOFF": 'capacity_offshore', 'solar
 capacity = {"WON": all_cap[all_cap.index.isin(WON, level=0)], "WOFF": all_cap[all_cap.index.isin(WOFF, level=0)],
             'solar': all_cap[all_cap.index.isin(PV, level=0)],
             'solar_rooftop': all_cap[all_cap.index.isin(PVR, level=0)]}
-for year in years:
-    print_green(f"Year {year}")
-    leap = year % 4 == 0
-    VRE_profiles = pd.DataFrame(index=range(8760 + leap * 24),
-                                columns=pd.MultiIndex.from_product([VRE_tech, regions], names=["tech", "I_reg"]))
-    #VRE_pot_cap = ..
-    FLHs = {}
-    for VRE in VREs:
-        #print(f"- {VRE} -")
-        filename = filenames[VRE].replace("YEAR", str(year))
-        # [site,region]
-        # if there is a time dimension, the dimensions are [time,region,site]
-        VRE_mat = mat73.loadmat(mat_folder + filename)
-        profiles = VRE_mat[profile_keys[VRE]]
-        # VRE_cap = capacity[VRE]
-        capacities = VRE_mat[capacity_keys[VRE]]
-        # print(capacities)
-        for site in sites:
-            caps = capacities[:, 5 - site]
-            caps.sort()
-            #print(f"Testing site {6 - site} where cap is {caps}")
-            # testing the sites backwards to stop at the first feasible option
-            if caps[0] > 1:
-                viable_site = 5 - site
-                #print(f"best viable site is {viable_site + 1}")
-                break
-            elif site == 5:
-                viable_site = 4
-                #print(f"no 'viable' site found, using {viable_site + 1} instead")
-        for site in sites:  # need another loop which wont break
-            tech_name = VRE_tech_name_dict[VRE] + str(site)
-            VRE_profiles[tech_name] = profiles[:, :, site - 1]
-            # pot_cap = pd.DataFrame(capacities.T, index=sites, columns=regions, )
-        FLHs[VRE] = get_FLH(profiles[:, :, :])
-        # print(FLHs)#[:, viable_site - 1])
-        # print(profiles[:, :, viable_site - 1])
-    demand_filename = f'SyntheticDemand_nordic_L_ssp2-26-2050_{year}.mat'
-    mat_demand = mat73.loadmat(mat_folder + demand_filename)
-    demand = mat_demand["demand"]
-    prepped_tot_demand = demand.sum(axis=1) / 1000
-    prepped_tot_demand += non_traditional_load.sum() / len(prepped_tot_demand)
-    #print_red(demand.shape,non_traditional_load.shape)
-    #print_red(type(demand), type(non_traditional_load))
-    #print_red(demand, non_traditional_load)
-    prepped_demand = demand/1000 #+ np.array(non_traditional_load)*np.ones(demand.shape)
-    threshold = 0.5
+fig_path = "figures\\profile_analysis\\"
+try: mkdir(fig_path)
+except FileExistsError: None
+
+
+def separate_years(years):
+    print_cyan(f"Starting the 'separate_years()' script")
+    for year in years:
+        print_green(f"Year {year}")
+        leap = year % 4 == 0
+        VRE_profiles = pd.DataFrame(index=range(8760 + leap * 24),
+                                    columns=pd.MultiIndex.from_product([VRE_tech, regions], names=["tech", "I_reg"]))
+        #VRE_pot_cap = ..
+        FLHs = {}
+        for VRE in VREs:
+            #print(f"- {VRE} -")
+            filename = filenames[VRE].replace("YEAR", str(year))
+            # [site,region]
+            # if there is a time dimension, the dimensions are [time,region,site]
+            VRE_mat = mat73.loadmat(mat_folder + filename)
+            profiles = VRE_mat[profile_keys[VRE]]
+            find_best_nonzero_site = False
+            if find_best_nonzero_site:
+                capacities = VRE_mat[capacity_keys[VRE]]
+                for site in sites:
+                    caps = capacities[:, 5 - site]  # testing the sites backwards to stop at the first feasible option
+                    caps.sort()
+                    if caps[0] > 1:
+                        viable_site = 5 - site
+                        #print(f"best viable site is {viable_site + 1}")
+                        break
+                    elif site == 5:
+                        viable_site = 4
+                        #print(f"no 'viable' site found, using {viable_site + 1} instead")
+            for site in sites:  # need another loop which wont break
+                tech_name = VRE_tech_name_dict[VRE] + str(site)
+                VRE_profiles[tech_name] = profiles[:, :, site - 1]
+                # pot_cap = pd.DataFrame(capacities.T, index=sites, columns=regions, )
+            FLHs[VRE] = get_FLH(profiles[:, :, :])
+            if find_best_nonzero_site:
+                print(FLHs[:, viable_site - 1])
+                print(profiles[:, :, viable_site - 1])
+        demand_filename = f'SyntheticDemand_nordic_L_ssp2-26-2050_{year}.mat'
+        mat_demand = mat73.loadmat(mat_folder + demand_filename)
+        demand = mat_demand["demand"]
+        prepped_tot_demand = demand.sum(axis=1) / 1000
+        prepped_tot_demand += non_traditional_load.sum() / len(prepped_tot_demand)
+        #print_red(demand.shape,non_traditional_load.shape)
+        #print_red(type(demand), type(non_traditional_load))
+        #print_red(demand, non_traditional_load)
+        prepped_demand = demand/1000 #+ np.array(non_traditional_load)*np.ones(demand.shape)
+        threshold = 0.5
+        mod = 1
+        window_size_days = 3
+        net_load, high_netload_durations, high_netload_event_starts, threshold_to_beat = get_high_netload(threshold,
+                  window_size_days, VRE_profiles, all_cap * mod, demand, sum(non_traditional_load))
+        max_val = max(high_netload_durations)
+        max_val_start = high_netload_event_starts[high_netload_durations.index(max_val)]
+
+        #print(f"These are the high_netload_durations: {high_netload_durations}")
+        #print(f"These are the start times: {high_netload_event_starts}")
+        sorted_high_netload_durations = high_netload_durations.copy()
+        sorted_high_netload_durations.sort(reverse=True)
+        print_red(f"Sorted high_netload_durations: {sorted_high_netload_durations}")
+        # accumulated = get_accumulated_deficiency(VRE_profiles,all_cap,demand)
+        # print(net_load)
+        plt.plot(rolling_average(net_load, 24 * window_size_days))
+        plt.plot(prepped_tot_demand, color="gray", linestyle="--")
+        plt.axhline(y=mean(net_load), color="black", linestyle="-.")
+        plt.axhline(y=threshold_to_beat, color="red")
+        plt.axvline(x=max_val_start, color="red")
+        plt.xticks(range(0, 8760, 730),
+                   labels=["1 Jan.", "1 Feb.", "1 Mar.", "1 Apr.", "1 May", "1 Jun.", "1 Jul.", "1 Aug.",
+                           "1 Sep.", "1 Oct.", "1 Nov.", "1 Dec."])
+        # plt.legend(labels=regions)
+        plt.title(
+            f"Longest event in Year {year} is: {round(max(high_netload_durations) / 24)} days and starts day {round(max_val_start / 24)}")
+        # plt.title(f"Year {year}, mean is {round(mean(net_load))} with mod={mod}")
+        # plt.xlim([0,168*3])
+        plt.tight_layout()
+        #plt.show()
+        plt.savefig(f"{fig_path}over{int(threshold*100)}_netload_events_{year}.png")
+        plt.close()
+        #print_cyan(VRE_profiles)
+        #print_green(all_cap)
+        #print_red(prepped_tot_demand)
+        make_pickles(year, VRE_profiles, all_cap, prepped_demand, non_traditional_load)
+        make_gams_profiles(year,VRE_profiles,prepped_demand,all_cap)
+
+    VRE_profile_dict = {}
+    load_dict = {}
+    for i_y, year in enumerate(years):
+        #print(f"Year {year}")
+        netload_components = pickle.load(open(f"PickleJar\\netload_components_{year}.pickle","rb"))
+        VRE_profile_dict[year] = netload_components["VRE_profiles"]
+        load_dict[year] = netload_components["load"]
+        if year != years[0]:  # make new VRE_profiles with seam in summer
+            print_cyan(f" - Making profiles for years {years[i_y-1]}-{year}")
+            #VRE_profile = pd.concat([VRE_profile_dict[years[i_y-1]].loc[4464:], VRE_profile_dict[years[i_y]].loc[:4464]])
+            VRE_df_fall = pd.DataFrame(VRE_profile_dict[years[i_y - 1]][new_profile_seam:])
+            VRE_df_spring = pd.DataFrame(VRE_profile_dict[years[i_y]][:new_profile_seam])
+            VRE_df_fall.index = pd.RangeIndex(new_profile_seam, new_profile_seam + len(VRE_df_fall))
+            VRE_df = pd.concat([VRE_df_spring, VRE_df_fall])
+            #print_cyan(VRE_profile_dict[years[i_y-1]],VRE_profile_dict[years[i_y]])
+            #print_green(VRE_df)
+            #print(load_dict[years[i_y - 1]],load_dict[years[i_y - 1]].shape)
+            #print_green(pd.DataFrame(load_dict[years[i_y - 1]]))
+            load_df_fall = pd.DataFrame(load_dict[years[i_y - 1]][new_profile_seam:])
+            load_df_spring = pd.DataFrame(load_dict[years[i_y]][:new_profile_seam])
+            load_df_fall.index = pd.RangeIndex(new_profile_seam,new_profile_seam+len(load_df_fall))
+            load_df = pd.concat([load_df_spring, load_df_fall])
+            #print_cyan(load)
+            make_gams_profiles(f"{years[i_y-1]}-{year}",VRE_df,load_df,all_cap)
+
+
+def combined_years(years):
+    print_cyan(f"Starting the 'combined_years()' script")
+    VRE_profiles = pd.DataFrame(columns=pd.MultiIndex.from_product([VRE_tech, regions], names=["tech", "I_reg"]))
+    demands = np.array([])
+    for year in years:
+        print_green(f"- Reading data for Year {year}")
+        leap = year % 4 == 0
+        VRE_profile = pd.DataFrame(index=range(8760+24*leap),
+                                    columns=pd.MultiIndex.from_product([VRE_tech, regions], names=["tech", "I_reg"]))
+        #VRE_pot_cap = ..
+        FLHs = {}
+        for VRE in VREs:
+            #print(f"- {VRE} -")
+            filename = filenames[VRE].replace("YEAR", str(year))
+            # [site,region]
+            # if there is a time dimension, the dimensions are [time,region,site]
+            VRE_mat = mat73.loadmat(mat_folder + filename)
+            profiles = VRE_mat[profile_keys[VRE]]
+            find_best_nonzero_site = False
+            if find_best_nonzero_site:
+                capacities = VRE_mat[capacity_keys[VRE]]
+                for site in sites:
+                    caps = capacities[:, 5 - site]  # testing the sites backwards to stop at the first feasible option
+                    caps.sort()
+                    if caps[0] > 1:
+                        viable_site = 5 - site
+                        #print(f"best viable site is {viable_site + 1}")
+                        break
+                    elif site == 5:
+                        viable_site = 4
+                        #print(f"no 'viable' site found, using {viable_site + 1} instead")
+            for site in sites:  # need another loop which wont break
+                tech_name = VRE_tech_name_dict[VRE] + str(site)
+                VRE_profile[tech_name] = profiles[:, :, site - 1]
+                # pot_cap = pd.DataFrame(capacities.T, index=sites, columns=regions, )
+            FLHs[VRE] = get_FLH(profiles[:, :, :])
+            if find_best_nonzero_site:
+                print(FLHs[:, viable_site - 1])
+                print(profiles[:, :, viable_site - 1])
+        VRE_profiles = pd.concat([VRE_profiles, VRE_profile])
+        VRE_profiles.index = range(len(VRE_profiles))
+        demand_filename = f'SyntheticDemand_nordic_L_ssp2-26-2050_{year}.mat'
+        mat_demand = mat73.loadmat(mat_folder + demand_filename)
+        demand = mat_demand["demand"]  # np.ndarray
+        prepped_tot_demand = demand.sum(axis=1) / 1000
+        prepped_tot_demand += non_traditional_load.sum() / len(prepped_tot_demand)
+        demands = np.append(demands,demand.sum(axis=1) / 1000)
+        print(f"VRE_profiles and demands are now appended and the lengths are {len(VRE_profiles)} and {len(demands)}, respectively")
+    threshold = 0.67
     mod = 1
     window_size_days = 3
     net_load, high_netload_durations, high_netload_event_starts, threshold_to_beat = get_high_netload(threshold,
-              window_size_days, VRE_profiles, all_cap * mod, demand, sum(non_traditional_load))
+              window_size_days, VRE_profiles, all_cap * mod, demands, sum(non_traditional_load))
     max_val = max(high_netload_durations)
     max_val_start = high_netload_event_starts[high_netload_durations.index(max_val)]
-
-    #print(f"These are the high_netload_durations: {high_netload_durations}")
-    #print(f"These are the start times: {high_netload_event_starts}")
-    sorted_high_netload_durations = high_netload_durations.copy()
+    print(f"These are the high_netload_durations: {high_netload_durations}")
+    print(f"These are the start times: {high_netload_event_starts}")
+    sorted_high_netload_durations = high_netload_durations.copy()  # event length in days
     sorted_high_netload_durations.sort(reverse=True)
-    print_red(f"Sorted high_netload_durations: {sorted_high_netload_durations}")
+    index_longest_event = high_netload_durations.index(sorted_high_netload_durations[0])
+    index_second_longest_event = high_netload_durations.index(sorted_high_netload_durations[1])
+    year_of_longest_event, starthour_of_longest_event = find_year_and_hour(high_netload_event_starts[index_longest_event])
+    print_red(f"Sorted high_netload_durations (days): {sorted_high_netload_durations}")
+    year_of_second_longest_event, starthour_of_second_longest_event = find_year_and_hour(high_netload_event_starts[index_second_longest_event])
+    print_red(f"The longest event ({round(sorted_high_netload_durations[0]/24)} days) start during Year {year_of_longest_event}, Hour {starthour_of_longest_event}")
+    print_red(f"The second longest event ({round(sorted_high_netload_durations[1]/24)} days) start during Year {year_of_second_longest_event}, Hour {starthour_of_second_longest_event}")
     # accumulated = get_accumulated_deficiency(VRE_profiles,all_cap,demand)
     # print(net_load)
-    plt.plot(rolling_average(net_load, 24 * window_size_days))
-    plt.plot(prepped_tot_demand, color="gray", linestyle="--")
-    plt.axhline(y=mean(net_load), color="black", linestyle="-.")
-    plt.axhline(y=threshold_to_beat, color="red")
-    plt.axvline(x=max_val_start, color="red")
-    plt.xticks(range(0, 8760, 730),
-               labels=["1 Jan.", "1 Feb.", "1 Mar.", "1 Apr.", "1 May", "1 Jun.", "1 Jul.", "1 Aug.",
-                       "1 Sep.", "1 Oct.", "1 Nov.", "1 Dec."])
-    # plt.legend(labels=regions)
-    plt.title(
-        f"Longest event in Year {year} is: {round(max(high_netload_durations) / 24)} days and starts day {round(max_val_start / 24)}")
-    # plt.title(f"Year {year}, mean is {round(mean(net_load))} with mod={mod}")
-    # plt.xlim([0,168*3])
-    plt.tight_layout()
-    #plt.show()
-    plt.savefig(f"figures\\over{int(threshold*100)}_netload_events_{year}.png")
-    plt.close()
-    #print_cyan(VRE_profiles)
-    #print_green(all_cap)
-    #print_red(prepped_tot_demand)
-    make_pickles(year, VRE_profiles, all_cap, prepped_demand, non_traditional_load)
-    make_gams_profiles(year,VRE_profiles,prepped_demand,all_cap)
+    make_pickles(year, VRE_profiles, all_cap, demands, non_traditional_load)
 
-VRE_profile_dict = {}
-load_dict = {}
-for i_y, year in enumerate(years):
-    #print(f"Year {year}")
-    netload_components = pickle.load(open(f"PickleJar\\netload_components_{year}.pickle","rb"))
-    VRE_profile_dict[year] = netload_components["VRE_profiles"]
-    load_dict[year] = netload_components["load"]
-    if year != years[0]:  # make new VRE_profiles with seam in summer
-        print_cyan(f" - Making profiles for years {years[i_y-1]}-{year}")
-        #VRE_profile = pd.concat([VRE_profile_dict[years[i_y-1]].loc[4464:], VRE_profile_dict[years[i_y]].loc[:4464]])
-        VRE_df_fall = pd.DataFrame(VRE_profile_dict[years[i_y - 1]][new_profile_seam:])
-        VRE_df_spring = pd.DataFrame(VRE_profile_dict[years[i_y]][:new_profile_seam])
-        VRE_df_fall.index = pd.RangeIndex(new_profile_seam, new_profile_seam + len(VRE_df_fall))
-        VRE_df = pd.concat([VRE_df_spring, VRE_df_fall])
-        #print_cyan(VRE_profile_dict[years[i_y-1]],VRE_profile_dict[years[i_y]])
-        #print_green(VRE_df)
-        #print(load_dict[years[i_y - 1]],load_dict[years[i_y - 1]].shape)
-        #print_green(pd.DataFrame(load_dict[years[i_y - 1]]))
-        load_df_fall = pd.DataFrame(load_dict[years[i_y - 1]][new_profile_seam:])
-        load_df_spring = pd.DataFrame(load_dict[years[i_y]][:new_profile_seam])
-        load_df_fall.index = pd.RangeIndex(new_profile_seam,new_profile_seam+len(load_df_fall))
-        load_df = pd.concat([load_df_spring, load_df_fall])
-        #print_cyan(load)
-        make_gams_profiles(f"{years[i_y-1]}-{year}",VRE_df,load_df,all_cap)
+#separate_years(range(2018,2020))
+combined_years(years)
 
 
 # accumulated * potential cap
