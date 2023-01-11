@@ -27,7 +27,7 @@ CFD-plots for 40-year period and for individual years
 def make_pickles(year, VRE_profiles, cap, load, non_traditional_load):
     total_VRE_prod = (VRE_profiles * cap).sum(axis=1)
     # net_load = load - total_VRE_prod
-    leap_year = year % 4 == 0
+    #leap_year = year % 4 == 0
     #mi = pd.MultiIndex.from_product([[year], range(1, 8761 + 24 * leap_year)], names=["year", "hour"])
     #df_small = pd.DataFrame(index=mi)
     # df_small["net_load"] = list(net_load)
@@ -128,11 +128,13 @@ def get_netload_deficiency(VRE_profiles, all_cap, demand_profile, extra_demand):
 
 
 def rolling_average(my_list, window_size, wrap_around=True):
+    if type(my_list)==pd.Series: my_list = list(my_list)
     rolling_average_list = []
     if window_size % 2 == 0:
         window_size += 1
     steps_in_each_direction = int((window_size - 1) / 2)
     list_length_iterator = range(len(my_list))
+
     for my_list_index in list_length_iterator:
         window = []
         for step in range(-steps_in_each_direction, steps_in_each_direction + 1):
@@ -167,6 +169,15 @@ def get_high_netload(threshold, rolling_average_days, VRE_profiles, all_cap, dem
     -------
     longest net_load as well as high net-load duration and start-point
     """
+    if type(demand_profile)==dict:
+        load_list = []
+        for year,load in demand_profile.items():
+            load_list += list(load)
+        if len(set([type(i) for i in load_list]))>1:
+            print_red("! More than one datatype in load_list in get_high_netload()")
+            print_red(load[1943:1946])
+        demand_profile = np.array(load_list)
+
     if demand_profile.max() > 1000: demand_profile = demand_profile / 1000
     total_VRE_prod = (VRE_profiles * all_cap).sum(axis=1)
     print(f"Total VRE prod: {round(total_VRE_prod.sum()/1000)} TWh")
@@ -180,7 +191,18 @@ def get_high_netload(threshold, rolling_average_days, VRE_profiles, all_cap, dem
         demand += extra_demand / 8760
     net_load = demand - total_VRE_prod
     net_load_RA = rolling_average(net_load, rolling_average_days * 24)
-    print(f"Max / Mean / Min rolling average net-load: {round(max(net_load_RA))} / {round(mean(net_load_RA))} / {round(min(net_load_RA))}")
+    try: print(f"Max / Mean / Min rolling average net-load: {round(max(net_load_RA))} / {round(mean(net_load_RA))} / {round(min(net_load_RA))}")
+    except ValueError as e:
+        print_red(sum(net_load_RA))
+        print_red(len(net_load_RA))
+        types = [type(i) for i in net_load_RA]
+        print_red(types.index(type(pd.Series())))
+        #print_red(types)
+        print_red(net_load_RA[1943:1946])
+        #print_red(type(net_load_RA[0]))
+        #print_red(sum(net_load_RA[:])
+        #net_load_RA
+        raise e
     #print(f"Min RA net-load: {min(net_load_RA)}")
     #print(f"Mean net-load: {mean(net_load_RA)}")
     threshold_to_beat = threshold * max(rolling_average(demand, rolling_average_days * 24))
@@ -378,51 +400,48 @@ def separate_years(years):
 def combined_years(years):
     print_cyan(f"Starting the 'combined_years()' script")
     VRE_profiles = pd.DataFrame(columns=pd.MultiIndex.from_product([VRE_tech, regions], names=["tech", "I_reg"]))
-    demands = np.array([])
+    demands = {}
     for year in years:
         print_green(f"- Reading data for Year {year}")
         leap = year % 4 == 0
         VRE_profile = pd.DataFrame(index=range(8760+24*leap),
                                     columns=pd.MultiIndex.from_product([VRE_tech, regions], names=["tech", "I_reg"]))
-        #VRE_pot_cap = ..
+        # regions = ["SE_NO_N", "SE_S", "NO_S", "FI", "DE_N", "DE_S"]
         FLHs = {}
-        for VRE in VREs:
+        for VRE in VREs: # ["WON", "WOFF", "solar", "solar_rooftop"]
             #print(f"- {VRE} -")
             filename = filenames[VRE].replace("YEAR", str(year))
             # [site,region]
             # if there is a time dimension, the dimensions are [time,region,site]
             VRE_mat = mat73.loadmat(mat_folder + filename)
             profiles = VRE_mat[profile_keys[VRE]]
-            find_best_nonzero_site = False
-            if find_best_nonzero_site:
-                capacities = VRE_mat[capacity_keys[VRE]]
-                for site in sites:
-                    caps = capacities[:, 5 - site]  # testing the sites backwards to stop at the first feasible option
-                    caps.sort()
-                    if caps[0] > 1:
-                        viable_site = 5 - site
-                        #print(f"best viable site is {viable_site + 1}")
-                        break
-                    elif site == 5:
-                        viable_site = 4
-                        #print(f"no 'viable' site found, using {viable_site + 1} instead")
-            for site in sites:  # need another loop which wont break
+            for site in sites:
                 tech_name = VRE_tech_name_dict[VRE] + str(site)
                 VRE_profile[tech_name] = profiles[:, :, site - 1]
+                if tech_name == "PVPA2":
+                    print_red(profiles[[12,-12], 0, site - 1])
                 # pot_cap = pd.DataFrame(capacities.T, index=sites, columns=regions, )
             FLHs[VRE] = get_FLH(profiles[:, :, :])
-            if find_best_nonzero_site:
-                print(FLHs[:, viable_site - 1])
-                print(profiles[:, :, viable_site - 1])
+        VRE_profile.index = pd.MultiIndex.from_product([[year], [f"h{h:04}" for h in range(1, len(VRE_profile)+1)]],
+                                                       names=["year", "timestep"])
         VRE_profiles = pd.concat([VRE_profiles, VRE_profile])
-        VRE_profiles.index = range(len(VRE_profiles))
+        VRE_profiles.index = pd.MultiIndex.from_tuples(VRE_profiles.index)
+        error_labels = []
+        for label, col in VRE_profiles.items():
+            if pd.isna(max(col))!=pd.isna(sum(col)):
+                print_red("inconsistent NA at",label)
+                error_labels.append(label)
+        print_red(VRE_profiles[error_labels].loc[(slice(None),"h0012"),:])
         demand_filename = f'SyntheticDemand_nordic_L_ssp2-26-2050_{year}.mat'
         mat_demand = mat73.loadmat(mat_folder + demand_filename)
         demand = mat_demand["demand"]  # np.ndarray
+        if len(set([type(i) for i in demand]))>1:
+            print_red("! More than one datatype in demand in combined_years()")
         prepped_tot_demand = demand.sum(axis=1) / 1000
         prepped_tot_demand += non_traditional_load.sum() / len(prepped_tot_demand)
-        demands = np.append(demands,demand.sum(axis=1) / 1000)
-        print(f"VRE_profiles and demands are now appended and the lengths are {len(VRE_profiles)} and {len(demands)}, respectively")
+        demands[year] = demand.sum(axis=1) / 1000
+        #print_red(demands[year].shape)
+        print(f"VRE_profiles and demands are now appended and the lengths are {len(VRE_profiles)} and {sum([len(load) for load in demands.values()])}, respectively")
     threshold = 0.67
     mod = 1
     window_size_days = 3
@@ -434,19 +453,19 @@ def combined_years(years):
     print(f"These are the start times: {high_netload_event_starts}")
     sorted_high_netload_durations = high_netload_durations.copy()  # event length in days
     sorted_high_netload_durations.sort(reverse=True)
+    print_red(f"Sorted high_netload_durations (days): {sorted_high_netload_durations}")
     index_longest_event = high_netload_durations.index(sorted_high_netload_durations[0])
     index_second_longest_event = high_netload_durations.index(sorted_high_netload_durations[1])
     year_of_longest_event, starthour_of_longest_event = find_year_and_hour(high_netload_event_starts[index_longest_event])
-    print_red(f"Sorted high_netload_durations (days): {sorted_high_netload_durations}")
-    year_of_second_longest_event, starthour_of_second_longest_event = find_year_and_hour(high_netload_event_starts[index_second_longest_event])
     print_red(f"The longest event ({round(sorted_high_netload_durations[0]/24)} days) start during Year {year_of_longest_event}, Hour {starthour_of_longest_event}")
+    year_of_second_longest_event, starthour_of_second_longest_event = find_year_and_hour(high_netload_event_starts[index_second_longest_event])
     print_red(f"The second longest event ({round(sorted_high_netload_durations[1]/24)} days) start during Year {year_of_second_longest_event}, Hour {starthour_of_second_longest_event}")
     # accumulated = get_accumulated_deficiency(VRE_profiles,all_cap,demand)
     # print(net_load)
-    make_pickles(year, VRE_profiles, all_cap, demands, non_traditional_load)
+    make_pickles(f"{years[0]}-{years[-1]}", VRE_profiles, all_cap, demands, non_traditional_load)
 
 #separate_years(range(2018,2020))
-combined_years(years)
+combined_years(years[:10])
 
 
 # accumulated * potential cap
