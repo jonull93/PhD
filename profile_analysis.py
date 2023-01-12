@@ -418,8 +418,6 @@ def combined_years(years):
             for site in sites:
                 tech_name = VRE_tech_name_dict[VRE] + str(site)
                 VRE_profile[tech_name] = profiles[:, :, site - 1]
-                if tech_name == "PVPA2":
-                    print_red(profiles[[12,-12], 0, site - 1])
                 # pot_cap = pd.DataFrame(capacities.T, index=sites, columns=regions, )
             FLHs[VRE] = get_FLH(profiles[:, :, :])
         VRE_profile.index = pd.MultiIndex.from_product([[year], [f"h{h:04}" for h in range(1, len(VRE_profile)+1)]],
@@ -431,17 +429,20 @@ def combined_years(years):
             if pd.isna(max(col))!=pd.isna(sum(col)):
                 print_red("inconsistent NA at",label)
                 error_labels.append(label)
-        print_red(VRE_profiles[error_labels].loc[(slice(None),"h0012"),:])
         demand_filename = f'SyntheticDemand_nordic_L_ssp2-26-2050_{year}.mat'
         mat_demand = mat73.loadmat(mat_folder + demand_filename)
         demand = mat_demand["demand"]  # np.ndarray
         if len(set([type(i) for i in demand]))>1:
             print_red("! More than one datatype in demand in combined_years()")
+        print_green("\nAverage net-load per region:")
+        print_green(regions)
+        print_green((-(VRE_profile*all_cap).sum(axis=0).sum(level="I_reg")+demand.sum(axis=0)/1000+non_traditional_load)/8760)
         prepped_tot_demand = demand.sum(axis=1) / 1000
         prepped_tot_demand += non_traditional_load.sum() / len(prepped_tot_demand)
         demands[year] = demand.sum(axis=1) / 1000
         #print_red(demands[year].shape)
         print(f"VRE_profiles and demands are now appended and the lengths are {len(VRE_profiles)} and {sum([len(load) for load in demands.values()])}, respectively")
+    print_red(VRE_profiles[error_labels].loc[(slice(None), "h0012"), :])
     threshold = 0.67
     mod = 1
     window_size_days = 3
@@ -465,7 +466,7 @@ def combined_years(years):
     make_pickles(f"{years[0]}-{years[-1]}", VRE_profiles, all_cap, demands, non_traditional_load)
 
 #separate_years(range(2018,2020))
-combined_years(years[:10])
+combined_years(years)
 
 
 # accumulated * potential cap
