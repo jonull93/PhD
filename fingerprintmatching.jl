@@ -9,10 +9,10 @@ fingerprintmatching:
 
 
 # Define the matrices
-m1 = [1 2 3; 4 5 6; 7 8 9]
-m2 = [10 11 12; 13 14 15; 16 17 18]
-m3 = [19 20 21; 22 23 24; 25 26 27]
-m4 = [28 29 30; 31 32 33; 34 35 36]/2
+m1 = [10 11 12; 4 5 6; 0 2 0]
+m2 = [10 11 12; 13 14 15; 1 1 0]
+m3 = [19 20 21; 22 23 24; 1 0 1]
+m4 = [28 29 30; 31 32 33; 3 4 2]/2
 
 # Define the weights
 w1 = 0.5
@@ -24,14 +24,15 @@ lower = [0, 0, 0]
 upper = [1, 1, 1]
 
 # Calculate the weighted sum of the matrices
-m_sum = w1*m1 + w2*m2 + w3*m3
+function matrix_SSE(m1,m2,m3,w)
+    m_sum = w[1]*m1 + w[2]*m2 + w[3]*m3
+    # Calculate the difference between the weighted sum and matrix 4
+    diff = m_sum - m4
+    # Calculate the sum of the squares of the differences
+    sse = sum(diff.^2)
+end
 
-# Calculate the difference between the weighted sum and matrix 4
-diff = m_sum - m4
-
-# Calculate the sum of the squares of the differences
-sse = sum(diff.^2)
-println("Initial SSE = $(sse)")
+println("Initial SSE = $(matrix_SSE(m1,m2,m3,[w1,w2,w3]))")
 # Use an optimization algorithm to find the best weights
 using Optim
 
@@ -46,11 +47,16 @@ return sse
 end
 
 res = optimize(sse_func, lower, upper, [w1, w2, w3])
+w1_new = res.minimizer[1]
+w2_new = res.minimizer[2]
+w3_new = res.minimizer[3]
 
 # Print the best weights
 println("The best weights are:")
-println("w1 = $(res.minimizer[1])")
-println("w2 = $(res.minimizer[2])")
-println("w3 = $(res.minimizer[3])")
+println("w1 = $(w1_new)")
+println("w2 = $(w2_new)")
+println("w3 = $(w3_new)")
+
+println("Final SSE = $(matrix_SSE(m1,m2,m3,[w1_new,w2_new,w3_new]))")
 
 #The output of the code will be the best weights that can be used to match matrices 1,2,3 to matrix 4.
