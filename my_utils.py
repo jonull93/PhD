@@ -364,3 +364,4 @@ def print_cyan(to_print: str, *argv):
         print(colored(to_print, "cyan"))
         for arg in argv:
             print(colored(arg, "cyan"))
+

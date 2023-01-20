@@ -98,3 +98,4 @@ except AttributeError:
 fig.tight_layout()
 plt.savefig(fig_path+f"yearly_elec_prod_{timestep}h.png", dpi=300, bbox_inches="tight")
 plt.savefig(fig_path+f"yearly_elec_prod_{timestep}h.svg", bbox_inches="tight")
+

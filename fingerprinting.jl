@@ -62,14 +62,3 @@ end
 
 return (w1, w2, w3, w4)
 end
-```
-Hydrogen has been used in steel production for many years, but recent research has focused on using hydrogen as a reducing agent in the steelmaking process. This research has focused on improving the efficiency of the process, reducing emissions, and improving the quality of the steel produced.
-
-One of the most promising areas of research is the use of hydrogen-based direct reduction (HDR) processes. These processes use hydrogen to reduce iron ore directly, eliminating the need for coke and other reducing agents. This reduces emissions and improves the efficiency of the process.
-
-Another area of research is the use of hydrogen-based processes to reduce the amount of energy required for steel production. This includes the use of hydrogen-based processes to preheat the steel before it is rolled or forged, as well as the use of hydrogen-based processes to reduce the amount of energy required for reheating.
-
-Finally, research is being conducted on the use of hydrogen-based processes to improve the quality of the steel produced. This includes the use of hydrogen-based processes to reduce the amount of impurities in the steel, as well as the use of hydrogen-based processes to improve the strength and ductility of the steel.
-
-Overall, research into the use of hydrogen for steel production is ongoing, and the potential benefits of using hydrogen-based processes are significant. As research continues, it is likely that hydrogen-based processes will become more widely used in steel production.
-```
