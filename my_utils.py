@@ -212,7 +212,7 @@ def write_inc(path, filename, data: dict, flip=True, fliplast=False, comment=Fal
             return
         elif type(data)==list:
             for i, val in enumerate(data):
-                writer.write(f"{'h' + str(i + 1).zfill(4)}  {vald}\n")
+                writer.write(f"{'h' + str(i + 1).zfill(4)}  {val}\n")
         for key1, val1 in data.items():
             if type(val1) == dict:  # key1: {..}
                 for key2, val2 in val1.items():
