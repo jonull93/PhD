@@ -5,7 +5,7 @@ import pandas as pd
 import numpy as np
 from os import mkdir
 from statistics import mean
-from my_utils import print_red, print_green, print_cyan
+from my_utils import print_red, print_green, print_cyan, fast_rolling_average
 
 """
 
@@ -127,7 +127,7 @@ def get_netload_deficiency(VRE_profiles, all_cap, demand_profile, extra_demand):
     return accumulated
 
 
-def rolling_average(my_list, window_size, wrap_around=True):
+"""def rolling_average(my_list, window_size, wrap_around=True):
     if type(my_list)==pd.Series: my_list = list(my_list)
     rolling_average_list = []
     if window_size % 2 == 0:
@@ -145,12 +145,7 @@ def rolling_average(my_list, window_size, wrap_around=True):
             elif i in list_length_iterator:  # disregard i outside of my_list if not wrapping around
                 window.append(my_list[i])
         rolling_average_list.append(sum(window) / len(window))
-    return rolling_average_list
-
-
-def fast_rolling_average(my_list, window_size):
-    df = pd.DataFrame(my_list)
-    return df.rolling(window_size).mean().fillna(method="bfill")
+    return rolling_average_list"""
 
 
 def get_high_netload(threshold, rolling_average_days, VRE_profiles, all_cap, demand_profile, extra_demand=0):
@@ -190,7 +185,7 @@ def get_high_netload(threshold, rolling_average_days, VRE_profiles, all_cap, dem
     else:
         demand += extra_demand / 8760
     net_load = demand - total_VRE_prod
-    net_load_RA = rolling_average(net_load, rolling_average_days * 24)
+    net_load_RA = fast_rolling_average(net_load, rolling_average_days * 24)
     try: print(f"Max / Mean / Min rolling average net-load: {round(max(net_load_RA))} / {round(mean(net_load_RA))} / {round(min(net_load_RA))}")
     except ValueError as e:
         print_red(sum(net_load_RA))
@@ -205,8 +200,11 @@ def get_high_netload(threshold, rolling_average_days, VRE_profiles, all_cap, dem
         raise e
     #print(f"Min RA net-load: {min(net_load_RA)}")
     #print(f"Mean net-load: {mean(net_load_RA)}")
-    threshold_to_beat = threshold * max(rolling_average(demand, rolling_average_days * 24))
+    rolling_average_netload = fast_rolling_average(demand, rolling_average_days * 24).stack().tolist()
+    #convert dataframe rolling_average_netload to list
+    threshold_to_beat = threshold * max(rolling_average_netload)
     print(f"Threshold to beat: {round(threshold_to_beat)}")
+    #print_cyan(threshold,rolling_average_netload.max(), threshold*float(rolling_average_netload.max()))
     high_netload = [i > threshold_to_beat for i in net_load_RA]  # list of True and False
     high_netload_durations = []
     high_netload_event_starts = []
@@ -218,6 +216,9 @@ def get_high_netload(threshold, rolling_average_days, VRE_profiles, all_cap, dem
             high_netload_durations.append(counter)
             high_netload_event_starts.append(i - counter)
             counter = 0
+    if over_threshold is True and counter > 0: #if the last hour should have triggered the elif
+        high_netload_durations.append(counter)
+        high_netload_event_starts.append(i - counter)
     if len(high_netload_durations) == 0:
         high_netload_durations.append(0)
         high_netload_event_starts.append(0)
@@ -230,7 +231,7 @@ def find_year_and_hour(index, start_year = 1980):
     while True:
         hours_in_this_year = 8760 + 24 * (year % 4 == 0)
         if index < hours_in_this_year + previous_hours:
-            return year, hours_in_this_year + previous_hours - index
+            return year, index - previous_hours
         previous_hours += hours_in_this_year
         year += 1
 
@@ -287,8 +288,10 @@ try: mkdir(fig_path)
 except FileExistsError: None
 
 
-def separate_years(years):
+def separate_years(years, add_nontraditional_load=True, make_output=True, make_figure=False, window_size_days=3,
+                   threshold=0.5):
     print_cyan(f"Starting the 'separate_years()' script")
+    if type(years)==type(1980): years = [years]
     for year in years:
         print_green(f"Year {year}")
         leap = year % 4 == 0
@@ -328,14 +331,12 @@ def separate_years(years):
         mat_demand = mat73.loadmat(mat_folder + demand_filename)
         demand = mat_demand["demand"]
         prepped_tot_demand = demand.sum(axis=1) / 1000
-        prepped_tot_demand += non_traditional_load.sum() / len(prepped_tot_demand)
+        if add_nontraditional_load: prepped_tot_demand += non_traditional_load.sum() / len(prepped_tot_demand)
         #print_red(demand.shape,non_traditional_load.shape)
         #print_red(type(demand), type(non_traditional_load))
         #print_red(demand, non_traditional_load)
         prepped_demand = demand/1000 #+ np.array(non_traditional_load)*np.ones(demand.shape)
-        threshold = 0.5
         mod = 1
-        window_size_days = 3
         net_load, high_netload_durations, high_netload_event_starts, threshold_to_beat = get_high_netload(threshold,
                   window_size_days, VRE_profiles, all_cap * mod, demand, sum(non_traditional_load))
         max_val = max(high_netload_durations)
@@ -348,56 +349,58 @@ def separate_years(years):
         print_red(f"Sorted high_netload_durations: {sorted_high_netload_durations}")
         # accumulated = get_accumulated_deficiency(VRE_profiles,all_cap,demand)
         # print(net_load)
-        plt.plot(rolling_average(net_load, 24 * window_size_days))
-        plt.plot(prepped_tot_demand, color="gray", linestyle="--")
-        plt.axhline(y=mean(net_load), color="black", linestyle="-.")
-        plt.axhline(y=threshold_to_beat, color="red")
-        plt.axvline(x=max_val_start, color="red")
-        plt.xticks(range(0, 8760, 730),
-                   labels=["1 Jan.", "1 Feb.", "1 Mar.", "1 Apr.", "1 May", "1 Jun.", "1 Jul.", "1 Aug.",
-                           "1 Sep.", "1 Oct.", "1 Nov.", "1 Dec."])
-        # plt.legend(labels=regions)
-        plt.title(
-            f"Longest event in Year {year} is: {round(max(high_netload_durations) / 24)} days and starts day {round(max_val_start / 24)}")
-        # plt.title(f"Year {year}, mean is {round(mean(net_load))} with mod={mod}")
-        # plt.xlim([0,168*3])
-        plt.tight_layout()
-        #plt.show()
-        plt.savefig(f"{fig_path}over{int(threshold*100)}_netload_events_{year}.png")
-        plt.close()
+        if make_figure:
+            plt.plot(fast_rolling_average(net_load, 24 * window_size_days))
+            plt.plot(prepped_tot_demand, color="gray", linestyle="--")
+            plt.axhline(y=mean(net_load), color="black", linestyle="-.")
+            plt.axhline(y=threshold_to_beat, color="red")
+            plt.axvline(x=max_val_start, color="red")
+            plt.xticks(range(0, 8760, 730),
+                       labels=["1 Jan.", "1 Feb.", "1 Mar.", "1 Apr.", "1 May", "1 Jun.", "1 Jul.", "1 Aug.",
+                               "1 Sep.", "1 Oct.", "1 Nov.", "1 Dec."])
+            # plt.legend(labels=regions)
+            plt.title(
+                f"Longest event in Year {year} is: {round(max(high_netload_durations) / 24)} days and starts day {round(max_val_start / 24)}")
+            # plt.title(f"Year {year}, mean is {round(mean(net_load))} with mod={mod}")
+            # plt.xlim([0,168*3])
+            plt.tight_layout()
+            #plt.show()
+            plt.savefig(f"{fig_path}over{int(threshold*100)}_netload_events_{year}.png")
+            plt.close()
         #print_cyan(VRE_profiles)
         #print_green(all_cap)
         #print_red(prepped_tot_demand)
-        make_pickles(year, VRE_profiles, all_cap, prepped_demand, non_traditional_load)
-        make_gams_profiles(year,VRE_profiles,prepped_demand,all_cap)
+        if make_output:
+            make_pickles(year, VRE_profiles, all_cap, prepped_demand, non_traditional_load)
+            make_gams_profiles(year,VRE_profiles,prepped_demand,all_cap)
+            VRE_profile_dict = {}
+            load_dict = {}
+            for i_y, year in enumerate(years):
+                # print(f"Year {year}")
+                netload_components = pickle.load(open(f"PickleJar\\netload_components_{year}.pickle", "rb"))
+                VRE_profile_dict[year] = netload_components["VRE_profiles"]
+                load_dict[year] = netload_components["load"]
+                if year != years[0]:  # make new VRE_profiles with seam in summer
+                    print_cyan(f" - Making profiles for years {years[i_y - 1]}-{year}")
+                    # VRE_profile = pd.concat([VRE_profile_dict[years[i_y-1]].loc[4464:], VRE_profile_dict[years[i_y]].loc[:4464]])
+                    VRE_df_fall = pd.DataFrame(VRE_profile_dict[years[i_y - 1]][new_profile_seam:])
+                    VRE_df_spring = pd.DataFrame(VRE_profile_dict[years[i_y]][:new_profile_seam])
+                    VRE_df_fall.index = pd.RangeIndex(new_profile_seam, new_profile_seam + len(VRE_df_fall))
+                    VRE_df = pd.concat([VRE_df_spring, VRE_df_fall])
+                    print_cyan(VRE_profile_dict[years[i_y - 1]], VRE_profile_dict[years[i_y]])
+                    print_green(VRE_df)
+                    # print(load_dict[years[i_y - 1]],load_dict[years[i_y - 1]].shape)
+                    # print_green(pd.DataFrame(load_dict[years[i_y - 1]]))
+                    load_df_fall = pd.DataFrame(load_dict[years[i_y - 1]][new_profile_seam:])
+                    load_df_spring = pd.DataFrame(load_dict[years[i_y]][:new_profile_seam])
+                    load_df_fall.index = pd.RangeIndex(new_profile_seam, new_profile_seam + len(load_df_fall))
+                    load_df = pd.concat([load_df_spring, load_df_fall])
+                    # print_cyan(load)
+                    make_gams_profiles(f"{years[i_y - 1]}-{year}", VRE_df, load_df, all_cap)
+    return net_load
 
-    VRE_profile_dict = {}
-    load_dict = {}
-    for i_y, year in enumerate(years):
-        #print(f"Year {year}")
-        netload_components = pickle.load(open(f"PickleJar\\netload_components_{year}.pickle","rb"))
-        VRE_profile_dict[year] = netload_components["VRE_profiles"]
-        load_dict[year] = netload_components["load"]
-        if year != years[0]:  # make new VRE_profiles with seam in summer
-            print_cyan(f" - Making profiles for years {years[i_y-1]}-{year}")
-            #VRE_profile = pd.concat([VRE_profile_dict[years[i_y-1]].loc[4464:], VRE_profile_dict[years[i_y]].loc[:4464]])
-            VRE_df_fall = pd.DataFrame(VRE_profile_dict[years[i_y - 1]][new_profile_seam:])
-            VRE_df_spring = pd.DataFrame(VRE_profile_dict[years[i_y]][:new_profile_seam])
-            VRE_df_fall.index = pd.RangeIndex(new_profile_seam, new_profile_seam + len(VRE_df_fall))
-            VRE_df = pd.concat([VRE_df_spring, VRE_df_fall])
-            #print_cyan(VRE_profile_dict[years[i_y-1]],VRE_profile_dict[years[i_y]])
-            #print_green(VRE_df)
-            #print(load_dict[years[i_y - 1]],load_dict[years[i_y - 1]].shape)
-            #print_green(pd.DataFrame(load_dict[years[i_y - 1]]))
-            load_df_fall = pd.DataFrame(load_dict[years[i_y - 1]][new_profile_seam:])
-            load_df_spring = pd.DataFrame(load_dict[years[i_y]][:new_profile_seam])
-            load_df_fall.index = pd.RangeIndex(new_profile_seam,new_profile_seam+len(load_df_fall))
-            load_df = pd.concat([load_df_spring, load_df_fall])
-            #print_cyan(load)
-            make_gams_profiles(f"{years[i_y-1]}-{year}",VRE_df,load_df,all_cap)
 
-
-def combined_years(years):
+def combined_years(years, threshold=0.5, window_size_days=3):
     print_cyan(f"Starting the 'combined_years()' script")
     VRE_profiles = pd.DataFrame(columns=pd.MultiIndex.from_product([VRE_tech, regions], names=["tech", "I_reg"]))
     demands = {}
@@ -442,10 +445,9 @@ def combined_years(years):
         demands[year] = demand.sum(axis=1) / 1000
         #print_red(demands[year].shape)
         print(f"VRE_profiles and demands are now appended and the lengths are {len(VRE_profiles)} and {sum([len(load) for load in demands.values()])}, respectively")
-    print_red(VRE_profiles[error_labels].loc[(slice(None), "h0012"), :])
-    threshold = 0.67
+    if len(error_labels)>0: print_red(VRE_profiles[error_labels].loc[(slice(None), "h0012"), :])
+    else: print_green("No missing profiles :)")
     mod = 1
-    window_size_days = 3
     net_load, high_netload_durations, high_netload_event_starts, threshold_to_beat = get_high_netload(threshold,
               window_size_days, VRE_profiles, all_cap * mod, demands, sum(non_traditional_load))
     max_val = max(high_netload_durations)
@@ -465,10 +467,40 @@ def combined_years(years):
     # print(net_load)
     make_pickles(f"{years[0]}-{years[-1]}", VRE_profiles, all_cap, demands, non_traditional_load)
 
-#separate_years(range(2018,2020))
-combined_years(years)
+
+#separate_years(years, make_figure=True, threshold=0.33)
+#combined_years(years)
+combined_years(years,threshold=0.33)
 
 
+"""net_load = separate_years(1980, add_nontraditional_load=False, make_figure=True, make_output=False, window_size_days=1)
+
+from timeit import default_timer as timer
+start_time = timer()
+for i in range(20):
+    a = rolling_average(net_load,window_size=1)
+end_time = timer()
+print(f"elapsed time slow = {round(end_time - start_time, 1)}")
+start_time = timer()
+
+for i in range(20):
+    b = fast_rolling_average(net_load, window_size=24, center=True, min_periods=1)
+end_time = timer()
+print(f"elapsed time fast = {round(end_time - start_time, 1)}")
+
+a = pd.DataFrame(data=a)
+#plt.plot(a)
+plt.plot(b)
+#plt.plot(a-b)
+plt.show()
+print(a)
+print(b)
+#print(a.rolling(5, center=True).mean())
+
+#for i in range(len(a)):
+#        error += (a[i] - b.iloc[i])**2
+#print(f" Error = {error}")
+"""
 # accumulated * potential cap
 # accumulated * "cost-optimal" cap mix
 # - one line per subregion
