@@ -80,7 +80,7 @@ def fast_cfd(df_netload, xmin, xmax, amp_length=0.1, area_method=False):
         df_freq = pd.DataFrame(data=s)
         #    s_form=list(s)
         output[amp] = df_freq
-    print(output[10].to_string())
+    #print(output[10].to_string())
     if area_method and False:
         for amp in amps:  # smidge and add all edges towards the vertical middle
             my_range = range(0, amp, amp_length*sign(amp))
@@ -88,14 +88,13 @@ def fast_cfd(df_netload, xmin, xmax, amp_length=0.1, area_method=False):
                 output[amp2] = output[amp2].add(output[amp], fill_value=0)
         for amp in amps:  # smidge and add all areas downwards
             None
-    print(output[10].to_string())
+    #print(output[10].to_string())
 
     # df_out=pd.DataFrame(data=output, index=[amp])
     # df_out = pd.DataFrame()
     print(f"time to build df_freq for all amps = {round(timer() - start_time, 1)}")
     start_time = timer()
     df_out_tot = pd.DataFrame()
-    # output2 = {}
     for amp in amps:
         df_out = output[amp]
         df_out = df_out.iloc[1:]
@@ -103,25 +102,43 @@ def fast_cfd(df_netload, xmin, xmax, amp_length=0.1, area_method=False):
         df_out = pd.concat([df_out], keys=[amp], names=['Amplitude'])
         df_out.rename(columns={'count2': 'Occurences'}, inplace=True)
         df_out_tot = df_out_tot.append(df_out)
-    #    output2[amp] = df_out
-    # df_out[0]
     print(f"time to build df_out_tot = {round(timer() - start_time, 1)}")
     if area_method:
+        start_time = timer()
         print_red(df_out_tot.index.get_level_values(0).unique())
+        # df_out_tot hold a single column and a few multiindexed rows
+        # please make this code more efficient
         for amp in df_out_tot.index.get_level_values(0).unique():
-            nr_durations = len(df_out_tot.loc[amp].index)
             to_pass_on = 0
-            #if amp <100: print("Before:",df_out_tot.loc[amp])
-            for index,val in df_out_tot.loc[amp].copy().iterrows():
-                #if amp <100: print(val[0],to_pass_on)
-                df_out_tot.loc[amp,index] += to_pass_on
+            df = df_out_tot.loc[amp].copy()
+            df = df.reindex(range(0, df.index.max() + 1), fill_value=0).sort_index(ascending=False)
+            indexes = df_out_tot.loc[amp].index
+            for index, val in df.iterrows():
+                if (amp, index) in indexes:
+                    df_out_tot.loc[(amp, index), :] += to_pass_on
+                else:
+                    df_out_tot.loc[(amp, index), :] = to_pass_on
                 to_pass_on = to_pass_on + val[0]
-            #if amp <100: print("After:", df_out_tot.loc[amp])
+        print(f"time to remake lines into areas = {round(timer() - start_time, 1)}")
+
+        """for amp in amps:
+            df_out = output[amp]
+            df_out = df_out.iloc[1:]
+            df_out.index.name = 'Duration'
+            df_out = pd.concat([df_out], keys=[amp], names=['Amplitude'])
+            df_out.rename(columns={'count2': 'Occurences'}, inplace=True)
+            df_out_tot = df_out_tot.append(df_out)
+        print(f"time to build df_out_tot = {round(timer() - start_time, 1)}")
+        start_time = timer()
+        if area_method:
+            df_out_tot = df_out_tot.groupby(level=0).apply(lambda x: x.reindex(range(0, x.index.max() + 1), fill_value=0).sort_index(ascending=False))
+            df_out_tot['Occurences'] = df_out_tot.groupby(level=0).apply(lambda x: x['Occurences'].cumsum())
+            print(f"time to remake lines into areas = {round(timer() - start_time, 1)}")"""
     return df_out_tot
 
 
 #year = "1980-2019"  # 1981
-amp_length = 1
+amp_length = 5
 rolling_hours = 12
 test_mode = True
 write_pickle = not test_mode
