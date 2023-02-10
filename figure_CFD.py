@@ -34,7 +34,7 @@ def fast_cfd(df_netload, xmin, xmax, amp_length=0.1, area_method=False):
     start_time = timer()
     for amp in amps:
         # initiate variables before hour loop
-        d = {'net load': net_load, 'count1': 0, 'count2': 0}
+        d = {'net load': net_loads_array, 'count1': 0, 'count2': 0}
         df_netload = pd.DataFrame(data=d)
         previous_hour = hours[0]
         previous_net_load_val = net_loads_array[0]
