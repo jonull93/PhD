@@ -4,6 +4,10 @@ import math
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+from multiprocessing import cpu_count
+from queue import Queue
+import threading
+import time as tm
 from timeit import default_timer as timer
 from my_utils import print_red, print_cyan, print_green, fast_rolling_average
 
@@ -24,7 +28,6 @@ def sign(num):
 def fast_cfd(df_netload, xmin, xmax, amp_length=0.1, area_method=False):
     df_freq = pd.DataFrame()
     output = {}
-    hours = df_netload.index
     # print("index = ", hours)
     net_loads_array = np.array(df_netload["net load"].values)
     # print("vals = ", net_loads_array)
@@ -36,6 +39,7 @@ def fast_cfd(df_netload, xmin, xmax, amp_length=0.1, area_method=False):
         # initiate variables before hour loop
         d = {'net load': net_loads_array, 'count1': 0, 'count2': 0}
         df_netload = pd.DataFrame(data=d)
+        hours = df_netload.index
         previous_hour = hours[0]
         previous_net_load_val = net_loads_array[0]
         amp_positive = amp >= 0
@@ -105,7 +109,7 @@ def fast_cfd(df_netload, xmin, xmax, amp_length=0.1, area_method=False):
     print(f"time to build df_out_tot = {round(timer() - start_time, 1)}")
     if area_method:
         start_time = timer()
-        print_red(df_out_tot.index.get_level_values(0).unique())
+        #print_red(df_out_tot.index.get_level_values(0).unique())
         # df_out_tot hold a single column and a few multiindexed rows
         # please make this code more efficient
         for amp in df_out_tot.index.get_level_values(0).unique():
@@ -137,19 +141,7 @@ def fast_cfd(df_netload, xmin, xmax, amp_length=0.1, area_method=False):
     return df_out_tot
 
 
-#year = "1980-2019"  # 1981
-amp_length = 5
-rolling_hours = 12
-test_mode = True
-write_pickle = not test_mode
-area_mode_in_cfd = True
-read_pickle = False
-years = range(1980, 2020)
-years_iter = [f"{years[0]}-{years[-1]}"] * (len(years) is 40) + list(years)
-years_iter2 = [f"{years[0]}-{years[-1]}"] + [f"{years[i]}-{years[i+1]}" for i in range(len(years)-1)]
-#years_iter = [f"1980-2019"]
-xmin = xmax = ymin = ymax = 0
-for year in range(1980,1981):
+def main(year, amp_length=1, rolling_hours=12, area_mode_in_cfd=True, write_pickle=True, read_pickle=True, xmin=0, xmax=0, ymin=0, ymax=0):
     print_cyan(f"\nStarting loop for year -- {year} --")
     pickle_read_name = rf"PickleJar\{year}_CFD_netload_df_amp{amp_length}{'_area'*area_mode_in_cfd}.pickle"
     pickle_dump_name = rf"PickleJar\{year}_CFD_netload_df_amp{amp_length}{'_area'*area_mode_in_cfd}.pickle"
@@ -187,8 +179,8 @@ for year in range(1980,1981):
         # 248s at 1 year then more changes and now 156-157s at 1 year
         end_time = timer()
         print(f"elapsed time = {round(end_time - start_time, 1)}")
-        if pickle_dump_name: pickle.dump(df_out_tot, open(pickle_dump_name, 'wb'))
-    print(df_out_tot.iloc[:40])
+        if write_pickle: pickle.dump(df_out_tot, open(pickle_dump_name, 'wb'))
+    #print(df_out_tot.iloc[:40])
     #print(df_out_tot)
     df_reset = df_out_tot.reset_index()
     df_reset.columns = ['Amplitude', 'Duration', 'Occurrence']
@@ -214,7 +206,7 @@ for year in range(1980,1981):
     Ynetload, Xnetload = np.meshgrid(Y, X)
     import scipy.io
 
-    scipy.io.savemat(f"output\\heatmap_values_{year}",
+    scipy.io.savemat(f"output\\heatmap_values_{year}_amp{amp_length}{'_area'*area_mode_in_cfd}",
                      {"amplitude": Ynetload, "duration": Xnetload, "recurrance": Znetload})
     # print({"amplitude":Xnetload, "duration":Ynetload, "recurrance":Znetload})
     #Z_testing = np.nan_to_num(Znetload)
@@ -222,18 +214,61 @@ for year in range(1980,1981):
     # import matplotlib as mpl
     # mpl.rcParams["patch.force_edgecolor"]=True
     plt.clf()
-    plt.pcolormesh(Xnetload, Ynetload, Znetload, alpha=1, linewidth=0, shading='nearest',
+    fig, ax = plt.subplots()
+    ax.pcolormesh(Xnetload, Ynetload, Znetload, alpha=1, linewidth=0, shading='nearest',
                    cmap=plt.cm.jet)  # , alpha=0.7)
-    plt.xlim([xmin, xmax])
-    plt.ylim([ymin, ymax])
+    ax.set_xlim([xmin, xmax])
+    ax.set_ylim([ymin, ymax])
     from matplotlib.ticker import (MultipleLocator, AutoMinorLocator)
-    ax = plt.gca()
     ax.xaxis.set_minor_locator(AutoMinorLocator())
     ax.yaxis.set_minor_locator(AutoMinorLocator())
-    plt.grid(visible=True, color="black", lw=1, axis="both", alpha=0.15, which="both")
-    plt.xlabel("Amplitude [GW]")
-    plt.ylabel("Duration [days]")
-    plt.title(f"Amplitude-Duration-Recurrence for {year}")
-    plt.tight_layout()
-    plt.savefig(f"figures\\profile_analysis\\cfd_{year}_amp{amp_length}_window{rolling_hours}{'_area'*area_mode_in_cfd}.png", dpi=500)
-    plt.show()
+    ax.grid(visible=True, color="black", lw=1, axis="both", alpha=0.15, which="both")
+    ax.set_xlabel("Amplitude [GW]")
+    ax.set_ylabel("Duration [days]")
+    ax.set_title(f"Amplitude-Duration-Recurrence for {year}")
+    fig.tight_layout()
+    fig.savefig(f"figures\\profile_analysis\\cfd_{year}_amp{amp_length}_window{rolling_hours}{'_area'*area_mode_in_cfd}.png", dpi=500)
+    #plt.show()
+    return xmin, xmax, ymin, ymax
+
+
+def crawler():
+    while not queue_years.empty():
+        year = queue_years.get()  # fetch new work from the Queue
+        print_green(f"Starting Year {year} in thread {threading.get_ident()+1}")
+        start_time_thread = timer()
+        main(year,amp_length=amp_length,rolling_hours=rolling_hours,area_mode_in_cfd=area_mode_in_cfd,write_pickle=write_pickle,
+             read_pickle=read_pickle,xmin=xmin,xmax=xmax,ymin=ymin,ymax=ymax)
+        print_green(f"   Finished Year {year} after {round(timer() - start_time_thread, 1)} seconds")
+        queue_years.task_done()
+    return None
+
+
+amp_length = 1
+rolling_hours = 12
+test_mode = False
+write_pickle = not test_mode
+area_mode_in_cfd = True
+read_pickle = False
+years = range(1980, 2020)
+years_iter2 = [f"{years[i]}-{years[i+1]}" for i in range(len(years)-1)]
+long_period = f"1980-2019"
+xmax= 0
+xmin, xmax, ymin, ymax = main(long_period, amp_length=amp_length, rolling_hours=rolling_hours, area_mode_in_cfd=True,
+                              write_pickle=True, read_pickle=True)
+print(xmax, xmin, ymin, ymax)
+
+queue_years = Queue(maxsize=0)
+for year in years_iter2:
+    queue_years.put(year)
+threads = {}
+thread_nr = {}
+num_threads = min(max(cpu_count() - 2, 4), len(years))
+
+for i in range(num_threads):
+    print_cyan(f'Starting thread {i + 1}')
+    worker = threading.Thread(target=crawler, args=(), daemon=False)
+    # setting threads as "daemon" allows main program to exit eventually even if these dont finish correctly
+    worker.start()
+    tm.sleep(0.5)  # staggering gdx threads shouldnt matter as long as the excel process has something to work on
+
