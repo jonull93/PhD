@@ -143,8 +143,8 @@ def fast_cfd(df_netload, xmin, xmax, amp_length=0.1, area_method=False):
 
 def main(year, amp_length=1, rolling_hours=12, area_mode_in_cfd=True, write_pickle=True, read_pickle=True, xmin=0, xmax=0, ymin=0, ymax=0):
     print_cyan(f"\nStarting loop for year -- {year} --")
-    pickle_read_name = rf"PickleJar\{year}_CFD_netload_df_amp{amp_length}{'_area'*area_mode_in_cfd}.pickle"
-    pickle_dump_name = rf"PickleJar\{year}_CFD_netload_df_amp{amp_length}{'_area'*area_mode_in_cfd}.pickle"
+    pickle_read_name = rf"PickleJar\{year}_CFD_netload_df_amp{amp_length}_window{rolling_hours}{'_area'*area_mode_in_cfd}.pickle"
+    pickle_dump_name = rf"PickleJar\{year}_CFD_netload_df_amp{amp_length}_window{rolling_hours}{'_area'*area_mode_in_cfd}.pickle"
 
     # df_netload = df_netload.reset_index()[["net load", "count1", "count2"]]
     try:
@@ -206,14 +206,13 @@ def main(year, amp_length=1, rolling_hours=12, area_mode_in_cfd=True, write_pick
     Ynetload, Xnetload = np.meshgrid(Y, X)
     import scipy.io
 
-    scipy.io.savemat(f"output\\heatmap_values_{year}_amp{amp_length}{'_area'*area_mode_in_cfd}",
+    scipy.io.savemat(f"output\\heatmap_values_{year}_amp{amp_length}_window{rolling_hours}{'_area'*area_mode_in_cfd}.mat",
                      {"amplitude": Ynetload, "duration": Xnetload, "recurrance": Znetload})
     # print({"amplitude":Xnetload, "duration":Ynetload, "recurrance":Znetload})
     #Z_testing = np.nan_to_num(Znetload)
     #print(Z_testing.sum(axis=0), Z_testing.sum(axis=0).shape)
     # import matplotlib as mpl
     # mpl.rcParams["patch.force_edgecolor"]=True
-    plt.clf()
     fig, ax = plt.subplots()
     ax.pcolormesh(Xnetload, Ynetload, Znetload, alpha=1, linewidth=0, shading='nearest',
                    cmap=plt.cm.jet)  # , alpha=0.7)
@@ -225,9 +224,10 @@ def main(year, amp_length=1, rolling_hours=12, area_mode_in_cfd=True, write_pick
     ax.grid(visible=True, color="black", lw=1, axis="both", alpha=0.15, which="both")
     ax.set_xlabel("Amplitude [GW]")
     ax.set_ylabel("Duration [days]")
-    ax.set_title(f"Amplitude-Duration-Recurrence for {year}")
+    ax.set_title(f"Amplitude-Duration-Recurrence for {year}, {rolling_hours}h window")
     fig.tight_layout()
     fig.savefig(f"figures\\profile_analysis\\cfd_{year}_amp{amp_length}_window{rolling_hours}{'_area'*area_mode_in_cfd}.png", dpi=500)
+    plt.close(fig)
     #plt.show()
     return xmin, xmax, ymin, ymax
 
@@ -270,5 +270,5 @@ for i in range(num_threads):
     worker = threading.Thread(target=crawler, args=(), daemon=False)
     # setting threads as "daemon" allows main program to exit eventually even if these dont finish correctly
     worker.start()
-    tm.sleep(0.5)  # staggering gdx threads shouldnt matter as long as the excel process has something to work on
+    tm.sleep(1)  # staggering gdx threads shouldnt matter as long as the excel process has something to work on
 
