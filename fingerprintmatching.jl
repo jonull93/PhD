@@ -115,10 +115,10 @@ for interesting_year in most_interesting_years
     year_combinations[interesting_year] = combinations(filter(!=(interesting_year),years_list), 2)  # a generator instead of a list until collect() is used
     println("$(length(year_combinations[interesting_year])) combinations to consider")
     for combination in year_combinations[interesting_year]
-        printstyled("Year combination = $(combination)\n"; color=:white)
-        println(size(combination))
+        case = [interesting_year,combination[1],combination[2]]
+        printstyled("Year combination = $(case)\n"; color=:white)
         matrices = [cfd_data[year] for year in combination]
-        println([year for year in combination])
+        #println([year for year in combination])
         #print(matrices[1]*0.2+matrices[2]*0.3)
         #println(sum(matrices[1]))
         #println(typeof(matrices[1]))
@@ -142,10 +142,18 @@ for interesting_year in most_interesting_years
 
         # Print the best weights
         println("The best weights are:")
-        println("w1 = $(w1_new)")
-        println("w2 = $(w2_new)")
-        println("w3 = $(w3_new)")
-
+        println("w1 = $(round(w1_new,sigdigits=3)) for year $(interesting_year)")
+        println("w2 = $(round(w2_new,sigdigits=3)) for year $(combination[1])")
+        println("w3 = $(round(w3_new,sigdigits=3)) for year $(combination[2])")
+        #println("The weights are $(w1_new), $(w2_new), $(w3_new) for years $(combination) and $(interesting_year) with SSE $(res.minimum)")
         println("Final SSE = $(matrix_SSE(m1,m2,m3,[w1_new,w2_new,w3_new]))")
+        final_SSE[case] = matrix_SSE(m1,m2,m3,[w1_new,w2_new,w3_new])
+    end
+end
+
+min_val = minimum(values(final_SSE))
+for (key, value) in final_SSE
+    if value == min_val
+        println("Minimum value is $(value) for key $(key)")
     end
 end
