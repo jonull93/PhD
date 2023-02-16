@@ -64,7 +64,7 @@ printstyled("Finished test run\n"; color=:cyan)
 # Parameters
 amplitude_resolution = 1
 window = 12
-years = 1980:1983#1980:2019
+years = 1980:2019#1980:2019
 most_interesting_years = ["2010-2011","2002-2003",]
 years_list = map(x -> string(x, "-", x+1), years)
 years_list = vcat(years_list,[i for i in most_interesting_years if !(i in years_list)])
@@ -113,7 +113,7 @@ final_SSE = Dict()
 for interesting_year in most_interesting_years
     printstyled("Starting optimization with year $(interesting_year)\n"; color=:cyan)
     year_combinations[interesting_year] = combinations(filter(!=(interesting_year),years_list), 2)  # a generator instead of a list until collect() is used
-    println("$(length(year_combinations[interesting_year])) combinations to consider")
+    printstyled("$(length(year_combinations[interesting_year])) combinations to consider\n"; color=:green)
     for combination in year_combinations[interesting_year]
         case = [interesting_year,combination[1],combination[2]]
         printstyled("Year combination = $(case)\n"; color=:white)
@@ -142,9 +142,9 @@ for interesting_year in most_interesting_years
 
         # Print the best weights
         println("The best weights are:")
-        println("w1 = $(round(w1_new,sigdigits=3)) for year $(interesting_year)")
-        println("w2 = $(round(w2_new,sigdigits=3)) for year $(combination[1])")
-        println("w3 = $(round(w3_new,sigdigits=3)) for year $(combination[2])")
+        println("w1 = $(round(w1_new,sigdigits=2)) for year $(interesting_year)")
+        println("w2 = $(round(w2_new,sigdigits=2)) for year $(combination[1])")
+        println("w3 = $(round(w3_new,sigdigits=2)) for year $(combination[2])")
         #println("The weights are $(w1_new), $(w2_new), $(w3_new) for years $(combination) and $(interesting_year) with SSE $(res.minimum)")
         println("Final SSE = $(matrix_SSE(m1,m2,m3,[w1_new,w2_new,w3_new]))")
         final_SSE[case] = matrix_SSE(m1,m2,m3,[w1_new,w2_new,w3_new])
