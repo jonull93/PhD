@@ -363,11 +363,11 @@ def separate_years(years, add_nontraditional_load=True, make_output=True, make_f
         prepped_demand = demand / 1000  # + np.array(non_traditional_load)*np.ones(demand.shape)
         mod = 1
         net_load, high_netload_durations, high_netload_event_starts, threshold_to_beat = get_high_netload(threshold,
-                                                                                                          window_size_days,
-                                                                                                          VRE_profiles,
-                                                                                                          all_cap * mod,
-                                                                                                          demand,
-                                                                                                          sum(non_traditional_load))
+                                                                                          window_size_days,
+                                                                                          VRE_profiles,
+                                                                                          all_cap * mod,
+                                                                                          demand,
+                                                                                          sum(non_traditional_load))
         max_val = max(high_netload_durations)
         max_val_start = high_netload_event_starts[high_netload_durations.index(max_val)]
 
@@ -379,22 +379,24 @@ def separate_years(years, add_nontraditional_load=True, make_output=True, make_f
         # accumulated = get_accumulated_deficiency(VRE_profiles,all_cap,demand)
         # print(net_load)
         if make_figure:
-            plt.plot(fast_rolling_average(net_load, 24 * window_size_days))
-            plt.plot(prepped_tot_demand, color="gray", linestyle="--")
-            plt.axhline(y=mean(net_load), color="black", linestyle="-.")
-            plt.axhline(y=threshold_to_beat, color="red")
-            plt.axvline(x=max_val_start, color="red")
+            plt.plot(fast_rolling_average(net_load, 24 * window_size_days), label="Net load")
+            plt.plot(prepped_tot_demand, color="gray", linestyle="--", label="Load" )
+            plt.axhline(y=mean(net_load), color="black", linestyle="-.", label="Average net load")
+            plt.axhline(y=threshold_to_beat, color="red", label=f"{threshold}% of peak load")
+            plt.axvline(x=max_val_start, color="red", label="Start of longest period")
             plt.xticks(range(0, 8760, 730),
                        labels=["1 Jan.", "1 Feb.", "1 Mar.", "1 Apr.", "1 May", "1 Jun.", "1 Jul.", "1 Aug.",
                                "1 Sep.", "1 Oct.", "1 Nov.", "1 Dec."])
             # plt.legend(labels=regions)
             plt.title(
                 f"Longest event in Year {year} is: {round(max(high_netload_durations) / 24)} days and starts day {round(max_val_start / 24)}")
-            # plt.title(f"Year {year}, mean is {round(mean(net_load))} with mod={mod}")
+            plt.ylabel("Load [GW]")
+            plt.xlabel("Date")
+            plt.legend()
             # plt.xlim([0,168*3])
             plt.tight_layout()
             # plt.show()
-            plt.savefig(f"{fig_path}over{int(threshold * 100)}_netload_events_{year}.png")
+            plt.savefig(f"{fig_path}over{int(threshold * 100)}_netload_events_{year}.png", dpi=400)
             plt.close()
         # print_cyan(VRE_profiles)
         # print_green(all_cap)
@@ -487,10 +489,10 @@ def combined_years(years, threshold=0.5, window_size_days=3):
     make_pickles(f"{years[0]}-{years[-1]}", VRE_profiles, all_cap, demands, non_traditional_load)
 
 
-# separate_years(years, threshold=0.33)
+separate_years(years, threshold=0.33, make_output=False, make_figure=True)
 # combined_years(years)
 # combined_years(years,threshold=0.33)
-remake_profile_seam()
+#remake_profile_seam()
 
 
 """net_load = separate_years(1980, add_nontraditional_load=False, make_figure=True, make_output=False, window_size_days=1)
