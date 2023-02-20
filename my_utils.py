@@ -4,6 +4,7 @@ import os
 import string
 from enum import Enum
 
+import numpy as np
 import pandas
 
 from order_cap import order_cap
@@ -212,7 +213,7 @@ def write_inc(path, filename, data: dict, flip=True, fliplast=False, comment=Fal
             return
         elif type(data)==list:
             for i, val in enumerate(data):
-                writer.write(f"{'h' + str(i + 1).zfill(4)}  {vald}\n")
+                writer.write(f"{'h' + str(i + 1).zfill(4)}  {val}\n")
         for key1, val1 in data.items():
             if type(val1) == dict:  # key1: {..}
                 for key2, val2 in val1.items():
@@ -364,3 +365,17 @@ def print_cyan(to_print: str, *argv):
         print(colored(to_print, "cyan"))
         for arg in argv:
             print(colored(arg, "cyan"))
+
+
+def fast_rolling_average(my_list, window_size, wraparound=True, **kwargs):
+    import pandas as pd
+    if type(my_list) == np.ndarray:
+        my_list = list(my_list)
+    if wraparound is True:
+        wraparound = int(window_size/2+2)
+    if type(my_list) == list:
+        df = pd.DataFrame(my_list)
+    else:
+        df = my_list
+    if wraparound: df = pd.concat([df.iloc[-wraparound:], df, df.iloc[:wraparound]])
+    return df.rolling(window_size, **kwargs).mean().fillna(method="bfill").iloc[wraparound:-wraparound]

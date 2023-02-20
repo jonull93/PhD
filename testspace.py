@@ -3,29 +3,108 @@ import os
 import pickle
 import order_cap
 import pandas as pd
+import numpy as np
 import matplotlib.pyplot as plt
 from order_cap import wind
 from my_utils import print_red, print_green, print_cyan
+import mat73
 
 # os.chdir(r"C:\Users\Jonathan\Box\python")  # not needed unless running line-by-line in a console
+
+'''
+## Step 1: Read Hourly Profile
+
+First, we need to read the hourly profile from the given file. We can do this using the `pandas` library.
+
+'''
+import pandas as pd
+
+# Read the hourly profile from the given file
+df = pd.read_excel(r"C:\Users\jonull\git\python\input\test_household_loadprofile.xlsx", engine="openpyxl")/30.8*0.12
+'''
+
+## Step 2: Calculate Average Hourly Value
+
+Next, we need to calculate the average hourly value for each hour of the day. We can do this by looping through each hour and calculating the average value for that hour.
+
+'''
+# Create a list to store the average hourly values
+average_hourly_value = []
+hourly_values = np.zeros((24, 8785//24))
+monthly_values = np.zeros((12,8784//12))
+summer_slice = slice(int(366/4),int(3*366/4))
+winter_slice = [i for i in range(0,int(366/4))]+[i for i in range(int(3*366/4),366)]
+print(summer_slice)
+# Loop through each hour
+for index,val in df.iterrows():
+    hour_of_day = index%24
+    day = int(index/24)
+    # Calculate the average value for the current hour
+    hourly_values[hour_of_day,day] = val[0]
+print(hourly_values)
+for hour in range(24):
+    average_hourly_value.append(hourly_values[hour,summer_slice].mean())
+
+fig, ax = plt.subplots()
+ax.boxplot(hourly_values[:,summer_slice].T, showfliers=False, whis=[25,75])
+plt.xlabel("Timme")
+plt.ylabel("Förbrukning [kW]")
+plt.title("Uppskattad last i F6-10 under sommarhalvåret\nRektanglarna visar medel, lägsta 25% samt högsta 25%")
+plt.savefig(r"C:\Users\jonull\git\python\figures\lastprofil.png")
+plt.show()
+plt.clf()
+exit()
+
+# Append the average value to the list
+# average_hourly_value.append(avg_value)
+'''
+
+## Step 3: Plot Average Hourly Value and Print Variance
+
+Finally, we can plot the average hourly value and print the statistical variance for each hour.
+
+'''
+# Import matplotlib for plotting
+import matplotlib.pyplot as plt
+
+# Plot the average hourly value
+plt.plot(average_hourly_value)
+plt.title("Average Hourly Value")
+plt.xlabel("Hour")
+plt.ylabel("Value")
+plt.show()
+
+# Print the statistical variance for each hour
+for hour, value in enumerate(average_hourly_value):
+    print("Hour {}: Variance = {}".format(hour, value))
+
+
+
+exit()
+years = range(1980,2020)
+
+ref_cap = mat73.loadmat(r"C:\Users\jonull\git\python\input\GISdata_solar1980_nordic_L.mat")["capacity_pvplantA"][2,:]
+#print(ref_cap)
+caps = []
+for year in years:
+    filename = rf"C:\Users\jonull\git\python\input\old\GISdata_solar{year}_nordic_L.mat"
+    caps.append(mat73.loadmat(filename)["capacity_pvplantA"][2,:])
+
+y1 = [i[0] for i in caps]
+y2 = [i[1] for i in caps]
+plt.plot(years,y1,label="-1")
+plt.axhline(ref_cap[0])
+plt.plot(years,y2,color="r",label="-2")
+plt.axhline(ref_cap[1],color="r")
+plt.legend()
+plt.show()
 
 file_suffix = ""
 if len(file_suffix) > 0: file_suffix = "_" + file_suffix
 scen_suffix = ""
 if len(scen_suffix) > 0: scen_suffix = "_" + scen_suffix
-timestep = 3
-data = pickle.load(open(os.path.relpath(rf"PickleJar\data_results_{timestep}h{file_suffix}.pickle"), "rb"))
-
-size = {}
-for key in data:
-    #print(f"{key} takes up {sys.getsizeof(data[key])} bytes")
-    for key2 in data[key]:
-        #print(f"{key2} takes up {sys.getsizeof(data[key][key2])} bytes")
-        size[key2] = sys.getsizeof(data[key][key2])
-    break
-
-size_s = pd.Series(data=size.values(), index=size.keys())
-#print(size_s.sort_values(ascending=False)[:10])
+#timestep = 3
+#data = pickle.load(open(os.path.relpath(rf"PickleJar\data_results_{timestep}h{file_suffix}.pickle"), "rb"))
 
 
 def aggregate_in_df(df, index_list: list, new_index: str):
@@ -33,39 +112,3 @@ def aggregate_in_df(df, index_list: list, new_index: str):
     df.drop(index_list, inplace=True, errors='ignore')
     df.loc[new_index] = temp
     return df
-
-years = [2020,2025,2030,2040]
-regions = ["nordic", "brit", "iberia"]
-h = 3
-flex = "lowFlex"
-#fig, axes = plt.subplots(nrows=1, ncols=4, figsize=(8, 3))
-FR_demand_6 = pd.DataFrame(columns=pd.MultiIndex(levels=[[],[]],
-                      codes=[[],[]],
-                      names=['Year','Region']))
-for i_y, year in enumerate(years):
-    for region in regions:
-        scen = f"{region}_{flex}_fullFC_{year}_{h}h"
-        FR_demand_6[year, region] = data[scen]["FR_demand"]["total"].loc[:, '6', :].sum(axis=0)
-    print(FR_demand_6)
-#    plt.sca(axes[i_y])
-#    plt.ylim([0,30])
-plt.boxplot(FR_demand_6, whis=(1,99), sym="x")
-plt.ylim(0,30)
-axes = plt.gca()
-axes.yaxis.grid()
-xregions = [r.capitalize() for r in regions]*4
-plt.xticks(range(1,len(FR_demand_6.columns)+1), xregions)
-for i in range(len(FR_demand_6.columns)+1): #draw seperating lines between xlabels
-    x = [i+0.5]*2
-    if i%3==0:
-        y = [0, -3.5]
-        plt.plot(x,y,clip_on=False,color="black",linewidth=1)
-        plt.plot(x, axes.get_ylim(), clip_on=False, color="grey", linewidth=0.5, ls=(15,(5,20)))
-        if i<len(FR_demand_6.columns):
-            plt.text(i+2, -3.5, years[int(i/3)], fontsize=12, ha="center")
-plt.ylabel("Frequency reserve demand [GW]")
-plt.title(f"Reserve demand, {flex}")
-plt.tight_layout()
-plt.savefig(rf"figures\FR_demand_boxplot_{h}h.png", dpi=600)
-plt.show()
-print(data["brit_lowFlex_fullFC_2030_3h"]["FR_demand"])
