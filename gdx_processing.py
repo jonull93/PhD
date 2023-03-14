@@ -81,7 +81,7 @@ if "PLIA" in comp_name:
 elif "QGTORT8" in comp_name:
     path = "C:\\Users\\Jonathan\\git\\python\\output\\"
     gdxpath = "C:\\Users\\Jonathan\\git\\multinode\\results\\"  # where to find gdx files
-elif "DAJ99D7" in comp_name: #.22
+elif "DESKTOP-ATM4RVA" in comp_name: #.22
     path = "C:\\Users\\Jonathan\\git\\python\\output\\"
     gdxpath = "C:\\Users\\Jonathan\\git\\multinode\\results\\"  # where to find gdx files
 else:
