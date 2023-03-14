@@ -83,7 +83,12 @@ y_data = Dict()
 x_data = Dict()
 for year in years_list
     filename = "input\\heatmap_values_$(year)_amp$(amplitude_resolution)_area.mat"
-    temp = matread(filename)
+    try
+        global temp = matread(filename)
+    catch e
+        filename = "output\\heatmap_values_$(year)_amp$(amplitude_resolution)_window$(window)_area.mat"
+        global temp = matread(filename)
+    end
     cfd_data[year] = replace(temp["recurrance"], NaN => 0)
     x_data[year] = temp["amplitude"][1,:]
     y_data[year] = temp["duration"][:,1]

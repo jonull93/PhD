@@ -19,6 +19,8 @@ Outputs:
 CFD plot and VRE event df for fingerprint matching
 """
 
+os.system('color')
+
 
 def sign(num):
     if num==0: return 1
@@ -82,9 +84,7 @@ def fast_cfd(df_netload, xmin, xmax, amp_length=0.1, area_method=False):
         # this sets the recurrence by counting the durations for each amplitude
         s = df_netload.count2.value_counts()
         df_freq = pd.DataFrame(data=s)
-        #    s_form=list(s)
         output[amp] = df_freq
-    #print(output[10].to_string())
     if area_method and False:
         for amp in amps:  # smidge and add all edges towards the vertical middle
             my_range = range(0, amp, amp_length*sign(amp))
@@ -92,12 +92,10 @@ def fast_cfd(df_netload, xmin, xmax, amp_length=0.1, area_method=False):
                 output[amp2] = output[amp2].add(output[amp], fill_value=0)
         for amp in amps:  # smidge and add all areas downwards
             None
-    #print(output[10].to_string())
-
     # df_out=pd.DataFrame(data=output, index=[amp])
     # df_out = pd.DataFrame()
-    print(f"time to build df_freq for all amps = {round(timer() - start_time, 1)}")
-    start_time = timer()
+    #print(f"time to build df_freq for all amps = {round(timer() - start_time, 1)}")
+    #start_time = timer()
     df_out_tot = pd.DataFrame()
     for amp in amps:
         df_out = output[amp]
@@ -105,13 +103,12 @@ def fast_cfd(df_netload, xmin, xmax, amp_length=0.1, area_method=False):
         df_out.index.name = 'Duration'
         df_out = pd.concat([df_out], keys=[amp], names=['Amplitude'])
         df_out.rename(columns={'count2': 'Occurences'}, inplace=True)
-        df_out_tot = df_out_tot.append(df_out)
-    print(f"time to build df_out_tot = {round(timer() - start_time, 1)}")
+        df_out_tot = pd.concat([df_out_tot, df_out])
+    #print(f"time to build df_out_tot = {round(timer() - start_time, 1)}")
     if area_method:
-        start_time = timer()
+        #start_time = timer()
         #print_red(df_out_tot.index.get_level_values(0).unique())
         # df_out_tot hold a single column and a few multiindexed rows
-        # please make this code more efficient
         for amp in df_out_tot.index.get_level_values(0).unique():
             to_pass_on = 0
             df = df_out_tot.loc[amp].copy()
@@ -123,21 +120,20 @@ def fast_cfd(df_netload, xmin, xmax, amp_length=0.1, area_method=False):
                 else:
                     df_out_tot.loc[(amp, index), :] = to_pass_on
                 to_pass_on = to_pass_on + val[0]
-        print(f"time to remake lines into areas = {round(timer() - start_time, 1)}")
-
-        """for amp in amps:
-            df_out = output[amp]
-            df_out = df_out.iloc[1:]
-            df_out.index.name = 'Duration'
-            df_out = pd.concat([df_out], keys=[amp], names=['Amplitude'])
-            df_out.rename(columns={'count2': 'Occurences'}, inplace=True)
-            df_out_tot = df_out_tot.append(df_out)
-        print(f"time to build df_out_tot = {round(timer() - start_time, 1)}")
-        start_time = timer()
-        if area_method:
-            df_out_tot = df_out_tot.groupby(level=0).apply(lambda x: x.reindex(range(0, x.index.max() + 1), fill_value=0).sort_index(ascending=False))
-            df_out_tot['Occurences'] = df_out_tot.groupby(level=0).apply(lambda x: x['Occurences'].cumsum())
-            print(f"time to remake lines into areas = {round(timer() - start_time, 1)}")"""
+    #print(f"time to build CFD data = {round(timer() - start_time, 1)}")
+    """for amp in amps:
+        df_out = output[amp]
+        df_out = df_out.iloc[1:]
+        df_out.index.name = 'Duration'
+        df_out = pd.concat([df_out], keys=[amp], names=['Amplitude'])
+        df_out.rename(columns={'count2': 'Occurences'}, inplace=True)
+        df_out_tot = df_out_tot.append(df_out)
+    print(f"time to build df_out_tot = {round(timer() - start_time, 1)}")
+    start_time = timer()
+    if area_method:
+        df_out_tot = df_out_tot.groupby(level=0).apply(lambda x: x.reindex(range(0, x.index.max() + 1), fill_value=0).sort_index(ascending=False))
+        df_out_tot['Occurences'] = df_out_tot.groupby(level=0).apply(lambda x: x['Occurences'].cumsum())
+        print(f"time to remake lines into areas = {round(timer() - start_time, 1)}")"""
     return df_out_tot
 
 
@@ -156,7 +152,6 @@ def main(year, amp_length=1, rolling_hours=12, area_mode_in_cfd=True, write_pick
         VRE_profiles = data["VRE_profiles"]
         load = data["load"]
         cap = data["cap"]
-
         if type(load) == dict:
             load_list = []
             for _year, load in load.items():
@@ -164,10 +159,8 @@ def main(year, amp_length=1, rolling_hours=12, area_mode_in_cfd=True, write_pick
             load = np.array(load_list)
         if load.ndim > 1:
             load = load.sum(axis=1)
-
         net_load = -(VRE_profiles * cap).sum(axis=1) + load
         # print(VRE_profiles.shape, net_load.shape, cap.shape)
-
         # d = {'net load': net_load,'count1':0,'count2':0}
         # df_netload = fast_rolling_average(pd.DataFrame(data=d),1)
         array_netload = fast_rolling_average(net_load, rolling_hours)
@@ -178,7 +171,7 @@ def main(year, amp_length=1, rolling_hours=12, area_mode_in_cfd=True, write_pick
         df_out_tot = fast_cfd(df_netload, xmin, xmax, amp_length=amp_length, area_method=area_mode_in_cfd)
         # 248s at 1 year then more changes and now 156-157s at 1 year
         end_time = timer()
-        print(f"elapsed time = {round(end_time - start_time, 1)}")
+        print(f"elapsed time to build CFD in thread {thread_nr[threading.get_ident()]} = {round(end_time - start_time, 1)}")
         if write_pickle: pickle.dump(df_out_tot, open(pickle_dump_name, 'wb'))
     #print(df_out_tot.iloc[:40])
     #print(df_out_tot)
@@ -186,7 +179,7 @@ def main(year, amp_length=1, rolling_hours=12, area_mode_in_cfd=True, write_pick
     df_reset.columns = ['Amplitude', 'Duration', 'Occurrence']
     xmax = max(xmax, int(math.ceil(df_reset["Amplitude"].max())))
     xmin = min(xmin, int(math.floor(df_reset["Amplitude"].min())))
-    df_pivot = df_reset.pivot('Amplitude', 'Duration')
+    df_pivot = df_reset.pivot(index='Amplitude', columns='Duration')
     filtered_df = df_reset[df_reset['Amplitude'].round(1) == 25.5]
     #print("Filtered df =", filtered_df)
     # df_reset["Energy"] = df_reset["Amplitude"]*df_reset["Duration"]*np.sign(df_reset["Amplitude"])
@@ -201,11 +194,10 @@ def main(year, amp_length=1, rolling_hours=12, area_mode_in_cfd=True, write_pick
     Z = df_pivot.values
     #print_cyan("Y =", Y, Y.shape)
     # print_green("X =", X, X.shape)
-    print_red("Z =", Z)
+    #print_red("Z =", Z)
     Znetload = np.where(Z > 50, 50, Z)
     Ynetload, Xnetload = np.meshgrid(Y, X)
     import scipy.io
-
     scipy.io.savemat(f"output\\heatmap_values_{year}_amp{amp_length}_window{rolling_hours}{'_area'*area_mode_in_cfd}.mat",
                      {"amplitude": Ynetload, "duration": Xnetload, "recurrance": Znetload})
     # print({"amplitude":Xnetload, "duration":Ynetload, "recurrance":Znetload})
@@ -233,9 +225,10 @@ def main(year, amp_length=1, rolling_hours=12, area_mode_in_cfd=True, write_pick
 
 
 def crawler():
+    thread_nr[threading.get_ident()] = len(thread_nr) + 1
     while not queue_years.empty():
         year = queue_years.get()  # fetch new work from the Queue
-        print_green(f"Starting Year {year} in thread {threading.get_ident()+1}")
+        print_green(f"Starting Year {year} in thread {thread_nr[threading.get_ident()]}. Remaining years: {queue_years.qsize()}")
         start_time_thread = timer()
         main(year,amp_length=amp_length,rolling_hours=rolling_hours,area_mode_in_cfd=area_mode_in_cfd,write_pickle=write_pickle,
              read_pickle=read_pickle,xmin=xmin,xmax=xmax,ymin=ymin,ymax=ymax)
@@ -250,17 +243,17 @@ test_mode = False
 write_pickle = not test_mode
 area_mode_in_cfd = True
 read_pickle = True
-years = range(1980, 2020)
+years = range(1980, 1983)
 years_iter2 = [f"{years[i]}-{years[i+1]}" for i in range(len(years)-1)]
 long_period = f"1980-2019"
 xmax= 0
-xmin, xmax, ymin, ymax = main(long_period, amp_length=amp_length, rolling_hours=rolling_hours, area_mode_in_cfd=True,
+xmin, xmax, ymin, ymax = main(long_period, amp_length=amp_length, rolling_hours=rolling_hours, area_mode_in_cfd=area_mode_in_cfd,
                               write_pickle=True, read_pickle=True)
-print(xmax, xmin, ymin, ymax)
-
+print("Xmin =", xmin, "Xmax =", xmax, "Ymin =", ymin, "Ymax =", ymax)
 queue_years = Queue(maxsize=0)
 for year in years_iter2:
     queue_years.put(year)
+print("Queue contains", queue_years.qsize(), "years")
 threads = {}
 thread_nr = {}
 num_threads = min(max(cpu_count() - 2, 4), len(years))
