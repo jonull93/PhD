@@ -2,3 +2,5 @@
 !input/*
 till_*
 *_old*
+
+!results/fingerprinted*

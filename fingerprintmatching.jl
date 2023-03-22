@@ -15,7 +15,9 @@ using LinearAlgebra
 using Plots
 
 #make it clear in the command prompt that the code is running
-printstyled("\n ############# -- Starting fingerprintmatching.jl -- #############\n", color=:yellow)
+timestamp = Dates.format(now(), "u_dd_HH.mm.SS")
+folder_name = "results/fingerprinted $timestamp"
+printstyled("\n ############# -- Starting fingerprintmatching.jl at $(timestamp) -- ############# \n"; color=:yellow)
 const print_lock = ReentrantLock()
 #=
 printstyled("Starting test optimization\n"; color=:cyan)
@@ -148,23 +150,29 @@ final_SSE = Dict()
 weights = Dict()
 queue = Queue{Any}()
 cores = Threads.nthreads()
+all_combinations = []
 for interesting_year in most_interesting_years
     #printstyled("Starting optimization that include year $(interesting_year)\n"; color=:cyan)
     year_combinations[interesting_year] = combinations(filter(!=(interesting_year),years_list), 2)  # a generator instead of a list until collect() is used
     for combination in year_combinations[interesting_year]
         case = [interesting_year,combination[1],combination[2]]
         enqueue!(queue,case)
+        push!(all_combinations,case)
     end
 end
 #dequeue!(queue)  # remove the first element
 #dequeue!(queue)  # remove the second element
-#print number of combinations
+#print number of all_combinations
 println("Number of combinations: $(length(queue))")
 printstyled("At around 1 min per combination, this will take $(round(length(queue)/60)) hours\n"; color=:green)
 printstyled("At around 8 min per combination and $(cores) cores this will take $(round(length(queue)*8/60/min(length(queue),cores),sigdigits=2)) hours with multi-threading\n"; color=:green)
 #printstyled("At around 25 s per combination, this will take $(round(length(queue)*25/60)) minutes\n"; color=:green)
 #printstyled("At around 25 s per combination and $(cores) cores, this will take $(round(length(queue)*25/60/min(length(queue),cores),sigdigits=2)) minutes with multi-threading\n"; color=:green)
 scaled_ref_mat = ref_mat ./ 40
+function sigmoid(x)
+    return 1 / (1 + exp(-x))
+end
+
 function diff_sum_weighted_mats(matrices,weights)
     m_sum = sum(wi * mi for (wi, mi) in zip(weights, matrices))
     diff = m_sum - scaled_ref_mat
@@ -228,9 +236,29 @@ end
 printstyled("Finished test sum_weighted_mats\n"; color=:cyan)
 println("Starting $(min(length(queue),cores)) threads (use ´julia --threads $(Sys.CPU_THREADS) script_name.jl´ to use max cores)") # returns "Starting 63 threads"
 
+best_weights = Dict()
+best_errors = Dict()
+best_alg = Dict()
+maxtime = 10
+algs_size = "small" # "small" or "large"
+BBO_algs_large = [:generating_set_search,
+:adaptive_de_rand_1_bin_radiuslimited,
+:simulated_annealing,
+:probabilistic_descent,
+:pso,
+:adaptive_de_rand_1_bin,
+:dxnes,
+]
+BBO_algs_small = [:pso,
+:adaptive_de_rand_1_bin,
+:probabilistic_descent,]
+BBO_algs = eval(Meta.parse("BBO_algs_$(algs_size)"))
+longest_alg_name = maximum([length(string(alg)) for alg in BBO_algs])
+#print, in yellow and with ######-separation, the maxtime and algs that the loop is ran with
+printstyled("############# -- Starting optimization loop with maxtime=$(maxtime)s and algs_size '$(algs_size)' -- #############\n"; color=:yellow)
 Threads.@threads for thread = 1:min(length(queue),cores)
-    #sleep for 5 ms to stagger thread starts
-    sleep(5e-3)
+    #sleep for 250 ms to stagger thread starts
+    sleep(0.25)
     while true
         if length(queue) == 0
             #println("Nothing to do")
@@ -258,7 +286,8 @@ Threads.@threads for thread = 1:min(length(queue),cores)
            diff = replace(diff, 0 => NaN)
            e = abs.(log10.(abs.(diff)))
            # return sum of e but ignoring NaN
-           return sum(e[.!isnan.(e)])
+           #penalty = sigmoid((sum(x)-1.011)*1000)+sigmoid((0.989-sum(x))*1000)
+           return sum(e[.!isnan.(e)])#+penalty*100000
         end
         function log_sum2(x)
            diff = diff_sum_weighted_mats_boxed(matrices,x)
@@ -273,7 +302,9 @@ Threads.@threads for thread = 1:min(length(queue),cores)
         lower = zeros(length(matrices))
         ###----------------------------
         ### SET THE ERROR FUNCTION TO OPTIMIZE WITH HERE
-        opt_func = log_sum2
+        #opt_func = eval(Meta.parse("x -> " * opt_func_str))
+        global opt_func_str = "sqrt_sum(x) + (sigmoid((sum(x)-1.011)*1000) + sigmoid((0.989-sum(x))*1000))*100000"
+        opt_func(x) = sqrt_sum(x) + (sigmoid((sum(x)-1.011)*1000) + sigmoid((0.989-sum(x))*1000))*100000
         ###----------------------------
         # NelderMead()
         # Fminbox(LBFGS())
@@ -296,32 +327,26 @@ Threads.@threads for thread = 1:min(length(queue),cores)
         #print (in green) the error and weights_list
         printstyled("error: $(round.(final_SSE[case],digits=2)), weights: $(round.(weights_list,digits=4))\n"; color=:green)
         =#
-        BBO_algs_large = [:generating_set_search,
-        :adaptive_de_rand_1_bin_radiuslimited,
-        :simulated_annealing,
-        :probabilistic_descent,
-        :pso,
-        :adaptive_de_rand_1_bin,
-        :dxnes,
-        ]
-        BBO_algs_small = [:pso,
-        :adaptive_de_rand_1_bin]
-        BBO_algs = BBO_algs_small
-        longest_alg_name = maximum([length(string(alg)) for alg in BBO_algs])
-        maxtime = 300
-        extreme_guesses = [[0.99999,0,0], [0,0.99999,0], [0,0,0.99999]]
-        local guesses = [w]
-        for g in extreme_guesses
-            push!(guesses, g)
+        extreme_guesses = [[1,0,0], [0,1,0], [0,0,1]]
+        extreme_guesses_one_normal = [
+            [1-1/40, 1/40, 0], [1-1/40, 0, 1/40],
+            [0, 1-1/40, 1/40], [1/40, 1-1/40, 0],
+            [1/40, 0, 1-1/40], [0, 1/40, 1-1/40]]
+        local guesses = [w, [0.4194, 0, 0.5806]]
+        for guess in extreme_guesses
+            push!(guesses, guess)
+        end
+        for guess in extreme_guesses_one_normal
+            push!(guesses, guess)
         end
         local alg_solutions = Dict()
         for alg in BBO_algs
             #print the next line only tif thread==1
             if thread == 1
-                printstyled("Trying $(alg) with maxtime=$(maxtime) ..\n"; color=:cyan)
+                printstyled("Trying $(alg)..\n"; color=:cyan)
             end
             local res = bboptimize(opt_func, guesses; method=alg, NumDimensions=length(w),
-                                    SearchRange=(0,1), MaxTime=maxtime, TraceInterval=10, TraceMode=:silent) #TargetFitness=88355.583298,FitnessTolerance=0.0001
+                                    SearchRange=(0,1), MaxTime=maxtime, TraceInterval=2, TraceMode=:silent) #TargetFitness=88355.583298,FitnessTolerance=0.0001
             local weights_list = best_candidate(res)
             local e = opt_func(weights_list)
             #PRINT THE ERROR AND WEIGHTS
@@ -330,12 +355,18 @@ Threads.@threads for thread = 1:min(length(queue),cores)
             #printstyled("error: $(round.(e,digits=5)), weights: $(round.(weights_list,digits=3))\n"; color=:green)
             alg_solutions[alg] = (e, weights_list)
         end
+        _best_alg = BBO_algs[argmin([alg_solutions[alg][1] for alg in BBO_algs])]
+        best_errors[case] = alg_solutions[_best_alg][1]
+        best_weights[case] = alg_solutions[_best_alg][2]
+        best_alg[case] = _best_alg
+
         #print each alg's solution
         lock(print_lock) do
             printstyled("years: $(case)\n"; color=:green)
             for alg in BBO_algs
                 #change the following line so that the printed length of algs of different lengths is the same
-                printstyled("$(rpad(string(alg),longest_alg_name+1)) error: $(round.(alg_solutions[alg][1],digits=3)), weights: $(round.(alg_solutions[alg][2],digits=3))\n"; color=:white)
+                #printstyled("$(rpad(string(alg),longest_alg_name+1)) error: $(round.(alg_solutions[alg][1],digits=3)), weights: $(round.(alg_solutions[alg][2],digits=3))\n"; color=:white)
+                println("$(round(alg_solutions[alg][1],digits=3)) $(round.(alg_solutions[alg][2],digits=3)) $(alg)")
                 #@sprintf("%20i-30s error: %10.5f, weights: %s\n", rpad(string(alg)), alg_solutions[alg][1], round.(alg_solutions[alg][2],digits=3))
 
             end
@@ -345,35 +376,37 @@ end
 
 # Find the 3 best combinations (lowest SSE), print their SSE and weights
 println("Done optimizing all combinations! :)")
-exit()
-
-println(final_SSE)
-println(weights)
-best_cases = []
-println("The 3 best combinations are:")
-sorted_cases = sort(collect(final_SSE), by=x->x[2])
-for (case, SSE) in sorted_cases[1:3]
-    println("$(case) with SSE $(round(SSE,digits=2))")
+printstyled("The 3 best combinations are:\n", color=:cyan)
+sorted_cases = sort(collect(best_errors), by=x->x[2])
+for (case, error) in sorted_cases[1:3]
+    printstyled("$(case) with error $(round(error,digits=1))\n", color=:green)
+    println("weights: $(round.(best_weights[case],digits=3))")
     # print each item in the case and its respective weight
-    for (i,year) in enumerate(case)
-        println("w$(year) = $(round(weights[case][i], digits=2))")
-    end
-    push!(best_cases,case)
 end
 
-#=# Print the best weights
-println("The best weights are:")
-println("w1 = $(round(w1_new,sigdigits=2)) for year $(interesting_year)")
-println("w2 = $(round(w2_new,sigdigits=2)) for year $(combination[1])")
-println("w3 = $(round(w3_new,sigdigits=2)) for year $(combination[2])")
-#println("The weights are $(w1_new), $(w2_new), $(w3_new) for years $(combination) and $(interesting_year) with SSE $(res.minimum)")
-println("Final SSE = $(matrix_SSE(m1,m2,m3,[w1_new,w2_new,w3_new]))")
+# Save the results as a .json file
+using JSON
 
-min_val = minimum(values(final_SSE))
+results = Dict("combinations" => all_combinations, "best_weights" => best_weights,
+    "best_errors" => best_errors, "opt_func" => opt_func_str,
+    maxtime => maxtime, "best_alg" => best_alg)
+mkpath(folder_name)
 
-for (key, value) in final_SSE
-    if value == min_val
-        println("Minimum value is $(value) for key $(key)")
-    end
+open(joinpath(folder_name, "results.json"), "w") do f
+    write(f, JSON.json(results))
 end
-=#
+
+parameters = Dict("maxtime" => maxtime, "opt_func" => opt_func_str, "BBO_algs" => BBO_algs)
+parameters_json = JSON.json(parameters)
+
+open(joinpath(folder_name, "parameters.txt"), "w") do f
+    write(f, parameters_json)
+end
+
+# Update the most recent results file
+open("results/most_recent_results.txt", "w") do f
+    write(f, folder_name)
+end
+
+# Call Script 1 from Script 2
+#run(`python figure_cfd.py`)

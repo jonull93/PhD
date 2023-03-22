@@ -261,16 +261,30 @@ area_mode_in_cfd = True
 read_pickle = True
 years = range(1980, 1983)
 years_iter2 = [f"{years[i]}-{years[i+1]}" for i in range(len(years)-1)]
-trio_combinations = [("2010-2011", "1982-1983", "1984-1985")]
-trio_weights = [(0.5, 0.25, 0.25)]
+#trio_combinations = [("2010-2011", "1982-1983", "1984-1985")]
+#trio_weights = [(0.5, 0.25, 0.25)]
 long_period = f"1980-2019"
 xmax= 0
 xmin, xmax, ymin, ymax = main(long_period, amp_length=amp_length, rolling_hours=rolling_hours, area_mode_in_cfd=area_mode_in_cfd,
                               write_files=True, read_pickle=True)
 print("Xmin =", xmin, "Xmax =", xmax, "Ymin =", ymin, "Ymax =", ymax)
 queue_years = Queue(maxsize=0)
-for i in range(len(trio_combinations)):
-    queue_years.put([trio_combinations[i], trio_weights[i]])
+# Load results from most recent fingerprinting run
+with open("results/most_recent_results", "r") as f:
+    folder_name = f.read().strip()
+
+import json
+
+with open(f"{folder_name}/results.json", "r") as f:
+    results = json.load(f)
+
+combinations = results["combinations"]
+weights = results["weights"]
+
+combined_results = [(combinations[i], weights[i]) for i in range(len(combinations))]
+
+for i in combined_results:
+    queue_years.put(i)
 for year in years_iter2:
     queue_years.put(year)
 print("Queue contains", queue_years.qsize(), "years")
