@@ -11,6 +11,7 @@ import time as tm
 from timeit import default_timer as timer
 from my_utils import print_red, print_cyan, print_green, fast_rolling_average
 import scipy.io
+import h5py
 
 """
 Inputs:
@@ -125,7 +126,7 @@ def fast_cfd(df_netload, xmin, xmax, amp_length=0.1, area_method=False):
     return df_out_tot
 
 
-def main(year, amp_length=1, rolling_hours=12, area_mode_in_cfd=True, write_pickle=True, read_pickle=True, xmin=0, xmax=0, ymin=0, ymax=0, weights=False):
+def main(year, amp_length=1, rolling_hours=12, area_mode_in_cfd=True, write_files=True, read_pickle=True, xmin=0, xmax=0, ymin=0, ymax=0, weights=False):
     if type(year) != list and type(year) != tuple:
         print_cyan(f"\nStarting loop for year -- {year} --")
         pickle_read_name = rf"PickleJar\{year}_CFD_netload_df_amp{amp_length}_window{rolling_hours}{'_area'*area_mode_in_cfd}.pickle"
@@ -161,7 +162,7 @@ def main(year, amp_length=1, rolling_hours=12, area_mode_in_cfd=True, write_pick
             # 248s at 1 year then more changes and now 156-157s at 1 year
             end_time = timer()
             print(f"elapsed time to build CFD in thread {thread_nr[threading.get_ident()]} = {round(end_time - start_time, 1)}")
-            if write_pickle: pickle.dump(df_out_tot, open(pickle_dump_name, 'wb'))
+            if write_files: pickle.dump(df_out_tot, open(pickle_dump_name, 'wb'))
         #print(df_out_tot.iloc[:40])
         #print(df_out_tot)
         df_reset = df_out_tot.reset_index()
@@ -185,20 +186,33 @@ def main(year, amp_length=1, rolling_hours=12, area_mode_in_cfd=True, write_pick
         # print_green("X =", X, X.shape)
         #print_red("Z =", Z)
         Ynetload, Xnetload = np.meshgrid(Y, X)
-        scipy.io.savemat(f"output\\heatmap_values_{year}_amp{amp_length}_window{rolling_hours}{'_area'*area_mode_in_cfd}.mat",
+        if write_files:
+            scipy.io.savemat(f"output\\heatmap_values_{year}_amp{amp_length}_window{rolling_hours}{'_area'*area_mode_in_cfd}.mat",
                          {"amplitude": Ynetload, "duration": Xnetload, "recurrance": Z})
     else:
+        print_cyan(f"\nStarting loop for years -- {year} --")
         if len(year) != len(weights):
             raise ValueError("year and weights must have the same length")
         m = {}
+        Zs = {}
         for y in year:
-            m[y] = scipy.io.loadmat(f"output\\heatmap_values_{y}_amp{amp_length}_window{rolling_hours}{'_area'*area_mode_in_cfd}.mat")
+            print_cyan(f"\nReading mat for year -- {y} --")
+            with h5py.File(
+                    f"output/heatmap_values_{y}_amp{amp_length}_window{rolling_hours}{'_area' * area_mode_in_cfd}_padded.mat",
+                    "r") as f:
+                Ynetload = np.array(f["amplitude"])
+                Xnetload = np.array(f["duration"])
+                Zs[y] = np.array(f["recurrance"])
+            #m[y] = scipy.io.loadmat(f"output\\heatmap_values_{y}_amp{amp_length}_window{rolling_hours}{'_area'*area_mode_in_cfd}_padded.mat")
         # construct Y_netload, Xnetload and Z using m and the weights
-        Ynetload = sum([m[y]["amplitude"] * w for y, w in zip(year, weights)])
-        Xnetload = sum([m[y]["duration"] * w for y, w in zip(year, weights)])
-        Z = sum([m[y]["recurrance"] * w for y, w in zip(year, weights)])
-
-    Znetload = np.where(Z > 75, 75, Z)
+        #Ynetload = sum([Ynetloads[y] * w for y, w in zip(year, weights)])
+        #Xnetload = sum([m[y]["duration"][:] * w for y, w in zip(year, weights)])
+        Z = sum([Zs[y] * w for y, w in zip(year, weights)])
+    if year == "1980-2019":
+        Z = Z/40
+    Znetload = np.where(Z > 50, 50, Z)
+    Znetload = np.where(Znetload == 0., np.nan, Znetload)
+    print(f"{Z = }")
     # print({"amplitude":Xnetload, "duration":Ynetload, "recurrance":Znetload})
     #Z_testing = np.nan_to_num(Znetload)
     #print(Z_testing.sum(axis=0), Z_testing.sum(axis=0).shape)
@@ -232,7 +246,7 @@ def crawler():
             year, weights = year
         print_green(f"Starting Year {year} in thread {thread_nr[threading.get_ident()]}. Remaining years: {queue_years.qsize()}")
         start_time_thread = timer()
-        main(year,amp_length=amp_length,rolling_hours=rolling_hours,area_mode_in_cfd=area_mode_in_cfd,write_pickle=write_pickle,
+        main(year,amp_length=amp_length,rolling_hours=rolling_hours,area_mode_in_cfd=area_mode_in_cfd,write_files=write_pickle,
              read_pickle=read_pickle,xmin=xmin,xmax=xmax,ymin=ymin,ymax=ymax,weights=weights)
         print_green(f"   Finished Year {year} after {round(timer() - start_time_thread, 1)} seconds")
         queue_years.task_done()
@@ -252,7 +266,7 @@ trio_weights = [(0.5, 0.25, 0.25)]
 long_period = f"1980-2019"
 xmax= 0
 xmin, xmax, ymin, ymax = main(long_period, amp_length=amp_length, rolling_hours=rolling_hours, area_mode_in_cfd=area_mode_in_cfd,
-                              write_pickle=True, read_pickle=True)
+                              write_files=True, read_pickle=True)
 print("Xmin =", xmin, "Xmax =", xmax, "Ymin =", ymin, "Ymax =", ymax)
 queue_years = Queue(maxsize=0)
 for i in range(len(trio_combinations)):
