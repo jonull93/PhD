@@ -150,9 +150,15 @@ def create_df_out_tot(year, xmin, xmax):
     return df_out_tot, xmin, xmax
 
 
-def make_cfd_plot(ax, Xnetload, Ynetload, Znetload, year, rolling_hours, xmin=False, xmax=False, ymin=False, ymax=False):
-    ax.pcolormesh(Xnetload, Ynetload, Znetload, alpha=1, linewidth=0, shading='nearest',
-                   cmap=plt.cm.turbo)  # , alpha=0.7)
+def make_cfd_plot(ax, Xnetload, Ynetload, Znetload, year, rolling_hours, xmin=False, xmax=False, ymin=False, ymax=False,
+                  cmap=plt.cm.turbo, vmin=False, vmax=False):
+    if not vmin:
+        vmin = Znetload[~np.isnan(Znetload)].min()
+    if not vmax:
+        vmax = Znetload[~np.isnan(Znetload)].max()
+    print_red(f"vmin={vmin}, vmax={vmax}")
+    cm = ax.pcolormesh(Xnetload, Ynetload, Znetload, alpha=1, linewidth=0, shading='nearest',
+                   cmap=cmap, vmin=vmin, vmax=vmax)  # , alpha=0.7)
     if xmin and xmax:
         ax.set_xlim([xmin, xmax])
     if ymin and ymax:
@@ -163,8 +169,7 @@ def make_cfd_plot(ax, Xnetload, Ynetload, Znetload, year, rolling_hours, xmin=Fa
     ax.grid(visible=True, color="black", lw=1, axis="both", alpha=0.15, which="both")
     ax.set_xlabel("Amplitude [GW]")
     ax.set_ylabel("Duration [days]")
-    ax.set_title(f"Amplitude-Duration-Recurrence for {year}, {rolling_hours}h window")
-    return ax
+    return cm
 
 def main(year, amp_length=1, rolling_hours=12, area_mode_in_cfd=True, write_files=True, read_pickle=True, xmin=0, xmax=0, ymin=0, ymax=0, weights=False):
     if type(year) != list and type(year) != tuple:
@@ -215,6 +220,7 @@ def main(year, amp_length=1, rolling_hours=12, area_mode_in_cfd=True, write_file
         Znetload = np.where(Znetload == 0., np.nan, Znetload)
         fig, ax = plt.subplots()
         make_cfd_plot(ax, Xnetload, Ynetload, Znetload, year, rolling_hours, xmin, xmax, ymin, ymax)
+        ax.set_title(f"Amplitude-Duration-Recurrence for {year}, {rolling_hours}h window")
         fig.tight_layout()
         filename = f"figures\\profile_analysis\\cfd_{year}_amp{amp_length}_window{rolling_hours}{'_area' * area_mode_in_cfd}.png"
         fig.savefig(filename, dpi=500)
@@ -237,18 +243,48 @@ def main(year, amp_length=1, rolling_hours=12, area_mode_in_cfd=True, write_file
                 Zs[y] = np.array(f["recurrance"])
             #m[y] = scipy.io.loadmat(f"output\\heatmap_values_{y}_amp{amp_length}_window{rolling_hours}{'_area'*area_mode_in_cfd}_padded.mat")
         # load the reference Znetload from 1980-2019
-        with h5py.File(
-                f"output/heatmap_values_1980-2019_amp{amp_length}_window{rolling_hours}{'_area' * area_mode_in_cfd}_padded.mat",
+        try:
+            with h5py.File(
+                f"output/heatmap_values_1980-2019_amp{amp_length}_window{rolling_hours}{'_area' * area_mode_in_cfd}.mat",
                 "r") as f:
-            Znetload_ref = np.array(f["recurrance"])
+                Z_ref = np.array(f["recurrance"])
+        except OSError:
+            _ = scipy.io.loadmat(f"output\\heatmap_values_1980-2019_amp{amp_length}_window{rolling_hours}{'_area'*area_mode_in_cfd}.mat")
+            Z_ref = _["recurrance"]
 
-        # construct Y_netload, Xnetload and Z using m and the weights
+        # make sure all matrices in Zs have 0s instead of nans
+        for y in year:
+            Zs[y] = np.where(np.isnan(Zs[y]), 0, Zs[y])
+        # construct Z using m and the weights
         Z = sum([Zs[y] * w for y, w in zip(year, weights)])
-        Znetload = np.where(Z > 50, 50, Z)
-        Znetload = np.where(Znetload == 0., np.nan, Znetload)
-        fig, axes = plt.subplots(1, 2, figsize=(8, 5))
-        make_cfd_plot(axes[0], Xnetload, Ynetload, Znetload, year, rolling_hours, xmin, xmax, ymin, ymax)
-        Znetload_diff =
+        # make both Z and Z ref have 0s instead of nans
+        Z = np.where(np.isnan(Z), 0, Z)
+        Z_ref = np.where(np.isnan(Z_ref), 0, Z_ref)
+        # get the difference matrix
+        Z_diff = Z_ref.T/40 - Z
+        Z_error = np.sqrt(np.abs(Z_diff)) #Z_error is the diff matrix with sqrt of each element
+        # restore nans so that plot is white instead of black
+        Z = np.where(Z == 0., np.nan, Z)
+        Z_ref = np.where(Z_ref == 0., np.nan, Z_ref)
+        Z_diff = np.where(Z_diff == 0., np.nan, Z_diff)
+        Z_error = np.where(Z_error == 0., np.nan, Z_error)
+
+        Z = np.where(Z == 0., np.nan, Z)
+        fig, axes = plt.subplots(1, 3, figsize=(10, 5))
+        cm = make_cfd_plot(axes[0], Xnetload, Ynetload, Z, year, rolling_hours, xmin, xmax, ymin, ymax, vmax=50)
+        fig.colorbar(cm, ax=axes[0])
+        cm = make_cfd_plot(axes[1], Xnetload, Ynetload, Z_diff, year, rolling_hours, xmin, xmax, ymin, ymax,
+                           cmap="seismic", vmin=-5, vmax=5)
+        fig.colorbar(cm, ax=axes[1])
+        axes[0].set_title(f"{year}\n{weights}", fontsize=7)
+        axes[1].set_title(f"diff matrix")
+        cm = make_cfd_plot(axes[2], Xnetload, Ynetload, Z_error, year, rolling_hours, xmin, xmax, ymin, ymax)
+        fig.colorbar(cm, ax=axes[2])
+        axes[2].set_title(f"sqrt.(error_mat) = {errors[str(year)]:.0f}")
+        fig.tight_layout()
+        filename = f"figures\\profile_analysis\\cfd_combination_{year}_amp{amp_length}_window{rolling_hours}.png"
+        fig.savefig(filename, dpi=500)
+        plt.close(fig)
 
     # print(f"{Z = }")
     # print({"amplitude":Xnetload, "duration":Ynetload, "recurrance":Znetload})
@@ -306,12 +342,22 @@ print(results.keys())
 combinations = results["combinations"]
 combinations_strings = [str(comb).replace("'",'"') for comb in combinations]
 weights = results["best_weights"]
-#print(weights.keys())
-#print(combinations)
+errors = results["best_errors"]
+print(combinations)
+#if combinations is longer than 8, only take the first 4 and last 4
+if len(combinations) > 8:
+    combinations = combinations[:4] + combinations[-4:]
+    combinations_strings = combinations_strings[:4] + combinations_strings[-4:]
+    weights = {key: weights[key] for key in combinations_strings}
+    errors = {key: errors[key] for key in combinations_strings}
+# make errors also accept keys with only ' instead of "
 for comb in combinations_strings:
-    key = comb
-    try: print(comb, [round(weights[key][i], 3) for i in range(len(weights[key]))])
-    except KeyError: print_red(f"KeyError for {key} ")
+    alt_comb = comb.replace('"',"'")
+    errors[alt_comb] = errors[comb]
+print(f"{combinations_strings[0] = }")
+#for i, comb in enumerate(combinations):
+#    errors[comb] = errors[combinations_strings[i]]
+
 combined_results = [(comb, [round(weights[key][i], 3) for i in range(len(weights[key]))]) for key, comb in zip(combinations_strings, combinations)]
 print(combined_results)
 

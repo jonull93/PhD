@@ -22,10 +22,11 @@ const print_lock = ReentrantLock()
 #set parameters
 amplitude_resolution = 1
 window = 12
-years = 1980:1985#:2018
+years = 1989:2015#:2018
 most_interesting_years = ["2010-2011","2002-2003",]
-maxtime = 300
-algs_size = "small" # "small" or "large" or "single"
+maxtime = 60
+algs_size = "adaptive" # "small" or "large" or "single"
+
 
 years_list = map(x -> string(x, "-", x+1), years)
 years_list = vcat(years_list,[i for i in most_interesting_years if !(i in years_list)])
@@ -120,8 +121,6 @@ end
 #dequeue!(queue)  # remove the second element
 #print number of all_combinations
 println("Number of combinations: $(length(queue))")
-printstyled("At around 1 min per combination, this will take $(round(length(queue)/60)) hours\n"; color=:green)
-printstyled("At around 8 min per combination and $(cores) cores this will take $(round(length(queue)*8/60/min(length(queue),cores),sigdigits=2)) hours with multi-threading\n"; color=:green)
 #printstyled("At around 25 s per combination, this will take $(round(length(queue)*25/60)) minutes\n"; color=:green)
 #printstyled("At around 25 s per combination and $(cores) cores, this will take $(round(length(queue)*25/60/min(length(queue),cores),sigdigits=2)) minutes with multi-threading\n"; color=:green)
 scaled_ref_mat = ref_mat ./ 40
@@ -206,14 +205,20 @@ BBO_algs_small = [:pso,
 :adaptive_de_rand_1_bin,
 :probabilistic_descent,]
 BBO_algs_single = [:pso]
+if maxtime>120
+    BBO_algs_adaptive = [:probabilistic_descent, :adaptive_de_rand_1_bin]
+else
+    BBO_algs_adaptive = [:pso, :probabilistic_descent]
+end
 BBO_algs = eval(Meta.parse("BBO_algs_$(algs_size)"))
+printstyled("At $maxtime s per solve, $(length(BBO_algs)) algs and $(cores) cores this will take $(round(length(queue)*maxtime/60/min(length(queue),cores)*length(BBO_algs),digits=1)) minutes with multi-threading\n"; color=:green)
 longest_alg_name = maximum([length(string(alg)) for alg in BBO_algs])
 #print, in yellow and with ######-separation, the maxtime and algs that the loop is ran with
 global_best = 9e9
 printstyled("############# -- Starting optimization loop with maxtime=$(maxtime)s and algs_size '$(algs_size)' -- #############\n"; color=:yellow)
 Threads.@threads for thread = 1:min(length(queue),cores)
     #sleep for 250 ms to stagger thread starts
-    sleep(0.1)
+    sleep(0.5)
     global global_best
     while true
         if length(queue) == 0
@@ -259,8 +264,8 @@ Threads.@threads for thread = 1:min(length(queue),cores)
         ###----------------------------
         ### SET THE ERROR FUNCTION TO OPTIMIZE WITH HERE
         ###----------------------------
-        global opt_func_str = "sqrt_sum(x) + (sigmoid((sum(x)-1.011)*1000) + sigmoid((0.989-sum(x))*1000))*100000"
-        opt_func(x) = sqrt_sum(x) + (sigmoid((sum(x)-1.011)*1000) + sigmoid((0.989-sum(x))*1000))*100000
+        global opt_func_str = "sqrt_sum(x) + (sigmoid((0.989-sum(x))*1000))*100000" #sigmoid((sum(x)-1.011)*1000) +
+        opt_func(x) = sqrt_sum(x) + (sigmoid((0.989-sum(x))*1000))*100000 #sigmoid((sum(x)-1.011)*1000) +
         extreme_guesses = [[1,0,0], [0,1,0], [0,0,1]]
         extreme_guesses_one_normal = [
             [1-1/40, 1/40, 0], [1-1/40, 0, 1/40],
@@ -340,14 +345,14 @@ all_combinations = sort(collect(all_combinations), by=x->best_errors[x])
 
 # Save the results as a .json file
 using JSON
-
-results = Dict("combinations" => all_combinations, "best_weights" => best_weights,
-    "best_errors" => best_errors, "opt_func" => opt_func_str,
-    maxtime => maxtime, "best_alg" => best_alg)
 # sum finc should be the text in opt_func_str before the first +
 sum_func = split(opt_func_str, "(")[1]
 folder_name = "results/FP $sum_func $timestamp"
 mkpath(folder_name)
+
+results = Dict("combinations" => all_combinations, "best_weights" => best_weights,
+    "best_errors" => best_errors, "opt_func" => opt_func_str, "sum_func" => sum_func,
+    maxtime => maxtime, "best_alg" => best_alg)
 
 #Create a file named after the range years
 years_filename = joinpath(folder_name, "$(minimum(years)) to $(maximum(years))")
@@ -372,7 +377,7 @@ open(joinpath(folder_name, "parameters.txt"), "w") do f
 end
 
 using XLSX
-XLSX.openxlsx(joinpath(folder_name, "results$timestamp.xlsx"), mode="w") do xf
+XLSX.openxlsx(joinpath(folder_name, "results $timestamp.xlsx"), mode="w") do xf
     sheet = xf[1] # Add sheet
     XLSX.rename!(sheet, "Results $maxtime s") # Rename sheet
 
