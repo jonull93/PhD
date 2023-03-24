@@ -1,0 +1,1 @@
+{"BBO_algs":["pso","probabilistic_descent"],"opt_func":"sqrt_sum(x) + (sigmoid((0.189-sum(x))*1000))*100000","maxtime":120}
