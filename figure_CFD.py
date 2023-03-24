@@ -32,12 +32,8 @@ def sign(num):
 def fast_cfd(df_netload, xmin, xmax, amp_length=0.1, area_method=False):
     df_freq = pd.DataFrame()
     output = {}
-    # print("index = ", hours)
     net_loads_array = np.array(df_netload["net load"].values)
-    # print("vals = ", net_loads_array)
-    # print("len of vals = ", len(net_loads_array))
     amps = np.arange(xmin, xmax, amp_length).tolist()
-    # print("length of amps:", len(amps))
     start_time = timer()
     for amp in amps:
         # initiate variables before hour loop
@@ -87,6 +83,7 @@ def fast_cfd(df_netload, xmin, xmax, amp_length=0.1, area_method=False):
         s = df_netload.count2.value_counts()
         df_freq = pd.DataFrame(data=s)
         output[amp] = df_freq
+    print(f"time to build output[amp] = {round(timer() - start_time, 1)} seconds. Now building df_out_tot")
     if area_method and False:
         for amp in amps:  # smidge and add all edges towards the vertical middle
             my_range = range(0, amp, amp_length*sign(amp))
@@ -94,10 +91,6 @@ def fast_cfd(df_netload, xmin, xmax, amp_length=0.1, area_method=False):
                 output[amp2] = output[amp2].add(output[amp], fill_value=0)
         for amp in amps:  # smidge and add all areas downwards
             None
-    # df_out=pd.DataFrame(data=output, index=[amp])
-    # df_out = pd.DataFrame()
-    #print(f"time to build df_freq for all amps = {round(timer() - start_time, 1)}")
-    #start_time = timer()
     df_out_tot = pd.DataFrame()
     for amp in amps:
         df_out = output[amp]
@@ -126,7 +119,8 @@ def fast_cfd(df_netload, xmin, xmax, amp_length=0.1, area_method=False):
     return df_out_tot
 
 
-def create_df_out_tot(year, xmin, xmax):
+def create_df_out_tot(year, xmin, xmax, rolling_hours=12, amp_length=1, area_mode_in_cfd=True):
+    print_cyan(f"create_df_out_tot({year}, {xmin}, {xmax}, {rolling_hours}, {amp_length}, {area_mode_in_cfd})")
     data = pickle.load(open(f"PickleJar\\netload_components_{year}.pickle", "rb"))
     VRE_profiles = data["VRE_profiles"]
     load = data["load"]
@@ -146,11 +140,12 @@ def create_df_out_tot(year, xmin, xmax):
     df_netload = pd.DataFrame(data={'net load': array_netload, 'count1': 0, 'count2': 0})
     xmax = max(xmax, int(math.ceil(df_netload["net load"].max())))
     xmin = min(xmin, int(math.floor(df_netload["net load"].min())))
+    print_cyan(f"Done preparing the netload, starting fast_cfd now")
     df_out_tot = fast_cfd(df_netload, xmin, xmax, amp_length=amp_length, area_method=area_mode_in_cfd)
     return df_out_tot, xmin, xmax
 
 
-def make_cfd_plot(ax, Xnetload, Ynetload, Znetload, year, rolling_hours, xmin=False, xmax=False, ymin=False, ymax=False,
+def make_cfd_plot(ax, Xnetload, Ynetload, Znetload, xmin=False, xmax=False, ymin=False, ymax=False,
                   cmap=plt.cm.turbo, vmin=False, vmax=False):
     if not vmin:
         vmin = Znetload[~np.isnan(Znetload)].min()
@@ -183,37 +178,26 @@ def main(year, amp_length=1, rolling_hours=12, area_mode_in_cfd=True, write_file
         except Exception as e:
             if read_pickle: print_red(f"Failed to read {pickle_read_name} due to {type(e)}")
             start_time = timer()
-            df_out_tot, xmin, xmax = create_df_out_tot(year, xmin, xmax)
+            df_out_tot, xmin, xmax = create_df_out_tot(year, xmin, xmax, rolling_hours=rolling_hours)
             # 248s at 1 year then more changes and now 156-157s at 1 year
             end_time = timer()
             print(f"elapsed time to build CFD in thread {thread_nr[threading.get_ident()]} = {round(end_time - start_time, 1)}")
             if write_files: pickle.dump(df_out_tot, open(pickle_dump_name, 'wb'))
-        # print(df_out_tot.iloc[:40])
-        # print(df_out_tot)
         df_reset = df_out_tot.reset_index()
         df_reset.columns = ['Amplitude', 'Duration', 'Occurrence']
         xmax = max(xmax, int(math.ceil(df_reset["Amplitude"].max())))
         xmin = min(xmin, int(math.floor(df_reset["Amplitude"].min())))
         df_pivot = df_reset.pivot(index='Amplitude', columns='Duration')
-        # filtered_df = df_reset[df_reset['Amplitude'].round(1) == 25.5]
-        # print("Filtered df =", filtered_df)
         # df_reset["Energy"] = df_reset["Amplitude"]*df_reset["Duration"]*np.sign(df_reset["Amplitude"])
-        # unique_amps, unique_amps_index = np.unique(df_reset["Amplitude"],return_index=True)
-        # print(df_pivot[df_pivot.columns[df_pivot.columns.get_level_values(1) > 375]].to_string())
-        # print(df_pivot[df_pivot.columns[df_pivot.columns.get_level_values(1) > 1300]].fillna(0)[df_pivot != 0])
-        # print(df_pivot[df_pivot["Duration"] >1300].fillna(0).sum())
         Y = df_pivot.columns.levels[1].values/24  # convert y axis values to days
         ymin = min(ymin, Y.min())
         ymax = max(ymax, Y.max())
         X = df_pivot.index.values
         Z = df_pivot.values
-        # print_cyan("Y =", Y, Y.shape)
-        # print_green("X =", X, X.shape)
-        # print_red("Z =", Z)
         Ynetload, Xnetload = np.meshgrid(Y, X)
         if write_files:
-            scipy.io.savemat(f"output\\heatmap_values_{year}_amp{amp_length}_window{rolling_hours}{'_area'*area_mode_in_cfd}.mat",
-                         {"amplitude": Ynetload, "duration": Xnetload, "recurrance": Z})
+        scipy.io.savemat(f"output\\heatmap_values_{year}_amp{amp_length}_window{rolling_hours}{'_area'*area_mode_in_cfd}.mat",
+                     {"amplitude": Ynetload, "duration": Xnetload, "recurrance": Z})
         if year == "1980-2019":
             Z = Z / 40
         Znetload = np.where(Z > 50, 50, Z)
@@ -286,13 +270,6 @@ def main(year, amp_length=1, rolling_hours=12, area_mode_in_cfd=True, write_file
         fig.savefig(filename, dpi=500)
         plt.close(fig)
 
-    # print(f"{Z = }")
-    # print({"amplitude":Xnetload, "duration":Ynetload, "recurrance":Znetload})
-    # Z_testing = np.nan_to_num(Znetload)
-    # print(Z_testing.sum(axis=0), Z_testing.sum(axis=0).shape)
-    # import matplotlib as mpl
-    # mpl.rcParams["patch.force_edgecolor"]=True
-
     #plt.show()
     return xmin, xmax, ymin, ymax
 
@@ -312,68 +289,66 @@ def crawler():
         queue_years.task_done()
     return None
 
+if __name__ == "__main__":
+    amp_length = 1
+    rolling_hours = 12
+    test_mode = False
+    write_pickle = not test_mode
+    area_mode_in_cfd = True
+    read_pickle = True
+    years = range(1980, 1983)
+    years_iter2 = [f"{years[i]}-{years[i+1]}" for i in range(len(years)-1)]
+    long_period = f"1980-2019"
+    xmax= 0
+    xmin, xmax, ymin, ymax = main(long_period, amp_length=amp_length, rolling_hours=rolling_hours, area_mode_in_cfd=area_mode_in_cfd,
+                                  write_files=False, read_pickle=True)
+    print("Xmin =", xmin, "Xmax =", xmax, "Ymin =", ymin, "Ymax =", ymax)
+    queue_years = Queue(maxsize=0)
+    # Load results from most recent fingerprinting run
+    with open("results/most_recent_results.txt", "r") as f:
+        folder_name = f.read().strip()
 
-amp_length = 1
-rolling_hours = 12
-test_mode = False
-write_pickle = not test_mode
-area_mode_in_cfd = True
-read_pickle = True
-years = range(1980, 1983)
-years_iter2 = [f"{years[i]}-{years[i+1]}" for i in range(len(years)-1)]
-#trio_combinations = [("2010-2011", "1982-1983", "1984-1985")]
-#trio_weights = [(0.5, 0.25, 0.25)]
-long_period = f"1980-2019"
-xmax= 0
-xmin, xmax, ymin, ymax = main(long_period, amp_length=amp_length, rolling_hours=rolling_hours, area_mode_in_cfd=area_mode_in_cfd,
-                              write_files=True, read_pickle=True)
-print("Xmin =", xmin, "Xmax =", xmax, "Ymin =", ymin, "Ymax =", ymax)
-queue_years = Queue(maxsize=0)
-# Load results from most recent fingerprinting run
-with open("results/most_recent_results.txt", "r") as f:
-    folder_name = f.read().strip()
+    import json
 
-import json
+    with open(f"{folder_name}/results.json", "r") as f:
+        results = json.load(f)
 
-with open(f"{folder_name}/results.json", "r") as f:
-    results = json.load(f)
+    print(results.keys())
+    combinations = results["combinations"]
+    combinations_strings = [str(comb).replace("'",'"') for comb in combinations]
+    weights = results["best_weights"]
+    errors = results["best_errors"]
+    print(combinations)
+    #if combinations is longer than 8, only take the first 4 and last 4
+    if len(combinations) > 8:
+        combinations = combinations[:4] + combinations[-4:]
+        combinations_strings = combinations_strings[:4] + combinations_strings[-4:]
+        weights = {key: weights[key] for key in combinations_strings}
+        errors = {key: errors[key] for key in combinations_strings}
+    # make errors also accept keys with only ' instead of "
+    for comb in combinations_strings:
+        alt_comb = comb.replace('"',"'")
+        errors[alt_comb] = errors[comb]
+    print(f"{combinations_strings[0] = }")
+    #for i, comb in enumerate(combinations):
+    #    errors[comb] = errors[combinations_strings[i]]
 
-print(results.keys())
-combinations = results["combinations"]
-combinations_strings = [str(comb).replace("'",'"') for comb in combinations]
-weights = results["best_weights"]
-errors = results["best_errors"]
-print(combinations)
-#if combinations is longer than 8, only take the first 4 and last 4
-if len(combinations) > 8:
-    combinations = combinations[:4] + combinations[-4:]
-    combinations_strings = combinations_strings[:4] + combinations_strings[-4:]
-    weights = {key: weights[key] for key in combinations_strings}
-    errors = {key: errors[key] for key in combinations_strings}
-# make errors also accept keys with only ' instead of "
-for comb in combinations_strings:
-    alt_comb = comb.replace('"',"'")
-    errors[alt_comb] = errors[comb]
-print(f"{combinations_strings[0] = }")
-#for i, comb in enumerate(combinations):
-#    errors[comb] = errors[combinations_strings[i]]
+    combined_results = [(comb, [round(weights[key][i], 3) for i in range(len(weights[key]))]) for key, comb in zip(combinations_strings, combinations)]
+    print(combined_results)
 
-combined_results = [(comb, [round(weights[key][i], 3) for i in range(len(weights[key]))]) for key, comb in zip(combinations_strings, combinations)]
-print(combined_results)
+    for i in combined_results:
+        queue_years.put(i)
+    for year in years_iter2:
+        queue_years.put(year)
+    print("Queue contains", queue_years.qsize(), "years")
+    threads = {}
+    thread_nr = {}
+    num_threads = min(max(cpu_count() - 2, 4), len(years))
 
-for i in combined_results:
-    queue_years.put(i)
-for year in years_iter2:
-    queue_years.put(year)
-print("Queue contains", queue_years.qsize(), "years")
-threads = {}
-thread_nr = {}
-num_threads = min(max(cpu_count() - 2, 4), len(years))
-
-for i in range(num_threads):
-    print_cyan(f'Starting thread {i + 1}')
-    worker = threading.Thread(target=crawler, args=(), daemon=False)
-    # setting threads as "daemon" allows main program to exit eventually even if these dont finish correctly
-    worker.start()
-    tm.sleep(1)  # staggering gdx threads shouldnt matter as long as the excel process has something to work on
+    for i in range(num_threads):
+        print_cyan(f'Starting thread {i + 1}')
+        worker = threading.Thread(target=crawler, args=(), daemon=False)
+        # setting threads as "daemon" allows main program to exit eventually even if these dont finish correctly
+        worker.start()
+        tm.sleep(1)  # staggering gdx threads shouldnt matter as long as the excel process has something to work on
 
