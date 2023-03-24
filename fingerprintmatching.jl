@@ -1,7 +1,7 @@
 #=
 fingerprintmatching:
 - Julia version: 
-- Author: Jonathan
+- Author: Jonathan Ullmark
 - Date: 2023-01-18
 =#
 import Combinatorics: combinations
@@ -22,9 +22,9 @@ const print_lock = ReentrantLock()
 #set parameters
 amplitude_resolution = 1
 window = 12
-years = 1989:2015#:2018
+years = 1998:2005#:2018
 most_interesting_years = ["2010-2011","2002-2003",]
-maxtime = 60
+maxtime = 30
 algs_size = "adaptive" # "small" or "large" or "single"
 
 
@@ -35,7 +35,7 @@ println("Number of years: $(length(years_list))")
 
 # Load mat data
 total_year = "1980-2019"
-ref_full = matread("input\\heatmap_values_$(total_year)_amp$(amplitude_resolution)_area.mat")
+ref_full = matread("output\\heatmap_values_$(total_year)_amp$(amplitude_resolution)_window$(window)_area.mat")
 ref_mat = ref_full["recurrance"]
 ref_y = ref_full["duration"][:,1]
 ref_x = ref_full["amplitude"][1,:]
@@ -62,27 +62,19 @@ for year in years_list
             end
         end
     end
-    #=try
-        global temp = matread(filename)
-    catch e
-        filename = "output\\heatmap_values_$(year)_amp$(amplitude_resolution)_window$(window)_area.mat"
-        global temp = matread(filename)
-    end=#
     cfd_data[year] = replace(temp["recurrance"], NaN => 0)
     #take [:,1]or [1,:]if ndims==2 otherwise just take the whole thing
     y_data[year] = getindex(temp["duration"], :, 1)
     x_data[year] = getindex(temp["amplitude"], 1, :)
     if size(cfd_data[year]) == size(ref_mat)
         #println("Matrix for $(year) is already the same size as the reference matrix")
-        continue
+        continue # move on to the next year
     end
     if length(findall(in(x_data[year]),ref_x))<length(x_data[year]); error("Non-matching x-axes"); end
     printstyled("Padding the matrix $(size(cfd_data[year])) for $(year) ..\n"; color=:green)
     columns_to_add = count(x -> x > maximum(x_data[year]), ref_x)
     println("Adding $(columns_to_add) columns")
-    #end_columns = count(x -> x > maximum(x_data[year]), ref_x)
     xpad = zeros((size(cfd_data[year])[1],columns_to_add))
-    #xpad2 = zeros((size(cfd_data[year])[2],end_columns))
     cfd_data[year] = hcat(cfd_data[year],xpad)
     #println("Added columns - new size is $(size(cfd_data[year]))")
     start_rows = count(y -> y < minimum(y_data[year]), ref_y)
@@ -91,8 +83,9 @@ for year in years_list
     ypad1 = zeros((start_rows,size(cfd_data[year])[2]))
     ypad2 = zeros((end_columns,size(cfd_data[year])[2]))
     cfd_data[year] = vcat(ypad1,cfd_data[year],ypad2)
-    # doublecheck that the dims of cfd_data[year] are the same as ref_mat
     if size(cfd_data[year]) != size(ref_mat)
+        #print in red the sizes of cfd_data[year] and ref_mat
+        printstyled("size(cfd_data[year]) = $(size(cfd_data[year])) and size(ref_mat) = $(size(ref_mat))\n"; color=:red)
         error("The dimensions of the matrix for $(year) are not the same as the reference matrix")
     end
     # save padded mat to filename but replace .mat with _padded.mat
@@ -151,43 +144,6 @@ function diff_sum_weighted_mats_boxed(matrices,weights)
     end
     return diff
 end
-printstyled("Starting test sum_weighted_mats\n"; color=:cyan)
-# pick any three years, 1/3 weights and plot a heatmap of diff_sum_weighted_mats
-test_weights = [1,1/3,1/3]
-x = length(queue)
-test_years = collect(Iterators.take(queue, 1))[1]
-if length(queue) != x
-    error("Queue was modified")
-end
-#print test_years and each element in test_years
-println("test_years: $(test_years)")
-for year in test_years
-    println("$(year): $(size(cfd_data[year]))")
-end
-test_matrices = [cfd_data[year] for year in test_years]
-test_diff = diff_sum_weighted_mats(test_matrices,test_weights)'
-test_diff = replace(test_diff, 0 => NaN)
-# transpose test_diff to get the correct orientation
-#test_diff = test_diff'
-#print size of test_diff
-println("test_diff: $(size(test_diff))")
-#println(test_diff[1500,:])
-#print sum of error
-println("sum of error (ignoring NaN): $(round(sum(abs.(test_diff[.!isnan.(test_diff)]))))")
-println("sum of log10(error) (ignoring NaN): $(round(sum(log10.(abs.(test_diff[.!isnan.(test_diff)])))))")
-println("sum of square root error (ignoring NaN): $(round(sum(sqrt.(abs.(test_diff[.!isnan.(test_diff)])))))")
-println("sum of squared error (ignoring NaN): $(round(sum(abs.(test_diff[.!isnan.(test_diff)]).^2)))")
-
-function apply_error_func(m)
-    m = replace(m, 0 => NaN)
-    m = abs.(m)
-    m = log10.(m)
-    return m
-end
-#h = heatmap(apply_error_func(test_diff), title="Difference between weighted sum of matrices and reference matrix", xlabel="Amplitude", ylabel="Duration", color=:viridis, colorbar=true)
-#gui(h)
-#readline()
-printstyled("Finished test sum_weighted_mats\n"; color=:cyan)
 println("Starting $(min(length(queue),cores)) threads (use ´julia --threads $(Sys.CPU_THREADS) script_name.jl´ to use max cores)") # returns "Starting 63 threads"
 
 best_weights = Dict()
@@ -227,7 +183,7 @@ Threads.@threads for thread = 1:min(length(queue),cores)
         end
         case = dequeue!(queue)
         start_time = Dates.now()
-        printstyled("Thread $(thread) started working on $(case) at $(Dates.format(now(), "HH:MM:SS") )\n"; color=:cyan)
+        printstyled("Thread $(thread) started working on $(case) at $(Dates.format(now(), "HH:MM:SS")), $(length(queue)) left in queue\n"; color=:cyan)
         matrices = [cfd_data[year] for year in case]
         # Use an optimization algorithm to find the best weights
         function sse(x)
@@ -264,8 +220,8 @@ Threads.@threads for thread = 1:min(length(queue),cores)
         ###----------------------------
         ### SET THE ERROR FUNCTION TO OPTIMIZE WITH HERE
         ###----------------------------
-        global opt_func_str = "sqrt_sum(x) + (sigmoid((0.989-sum(x))*1000))*100000" #sigmoid((sum(x)-1.011)*1000) +
-        opt_func(x) = sqrt_sum(x) + (sigmoid((0.989-sum(x))*1000))*100000 #sigmoid((sum(x)-1.011)*1000) +
+        global opt_func_str = "sqrt_sum(x) + (sigmoid((sum(x)-1.011)*1000) + sigmoid((0.989-sum(x))*1000))*100000" #sigmoid((sum(x)-1.011)*1000) +
+        opt_func(x) = sqrt_sum(x) + (sigmoid((sum(x)-1.011)*1000) + sigmoid((0.989-sum(x))*1000))*100000 #sigmoid((sum(x)-1.011)*1000) +
         extreme_guesses = [[1,0,0], [0,1,0], [0,0,1]]
         extreme_guesses_one_normal = [
             [1-1/40, 1/40, 0], [1-1/40, 0, 1/40],
@@ -294,13 +250,13 @@ Threads.@threads for thread = 1:min(length(queue),cores)
             #printstyled("error: $(round.(e,digits=5)), weights: $(round.(weights_list,digits=3))\n"; color=:green)
             alg_solutions[alg] = (e, weights_list)
         end
-        _best_alg = BBO_algs[argmin([alg_solutions[alg][1] for alg in BBO_algs])]
-        best_errors[case] = alg_solutions[_best_alg][1]
-        best_weights[case] = alg_solutions[_best_alg][2]
-        best_alg[case] = _best_alg
 
         #print each alg's solution
         lock(print_lock) do
+            _best_alg = BBO_algs[argmin([alg_solutions[alg][1] for alg in BBO_algs])]
+            best_errors[case] = alg_solutions[_best_alg][1]
+            best_weights[case] = alg_solutions[_best_alg][2]
+            best_alg[case] = _best_alg
             if alg_solutions[_best_alg][1] < global_best
                 printstyled("years: $(case)"; color=:green)
                 printstyled("       <-- best so far\n"; color=:red)
@@ -312,7 +268,7 @@ Threads.@threads for thread = 1:min(length(queue),cores)
             for alg in BBO_algs
                 #change the following line so that the printed length of algs of different lengths is the same
                 #printstyled("$(rpad(string(alg),longest_alg_name+1)) error: $(round.(alg_solutions[alg][1],digits=3)), weights: $(round.(alg_solutions[alg][2],digits=3))\n"; color=:white)
-                print("$(round(alg_solutions[alg][1],digits=3)) $(round.(alg_solutions[alg][2],digits=3)) $(alg)")
+                print("$(round(alg_solutions[alg][1],digits=3)) $(round.(alg_solutions[alg][2],digits=3)) $(rpad(round(sum(alg_solutions[alg][2]),digits=2),4)) $(alg)")
                 if alg == _best_alg
                     printstyled(" <-\n"; color=:green)
                 else
@@ -334,14 +290,18 @@ end
 # Find the 3 best combinations (lowest SSE), print their SSE and weights
 println("Done optimizing all combinations! :)")
 printstyled("The 3 best combinations are:\n", color=:cyan)
-sorted_cases = sort(collect(best_errors), by=x->x[2])
-for (case, error) in sorted_cases[1:3]
-    printstyled("$(case) with error $(round(error,digits=1))\n", color=:green)
-    println("weights: $(round.(best_weights[case],digits=3))")
-    # print each item in the case and its respective weight
+try
+    global sorted_cases = sort(collect(best_errors), by=x->x[2])
+    for (case, error) in sorted_cases[1:3]
+        printstyled("$(case) with error $(round(error,digits=1))\n", color=:green)
+        println("weights: $(round.(best_weights[case],digits=3)) (sum: $(round(sum(best_weights[case]),digits=2)))")
+        # print each item in the case and its respective weight
+    end
+    #sort all_combinations by its value in the dictionary best_errors
+    global all_combinations = sort(collect(all_combinations), by=x->best_errors[x])
+catch e
+    printstyled("!Error: $(e)\n", color=:red)
 end
-#sort all_combinations by its value in the dictionary best_errors
-all_combinations = sort(collect(all_combinations), by=x->best_errors[x])
 
 # Save the results as a .json file
 using JSON
