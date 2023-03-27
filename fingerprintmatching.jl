@@ -22,10 +22,10 @@ const print_lock = ReentrantLock()
 #set parameters
 amplitude_resolution = 1
 window = 12
-years = 1998:2005#:2018
+years = 1980:2018#:2018
 most_interesting_years = ["2010-2011","2002-2003",]
-maxtime = 30
-algs_size = "adaptive" # "small" or "large" or "single"
+maxtime = 60*10
+algs_size = "adaptive" # "small" or "large" or "single" or "adaptive"
 
 
 years_list = map(x -> string(x, "-", x+1), years)
@@ -280,21 +280,42 @@ Threads.@threads for thread = 1:min(length(queue),cores)
         end
         #if case not in best_errors
         if !(case in keys(best_errors))
+            printstyled("did not find $case in best_errors\n"; color=:red)
             best_errors[case] = alg_solutions[_best_alg][1]
             best_weights[case] = alg_solutions[_best_alg][2]
             best_alg[case] = _best_alg
         end
+        if !(case in keys(best_errors))
+            printstyled("AGAIN did not find $case in best_weights\n"; color=:red)
+            lock(print_lock) do
+                best_errors[case] = alg_solutions[_best_alg][1]
+                best_weights[case] = alg_solutions[_best_alg][2]
+                best_alg[case] = _best_alg
+            end
+        end
+        if !(case in keys(best_errors))
+            printstyled("AGAIN AGAIN did not find $case in best_alg\n"; color=:red)
+            error("failed to add $case to best_errors")
+        end
+    end
+end
+for comb in all_combinations
+    #if comb not in best_errors
+    if !(comb in keys(best_errors))
+        best_errors[comb] = Inf
+        best_weights[comb] = [0,0,0]
+        best_alg[comb] = "none"
     end
 end
 
 # Find the 3 best combinations (lowest SSE), print their SSE and weights
-println("Done optimizing all combinations! :)")
-printstyled("The 3 best combinations are:\n", color=:cyan)
+println("Done optimizing all combinations at $(now().time)")
+printstyled("The 3 best combinations are ($(years[1]-years[-1]) [opt_func=$(opt_func_str)]:\n", color=:cyan)
 try
     global sorted_cases = sort(collect(best_errors), by=x->x[2])
     for (case, error) in sorted_cases[1:3]
         printstyled("$(case) with error $(round(error,digits=1))\n", color=:green)
-        println("weights: $(round.(best_weights[case],digits=3)) (sum: $(round(sum(best_weights[case]),digits=2)))")
+        println("weights: $(round.(best_weights[case],digits=3)) (sum: $(round(sum(best_weights[case]),digits=3)))")
         # print each item in the case and its respective weight
     end
     #sort all_combinations by its value in the dictionary best_errors
@@ -366,4 +387,4 @@ open("results/most_recent_results.txt", "w") do f
 end
 
 # Call Script 1 from Script 2
-#run(`python figure_cfd.py`)
+run(`python figure_cfd.py`)

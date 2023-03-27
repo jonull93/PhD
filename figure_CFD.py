@@ -29,6 +29,23 @@ def sign(num):
     return np.sign(num)
 
 
+def get_contour(Z, transpose=False):
+    if transpose:
+        Z = Z.T
+    # Z is a 2D array of values
+    # returns a 2D array of 0s and 1s where 1s are the contour (along rows, looking for non-zeros left to right)
+    # for each row, find the last non-zero value and set the corresponding index in the contour array to 1
+    contour = np.zeros(Z.shape)
+    # if there are nan values, convert them to 0
+    Z[np.isnan(Z)] = 0
+    for i, row in enumerate(Z):
+        if np.count_nonzero(row) == 0:
+            continue
+        last_nonzero = np.nonzero(row)[0][-1]  # returns a tuple (len=1) of arrays of indices
+        contour[i, last_nonzero] = 1
+    return contour
+
+
 def fast_cfd(df_netload, xmin, xmax, amp_length=0.1, area_method=False):
     df_freq = pd.DataFrame()
     output = {}
@@ -146,14 +163,14 @@ def create_df_out_tot(year, xmin, xmax, rolling_hours=12, amp_length=1, area_mod
 
 
 def make_cfd_plot(ax, Xnetload, Ynetload, Znetload, xmin=False, xmax=False, ymin=False, ymax=False,
-                  cmap=plt.cm.turbo, vmin=False, vmax=False):
+                  color=plt.cm.turbo, vmin=False, vmax=False):
     if not vmin:
         vmin = Znetload[~np.isnan(Znetload)].min()
     if not vmax:
         vmax = Znetload[~np.isnan(Znetload)].max()
     print_red(f"vmin={vmin}, vmax={vmax}")
     cm = ax.pcolormesh(Xnetload, Ynetload, Znetload, alpha=1, linewidth=0, shading='nearest',
-                   cmap=cmap, vmin=vmin, vmax=vmax)  # , alpha=0.7)
+                   cmap=color, vmin=vmin, vmax=vmax)  # , alpha=0.7)
     if xmin and xmax:
         ax.set_xlim([xmin, xmax])
     if ymin and ymax:
@@ -196,14 +213,14 @@ def main(year, amp_length=1, rolling_hours=12, area_mode_in_cfd=True, write_file
         Z = df_pivot.values
         Ynetload, Xnetload = np.meshgrid(Y, X)
         if write_files:
-        scipy.io.savemat(f"output\\heatmap_values_{year}_amp{amp_length}_window{rolling_hours}{'_area'*area_mode_in_cfd}.mat",
-                     {"amplitude": Ynetload, "duration": Xnetload, "recurrance": Z})
+            scipy.io.savemat(f"output\\heatmap_values_{year}_amp{amp_length}_window{rolling_hours}{'_area'*area_mode_in_cfd}.mat",
+                         {"amplitude": Ynetload, "duration": Xnetload, "recurrance": Z})
         if year == "1980-2019":
             Z = Z / 40
         Znetload = np.where(Z > 50, 50, Z)
         Znetload = np.where(Znetload == 0., np.nan, Znetload)
         fig, ax = plt.subplots()
-        make_cfd_plot(ax, Xnetload, Ynetload, Znetload, year, rolling_hours, xmin, xmax, ymin, ymax)
+        make_cfd_plot(ax, Xnetload, Ynetload, Znetload, xmin=xmin, xmax=xmax, ymin=ymin, ymax=ymax)
         ax.set_title(f"Amplitude-Duration-Recurrence for {year}, {rolling_hours}h window")
         fig.tight_layout()
         filename = f"figures\\profile_analysis\\cfd_{year}_amp{amp_length}_window{rolling_hours}{'_area' * area_mode_in_cfd}.png"
@@ -247,6 +264,7 @@ def main(year, amp_length=1, rolling_hours=12, area_mode_in_cfd=True, write_file
         # get the difference matrix
         Z_diff = Z_ref.T/40 - Z
         Z_error = np.sqrt(np.abs(Z_diff)) #Z_error is the diff matrix with sqrt of each element
+        Z_contour = {y: get_contour(Zs[y]) for y in year}
         # restore nans so that plot is white instead of black
         Z = np.where(Z == 0., np.nan, Z)
         Z_ref = np.where(Z_ref == 0., np.nan, Z_ref)
@@ -255,18 +273,25 @@ def main(year, amp_length=1, rolling_hours=12, area_mode_in_cfd=True, write_file
 
         Z = np.where(Z == 0., np.nan, Z)
         fig, axes = plt.subplots(1, 3, figsize=(10, 5))
-        cm = make_cfd_plot(axes[0], Xnetload, Ynetload, Z, year, rolling_hours, xmin, xmax, ymin, ymax, vmax=50)
+        cm = make_cfd_plot(axes[0], Xnetload, Ynetload, Z, xmin=xmin, xmax=xmax, ymin=ymin, ymax=ymax, vmax=50)
+        # print the contours for each year from the dictionary Z_contour (year: 2d-array), alternate colors
+        colors = plt.rcParams['axes.prop_cycle'].by_key()['color']
+        for i, y in enumerate(year):
+            axes[0].contour(Xnetload, Ynetload, Z_contour[y], colors=colors[i], linewidths=0.5)
+            #add the year to the legend, but reformat the years from 1980-2019 to '80-'19
+            axes[0].plot([], [], color=colors[i], label=f"'{y[2:4]}-'{y[7:]}")
+        axes[0].legend()
         fig.colorbar(cm, ax=axes[0])
-        cm = make_cfd_plot(axes[1], Xnetload, Ynetload, Z_diff, year, rolling_hours, xmin, xmax, ymin, ymax,
-                           cmap="seismic", vmin=-5, vmax=5)
+        cm = make_cfd_plot(axes[1], Xnetload, Ynetload, Z_diff, xmin=xmin, xmax=xmax, ymin=ymin, ymax=ymax,
+                           color="seismic", vmin=-5, vmax=5)
         fig.colorbar(cm, ax=axes[1])
         axes[0].set_title(f"{year}\n{weights}", fontsize=7)
         axes[1].set_title(f"diff matrix")
-        cm = make_cfd_plot(axes[2], Xnetload, Ynetload, Z_error, year, rolling_hours, xmin, xmax, ymin, ymax)
+        cm = make_cfd_plot(axes[2], Xnetload, Ynetload, Z_error, xmin=xmin, xmax=xmax, ymin=ymin, ymax=ymax)
         fig.colorbar(cm, ax=axes[2])
         axes[2].set_title(f"sqrt.(error_mat) = {errors[str(year)]:.0f}")
         fig.tight_layout()
-        filename = f"figures\\profile_analysis\\cfd_combination_{year}_amp{amp_length}_window{rolling_hours}.png"
+        filename = f"{results_folder_name}/cfd_combination_{year}_{sum_func}_{maxtime}s.png"
         fig.savefig(filename, dpi=500)
         plt.close(fig)
 
@@ -306,18 +331,19 @@ if __name__ == "__main__":
     queue_years = Queue(maxsize=0)
     # Load results from most recent fingerprinting run
     with open("results/most_recent_results.txt", "r") as f:
-        folder_name = f.read().strip()
-
+        results_folder_name = f.read().strip()
     import json
-
-    with open(f"{folder_name}/results.json", "r") as f:
+    with open(f"{results_folder_name}/results.json", "r") as f:
         results = json.load(f)
-
+    with open(f"{results_folder_name}/parameters.txt", "r") as f:
+        parameters = json.load(f)
     print(results.keys())
     combinations = results["combinations"]
     combinations_strings = [str(comb).replace("'",'"') for comb in combinations]
     weights = results["best_weights"]
     errors = results["best_errors"]
+    sum_func = results["sum_func"]
+    maxtime = parameters["maxtime"]
     print(combinations)
     #if combinations is longer than 8, only take the first 4 and last 4
     if len(combinations) > 8:
