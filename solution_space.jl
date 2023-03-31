@@ -10,18 +10,29 @@ using Plots
 using LinearAlgebra
 
 function diff_sum_weighted_mats(matrices,weights)
-    m_sum = sum(wi * mi for (wi, mi) in zip(weights, matrices))
-    diff = m_sum - scaled_ref_mat
+    m_sum = zeros(size(matrices[1]))
+    for i in 1:length(matrices)
+        m_sum .+= weights[i] .* matrices[i]
+    end
+    diff = m_sum .- scaled_ref_mat
     return diff
 end
 function sse(diff)
    return dot(diff,diff)
 end
 function abs_sum(diff)
-   return sum(abs.(diff))
+    result = 0.0
+    @inbounds @simd for i in eachindex(diff)
+        result += abs(diff[i])
+    end
+    return result
 end
 function sqrt_sum(diff)
-   return sum(sqrt.(abs.(diff)))
+    result = 0.0
+    @inbounds @simd for i in eachindex(diff)
+        result += sqrt(abs(diff[i]))
+    end
+    return result
 end
 function log_sum(diff)
    diff = replace(diff, 0 => NaN)
@@ -52,7 +63,9 @@ weight_matrix_sqrt = weight_matrices["Z_sqrt"]  # min = 1, max = 14
 
 ref_mat[isnan.(ref_mat)].= 0
 scaled_ref_mat = ref_mat ./ 40
-combination = ["2010-2011", "2000-2001", "2006-2007"]#["1983-1984", "2000-2001", "2007-2008"]#["2002-2003","2000-2001","2004-2005"]
+combination = ["2010-2011", "1981-1982", "2013-2014"]
+#["2010-2011", "2000-2001", "2006-2007"]
+#["1983-1984", "2000-2001", "2007-2008"]#["2002-2003","2000-2001","2004-2005"]
 cfd_data = Dict()
 for year in combination
     filename = "output\\heatmap_values_$(year)_amp1_window12_area_padded.mat"
@@ -62,7 +75,7 @@ end
 matrices = [cfd_data[year] for year in combination]
 printstyled("M1[1:2,1:2] = $(matrices[1][1:2,1:2]) \n"; color=:cyan)
 
-res = 32  # make sure res+1 is divisible by 3
+res = 11  # make sure res+1 is divisible by 3
 center = (res-1)÷3+1
 
 function create_filled_triangle_matrix2(n::Int)
@@ -184,4 +197,4 @@ annotate!([(center,center,text("<--(⅓,⅓,⅓)",7,:center))])
 annotate!([(wmat2_best_index[2],wmat2_best_index[1],text("+",16,:center))])
 savefig(joinpath(path,"res$(res)_wmatsqrt_error_triangle.png"))
 
-println("Done with $combination_string after $(round((time()-starttime)/60,digits=1)) minutes")
+println("Done with $combination_string after $(round((time()-starttime)/60,digits=2)) minutes")
