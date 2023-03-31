@@ -165,9 +165,9 @@ def create_df_out_tot(year, xmin, xmax, rolling_hours=12, amp_length=1, area_mod
 def make_cfd_plot(ax, Xnetload, Ynetload, Znetload, xmin=False, xmax=False, ymin=False, ymax=False,
                   color=plt.cm.turbo, vmin=False, vmax=False):
     if not vmin:
-        vmin = Znetload[~np.isnan(Znetload)].min()
+        vmin = round(Znetload[~np.isnan(Znetload)].min(),2)
     if not vmax:
-        vmax = Znetload[~np.isnan(Znetload)].max()
+        vmax = round(Znetload[~np.isnan(Znetload)].max(),2)
     print_red(f"vmin={vmin}, vmax={vmax}")
     cm = ax.pcolormesh(Xnetload, Ynetload, Znetload, alpha=1, linewidth=0, shading='nearest',
                    cmap=color, vmin=vmin, vmax=vmax)  # , alpha=0.7)
@@ -273,7 +273,10 @@ def main(year, amp_length=1, rolling_hours=12, area_mode_in_cfd=True, write_file
 
         Z = np.where(Z == 0., np.nan, Z)
         fig, axes = plt.subplots(1, 3, figsize=(10, 5))
-        cm = make_cfd_plot(axes[0], Xnetload, Ynetload, Z, xmin=xmin, xmax=xmax, ymin=ymin, ymax=ymax, vmax=50)
+        try: cm = make_cfd_plot(axes[0], Xnetload, Ynetload, Z, xmin=xmin, xmax=xmax, ymin=ymin, ymax=ymax, vmax=50)
+        except Exception as e:
+            print_red(f"Error in {year} when plotting Z: {e}")
+            raise e
         # print the contours for each year from the dictionary Z_contour (year: 2d-array), alternate colors
         colors = plt.rcParams['axes.prop_cycle'].by_key()['color']
         for i, y in enumerate(year):
@@ -286,12 +289,12 @@ def main(year, amp_length=1, rolling_hours=12, area_mode_in_cfd=True, write_file
                            color="seismic", vmin=-5, vmax=5)
         fig.colorbar(cm, ax=axes[1])
         axes[0].set_title(f"{year}\n{weights}", fontsize=7)
-        axes[1].set_title(f"diff matrix")
+        axes[1].set_title(f"Zref-Z = diff_mat")
         cm = make_cfd_plot(axes[2], Xnetload, Ynetload, Z_error, xmin=xmin, xmax=xmax, ymin=ymin, ymax=ymax)
         fig.colorbar(cm, ax=axes[2])
-        axes[2].set_title(f"sqrt.(error_mat) = {errors[str(year)]:.0f}")
+        axes[2].set_title(f"{sum_func}.(diff_mat) = {errors[str(year)]:.0f}")
         fig.tight_layout()
-        filename = f"{results_folder_name}/cfd_combination_{year}_{sum_func}_{maxtime}s.png"
+        filename = f"{results_folder_name}/{errors[str(year)]:.0f}_{year}.png"
         fig.savefig(filename, dpi=500)
         plt.close(fig)
 
@@ -321,9 +324,10 @@ if __name__ == "__main__":
     write_pickle = not test_mode
     area_mode_in_cfd = True
     read_pickle = True
-    years = range(1980, 1983)
+    years = range(1980, 1980)
     years_iter2 = [f"{years[i]}-{years[i+1]}" for i in range(len(years)-1)]
     long_period = f"1980-2019"
+
     xmax= 0
     xmin, xmax, ymin, ymax = main(long_period, amp_length=amp_length, rolling_hours=rolling_hours, area_mode_in_cfd=area_mode_in_cfd,
                                   write_files=False, read_pickle=True)
@@ -332,6 +336,7 @@ if __name__ == "__main__":
     # Load results from most recent fingerprinting run
     with open("results/most_recent_results.txt", "r") as f:
         results_folder_name = f.read().strip()
+    print_cyan(f"Loading results from {results_folder_name}...")
     import json
     with open(f"{results_folder_name}/results.json", "r") as f:
         results = json.load(f)
@@ -344,11 +349,11 @@ if __name__ == "__main__":
     errors = results["best_errors"]
     sum_func = results["sum_func"]
     maxtime = parameters["maxtime"]
-    print(combinations)
+    #print(combinations)
     #if combinations is longer than 8, only take the first 4 and last 4
     if len(combinations) > 8:
-        combinations = combinations[:4] + combinations[-4:]
-        combinations_strings = combinations_strings[:4] + combinations_strings[-4:]
+        combinations = combinations[:6] + combinations[-2:]
+        combinations_strings = combinations_strings[:6] + combinations_strings[-2:]
         weights = {key: weights[key] for key in combinations_strings}
         errors = {key: errors[key] for key in combinations_strings}
     # make errors also accept keys with only ' instead of "
@@ -359,7 +364,7 @@ if __name__ == "__main__":
     #for i, comb in enumerate(combinations):
     #    errors[comb] = errors[combinations_strings[i]]
 
-    combined_results = [(comb, [round(weights[key][i], 3) for i in range(len(weights[key]))]) for key, comb in zip(combinations_strings, combinations)]
+    combined_results = [(comb, [round(weights[key][i], 3) for i in range(len(weights[key]))]) for key, comb in zip(combinations_strings, combinations) if sum(weights[key]) > 0]
     print(combined_results)
 
     for i in combined_results:
@@ -369,7 +374,7 @@ if __name__ == "__main__":
     print("Queue contains", queue_years.qsize(), "years")
     threads = {}
     thread_nr = {}
-    num_threads = min(max(cpu_count() - 2, 4), len(years))
+    num_threads = min(max(cpu_count() - 2, 4), len(queue_years.queue))
 
     for i in range(num_threads):
         print_cyan(f'Starting thread {i + 1}')
