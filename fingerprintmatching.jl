@@ -13,6 +13,7 @@ using Dates
 using Printf
 using LinearAlgebra
 using Plots
+using JSON
 
 #make it clear in the command prompt that the code is running
 timestamp = Dates.format(now(), "u_dd_HH.MM.SS")
@@ -30,15 +31,23 @@ if false
     println("Removed years: $(to_remove)")
 end
 most_interesting_years = ["2010-2011","2002-2003",]
-maxtime = 60*4
-algs_size = :probabilistic_descent # "small" or "large" or "single" or "adaptive"
+maxtime = 60*10
+algs_size = "adaptive" # "small" or "large" or "single" or "adaptive"
 years_to_add = 3 # number of years to add to the most interesting year for each combination
+# ask the user whether to import the 100 best combinations from the previous run
+# if no input is given in 10 seconds, assume import_combinations is false
+printstyled("Attampt to import combinations from previous run? (y/n) "; color=:yellow)
+input = readline()
+if input == "y"
+    import_combinations = true
+else
+    import_combinations = false
+end
+
 # years_to_add scales insanely with the number of years, so it is not recommended to use more than 2
 
 years_list = map(x -> string(x, "-", x+1), years)
 years_list = vcat(years_list,[i for i in most_interesting_years if !(i in years_list)])
-println("Years: $(years_list)")
-println("Number of years: $(length(years_list))")
 
 # Load mat data
 total_year = "1980-2019"
@@ -52,6 +61,46 @@ weight_matrices = matread("output/weight_matrices.mat")
 weight_matrix_lin19diff = weight_matrices["Z_lin19diff"]
 weight_matrix_lin190diff = weight_matrices["Z_lin190diff"]
 weight_matrix_sqrt = weight_matrices["Z_sqrt"]  # min = 1, max = 14
+
+# Generate combinations of years to optimize match for
+year_combinations = Dict()
+final_SSE = Dict()
+weights = Dict()
+queue = Queue{Any}()
+cores = Threads.nthreads()
+all_combinations = []
+if import_combinations
+    # read folder_name from results/most_recent_results.txt
+    folder_name = readlines("results/most_recent_results.txt")[1]
+    # read folder_name/best_100.json, or skip to the else-block if the file does not exist
+    if !isfile("$(folder_name)/best_100.json")
+        println("File $(folder_name)/best_100.json does not exist, skipping import of combinations")
+        @goto skip_import
+    end
+    best_100 = JSON.parsefile("$(folder_name)/best_100.json")
+    # add each item in best_100 to all_combinations and queue
+    for item in best_100
+        enqueue!(queue,item)
+        push!(all_combinations,item)
+    end
+    # remove all items from years if they are not found in any list in all_combinations
+else
+    @label skip_import
+    println("Years: $(years_list)")
+    println("Number of years: $(length(years_list))")
+
+    for interesting_year in most_interesting_years
+        #printstyled("Starting optimization that include year $(interesting_year)\n"; color=:cyan)
+        year_combinations[interesting_year] = combinations(filter(!=(interesting_year),years_list), years_to_add)  # a generator instead of a list until collect() is used
+        for combination in year_combinations[interesting_year]
+            case = [interesting_year]
+            append!(case,combination)
+            enqueue!(queue,case)
+            push!(all_combinations,case)
+        end
+    end
+end
+
 
 ref_mat[isnan.(ref_mat)].= 0
 cfd_data = Dict()
@@ -106,27 +155,20 @@ for year in years_list
         compress=true)
 end
 
-# Generate combinations of years to optimize match for
-year_combinations = Dict()
-final_SSE = Dict()
-weights = Dict()
-queue = Queue{Any}()
-cores = Threads.nthreads()
-all_combinations = []
-for interesting_year in most_interesting_years
-    #printstyled("Starting optimization that include year $(interesting_year)\n"; color=:cyan)
-    year_combinations[interesting_year] = combinations(filter(!=(interesting_year),years_list), years_to_add)  # a generator instead of a list until collect() is used
-    for combination in year_combinations[interesting_year]
-        case = [interesting_year]
-        append!(case,combination)
-        enqueue!(queue,case)
-        push!(all_combinations,case)
-    end
-end
 #dequeue!(queue)  # remove the first element
 #dequeue!(queue)  # remove the second element
 #print number of all_combinations
 println("Number of combinations: $(length(queue))")
+threads_to_start = min(length(queue),cores)
+consequtive_runs = div(length(queue),threads_to_start)
+for i in 20:-1:1
+    if div(length(queue),threads_to_start-i) == consequtive_runs
+        printstyled("Reducing number of threads to $(threads_to_start-i) since this wont affect time to complete queue\n"; color=:red)
+        global threads_to_start -= i
+        break
+    end
+end
+
 #printstyled("At around 25 s per combination, this will take $(round(length(queue)*25/60)) minutes\n"; color=:green)
 #printstyled("At around 25 s per combination and $(cores) cores, this will take $(round(length(queue)*25/60/min(length(queue),cores),sigdigits=2)) minutes with multi-threading\n"; color=:green)
 scaled_ref_mat = ref_mat ./ 40
@@ -143,7 +185,7 @@ function diff_sum_weighted_mats(matrices,weights)
     return diff
 end
 
-println("Starting $(min(length(queue),cores)) threads (use ´julia --threads $(Sys.CPU_THREADS) script_name.jl´ to use max cores)") # returns "Starting 63 threads"
+println("Starting $(threads_to_start) threads (use ´julia --threads $(Sys.CPU_THREADS) script_name.jl´ to use max cores)") # returns "Starting 63 threads"
 
 best_weights = Dict()
 best_errors = Dict()
@@ -170,14 +212,15 @@ if typeof(algs_size) == String
 else
     BBO_algs = [algs_size]
 end
-printstyled("At $maxtime s per solve, $(length(BBO_algs)) algs and $(cores) cores this will take $(round(length(queue)*maxtime/60/min(length(queue),cores)*length(BBO_algs),digits=1)) minutes with multi-threading\n"; color=:green)
+printstyled("At $maxtime s per solve, $(length(BBO_algs)) algs and $(threads_to_start) threads, this will take $(round(length(queue)*maxtime/60/threads_to_start*length(BBO_algs),digits=1)) minutes with multi-threading\n"; color=:green)
 longest_alg_name = maximum([length(string(alg)) for alg in BBO_algs])
 #print, in yellow and with ######-separation, the maxtime and algs that the loop is ran with
 global_best = 9e9
 printstyled("############# -- Starting optimization loop with maxtime=$(maxtime)s and algs_size '$(algs_size)' -- #############\n"; color=:yellow)
-Threads.@threads for thread = 1:min(length(queue),cores)
+Threads.@threads for thread = 1:threads_to_start
     #sleep for 250 ms to stagger thread starts
-    sleep(0.5)
+    time_to_sleep = 0.1*thread
+    sleep(time_to_sleep)
     global global_best
     while true
         if length(queue) == 0
@@ -341,7 +384,6 @@ catch e
 end
 
 # Save the results as a .json file
-using JSON
 folder_name = "results/FP $sum_func $timestamp"
 mkpath(folder_name)
 
@@ -376,7 +418,7 @@ open(joinpath(folder_name, "parameters.txt"), "w") do f
     write(f, parameters_json)
 end
 
-using XLSX
+#=using XLSX
 XLSX.openxlsx(joinpath(folder_name, "results $sum_func $timestamp.xlsx"), mode="w") do xf
     sheet = xf[1] # Add sheet
     XLSX.rename!(sheet, "Results $maxtime s") # Rename sheet
@@ -400,6 +442,35 @@ XLSX.openxlsx(joinpath(folder_name, "results $sum_func $timestamp.xlsx"), mode="
         sheet["F$row"] = weight[2]
         sheet["G$row"] = weight[3]
         sheet["H$row"] = string(alg)
+    end
+end=#
+using XLSX
+XLSX.openxlsx(joinpath(folder_name, "results $sum_func $timestamp.xlsx"), mode="w") do xf
+    sheet = xf[1] # Add sheet
+    XLSX.rename!(sheet, "Results $maxtime s") # Rename sheet
+
+    # Step 6.3: Write the headers for the columns
+    n = length(all_combinations[1]) # Assuming all_combinations is non-empty
+    year_headers = ["Year $i" for i in 1:n]
+    weight_headers = ["W$i" for i in 1:n]
+    headers = vcat(["Error"], year_headers, weight_headers, ["Algorithm"])
+    sheet["A1", dim=2] = headers
+
+    # Step 6.4: Iterate through the combinations and write the results to the worksheet
+    for i in 1:length(all_combinations)
+        combination = all_combinations[i]
+        error = best_errors[combination]
+        weight = best_weights[combination]
+        alg = best_alg[combination]
+        row = i + 1
+        sheet["A$row"] = error
+        for j in 1:n
+            sheet["$(Char('A' + j))$row"] = combination[j]
+        end
+        for j in 1:n
+            sheet["$(Char('A' + n + j))$row"] = weight[j]
+        end
+        sheet["$(Char('A' + 2 * n + 1))$row"] = string(alg)
     end
 end
 
