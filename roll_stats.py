@@ -8,11 +8,12 @@ def gen_one_stat():
 
 
 x = []
+print("Generating 10000 stats")
 for i in range(10000):
     stat = gen_one_stat()
     x.append(stat)
 print(f"average is {sum(x)/len(x)}")
-print(f"expected total for 6 stats is {sum(x)/len(x)*6}")
+print(f"Expected total for 6 stats is {sum(x)/len(x)*6}")
 plt.hist(x)
 plt.show()
 
@@ -25,7 +26,7 @@ while True:
     viable_stats = summed_rolls>=80
     if viable_stats:
         print(stats)
-        print(summed_rolls)
+        print(f"Sum of stats = {summed_rolls}")
         break
     else:
-        print_red(summed_rolls)
+        print_red(f"Sum of stats is too low! {summed_rolls}")
