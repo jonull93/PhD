@@ -31,7 +31,7 @@ if false
     println("Removed years: $(to_remove)")
 end
 most_interesting_years = ["2010-2011","2002-2003",]
-maxtime = 60*10
+maxtime = 60*60*3
 algs_size = "adaptive" # "small" or "large" or "single" or "adaptive"
 years_to_add = 3 # number of years to add to the most interesting year for each combination
 # ask the user whether to import the 100 best combinations from the previous run
@@ -86,6 +86,7 @@ if import_combinations
     # remove all items from years if they are not found in any list in all_combinations
 else
     @label skip_import
+    printstyled("Building combinations instead of importing! \n"; color=:red)
     println("Years: $(years_list)")
     println("Number of years: $(length(years_list))")
 
@@ -301,13 +302,8 @@ Threads.@threads for thread = 1:threads_to_start
                                     SearchRange=(0,1), MaxTime=maxtime, TraceInterval=2, TraceMode=:silent) #TargetFitness=88355.583298,FitnessTolerance=0.0001
             local weights_list = best_candidate(res)
             local e = opt_func(weights_list)
-            #PRINT THE ERROR AND WEIGHTS
-            #printstyled("years: $(case)\n"; color=:green)
-            #printstyled("alg: $(alg)\n"; color=:green)
-            #printstyled("error: $(round.(e,digits=5)), weights: $(round.(weights_list,digits=3))\n"; color=:green)
             alg_solutions[alg] = (e, weights_list)
         end
-
         #print each alg's solution
         lock(print_lock) do
             _best_alg = BBO_algs[argmin([alg_solutions[alg][1] for alg in BBO_algs])]
@@ -323,15 +319,12 @@ Threads.@threads for thread = 1:threads_to_start
             end
             # find for which alg the error is the lowest
             for alg in BBO_algs
-                #change the following line so that the printed length of algs of different lengths is the same
-                #printstyled("$(rpad(string(alg),longest_alg_name+1)) error: $(round.(alg_solutions[alg][1],digits=3)), weights: $(round.(alg_solutions[alg][2],digits=3))\n"; color=:white)
                 print("$(round(alg_solutions[alg][1],digits=3)) $(round.(alg_solutions[alg][2],digits=3)) $(rpad(round(sum(alg_solutions[alg][2]),digits=2),4)) $(alg)")
                 if alg == _best_alg
                     printstyled(" <-\n"; color=:green)
                 else
                     print("\n")
                 end
-                #@sprintf("%20i-30s error: %10.5f, weights: %s\n", rpad(string(alg)), alg_solutions[alg][1], round.(alg_solutions[alg][2],digits=3))
 
             end
         end
@@ -360,7 +353,7 @@ for comb in all_combinations
     #if comb not in best_errors
     if !(comb in keys(best_errors))
         best_errors[comb] = Inf
-        best_weights[comb] = [0,0,0]
+        best_weights[comb] = zeros(length(comb))
         best_alg[comb] = "none"
     end
 end
