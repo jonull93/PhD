@@ -254,7 +254,7 @@ def write_inc(path, filename, data: dict, flip=True, fliplast=False, comment=Fal
     return None
 
 
-def write_inc_from_df_columns(path, filename, df: pandas.DataFrame, comment=False):
+def write_inc_from_df_columns(path, filename, df: pandas.DataFrame, comment=False, first_day=1):
     """
 
     Parameters
@@ -272,6 +272,31 @@ def write_inc_from_df_columns(path, filename, df: pandas.DataFrame, comment=Fals
         os.mkdir(path)
     except:
         None
+    if "timestep" in df.index.names and first_day > 1:
+        if df.index.get_level_values(level="timestep")[0] in ["d001a", "h0001"]:
+            import re
+            def shift_time_index(df, start_hour):
+                # Identify the index level containing the desired values
+                target_level = None
+                for level, name in enumerate(df.index.names):
+                    if any(re.match(r'(h|d)\d+', value) for value in df.index.get_level_values(name)):
+                        target_level = level
+                        break
+                if target_level is None:
+                    print("No matching index level found.")
+                    return df
+                # Modify the index level with the given start_hour
+                def update_time_index(value):
+                    prefix, num = value[0], int(value[1:])
+                    new_num = (num + start_hour - 1) % len(df) + 1
+                    return f'{prefix}{new_num:04d}'
+                new_index_level = df.index.get_level_values(target_level).map(update_time_index)
+                new_index = df.index.set_levels(new_index_level, level=target_level)
+                # Set the modified index back to the DataFrame
+                df.index = new_index
+            shift_time_index(df, (first_day-1)*24)
+        else:
+            print("First day is not 1, but the first timestep index is not 'd001a' or 'h0001'.")
 
     with open(path + filename, "w") as writer:
         if comment:
@@ -289,7 +314,7 @@ def write_inc_from_df_columns(path, filename, df: pandas.DataFrame, comment=Fals
 
 
 def append_to_file(filename, scenario, time_to_solve):
-    "adds 'to_add' to a new line at the top of originalfile"
+    "adds 'to_add' to a new line at the bottom of originalfile"
     to_add = f"{dt.datetime.now().strftime('%D - %H:%M:%S')} : {scenario:<40} : " \
              f"{time_to_solve} min\n"
     with open(filename + ".txt", 'a') as f2:
