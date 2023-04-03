@@ -31,12 +31,13 @@ if false
     println("Removed years: $(to_remove)")
 end
 most_interesting_years = ["2010-2011","2002-2003",]
-maxtime = 60*60*3
-algs_size = "adaptive" # "small" or "large" or "single" or "adaptive"
-years_to_add = 3 # number of years to add to the most interesting year for each combination
+maxtime = 60*30
+algs_size = "small" # "small" or "large" or "single" or "adaptive"
+years_to_add = 1 # number of years to add to the most interesting year for each combination
 # ask the user whether to import the 100 best combinations from the previous run
 # if no input is given in 10 seconds, assume import_combinations is false
-printstyled("Attampt to import combinations from previous run? (y/n) "; color=:yellow)
+
+printstyled("Attempt to import combinations from previous run? (y/n) "; color=:yellow)
 input = readline()
 if input == "y"
     import_combinations = true
@@ -161,9 +162,9 @@ end
 #print number of all_combinations
 println("Number of combinations: $(length(queue))")
 threads_to_start = min(length(queue),cores)
-consequtive_runs = div(length(queue),threads_to_start)
-for i in 20:-1:1
-    if div(length(queue),threads_to_start-i) == consequtive_runs
+consequtive_runs = div(length(queue),threads_to_start,RoundUp)
+for i in threads_to_start-1:-1:1
+    if div(length(queue),threads_to_start-i,RoundUp) == consequtive_runs
         printstyled("Reducing number of threads to $(threads_to_start-i) since this wont affect time to complete queue\n"; color=:red)
         global threads_to_start -= i
         break
@@ -289,8 +290,12 @@ Threads.@threads for thread = 1:threads_to_start
             [15/40,5/40,5/40,15/40], [5/40,15/40,15/40,5/40], [5/40,15/40,5/40,15/40],
             [5/40,5/40,15/40,15/40]
             ]
+        local initial_guesses_1 = [
+            [1/2, 1/2], [1/3, 2/3], [2/3, 1/3], [2/40, 38/40], [38/40, 2/40]
+            ]
         local initial_guesses = initial_guesses_2
         years_to_add == 3 && (initial_guesses = initial_guesses_3)
+        years_to_add == 1 && (initial_guesses = initial_guesses_1)
         local init
         local alg_solutions = Dict()
         for alg in BBO_algs
