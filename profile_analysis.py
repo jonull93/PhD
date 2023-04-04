@@ -60,7 +60,7 @@ def make_gams_profiles(year, VRE_profiles, load, pot_cap, ):
     timestamp = datetime.now().strftime("%d-%m-%Y, %H:%M:%S")
     comment = [f"Made by Jonathan Ullmark at {timestamp}"] + \
               [
-                  f"Through profile_analysis.py (quality-of-life scripts repo) with data gathered from globalenergygis\\dev"]
+                  f"Through profile_analysis.py (personal scripts repo) with data gathered from globalenergygis\\dev"]
     path = "output\\"
     VRE_filename = f"gen_profile_VRE_{year}.inc"
     load_filename = f"hourly_load_{year}.inc"
@@ -489,10 +489,10 @@ def combined_years(years, threshold=0.5, window_size_days=3):
     make_pickles(f"{years[0]}-{years[-1]}", VRE_profiles, all_cap, demands, non_traditional_load)
 
 
-separate_years(years, threshold=0.33, make_output=False, make_figure=True)
+#separate_years(years, threshold=0.33, make_output=False, make_figure=True)
 # combined_years(years)
 # combined_years(years,threshold=0.33)
-#remake_profile_seam()
+remake_profile_seam()
 
 
 """net_load = separate_years(1980, add_nontraditional_load=False, make_figure=True, make_output=False, window_size_days=1)
