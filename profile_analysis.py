@@ -67,7 +67,7 @@ def make_gams_profiles(year, VRE_profiles, load, pot_cap, ):
     cap_filename = f"potential_cap_VRE_{year}.inc"
     VRE_df = pd.DataFrame(VRE_profiles.unstack())
     VRE_df.index.names = ["tech", "I_reg", "timestep"]
-    VRE_df.index.set_levels(timesteps, level="timestep", inplace=True)
+    VRE_df.index = VRE_df.index.set_levels(timesteps, level="timestep")
     VRE_df = VRE_df.dropna().clip(lower=1e-7).round(5)
     write_inc_from_df_columns(path, VRE_filename, VRE_df, comment)
     if type(load) != pd.DataFrame:
@@ -78,8 +78,8 @@ def make_gams_profiles(year, VRE_profiles, load, pot_cap, ):
         load_df = load
     load_df = pd.DataFrame(load_df.round(4).unstack())
     load_df.index.names = ["I_reg", "timestep"]
-    load_df.index.set_levels(timesteps, level="timestep", inplace=True)
-    load_df.index.set_levels(regions, level="I_reg", inplace=True)
+    load_df.index = load_df.index.set_levels(timesteps, level="timestep")
+    load_df.index = load_df.index.set_levels(regions, level="I_reg")
     # print_cyan(load_df)
     write_inc_from_df_columns(path, load_filename, load_df, comment=comment)
     write_inc_from_df_columns(path, cap_filename, pot_cap.to_frame(), comment=comment)
@@ -489,10 +489,10 @@ def combined_years(years, threshold=0.5, window_size_days=3):
     make_pickles(f"{years[0]}-{years[-1]}", VRE_profiles, all_cap, demands, non_traditional_load)
 
 
-separate_years(years, threshold=0.33, make_output=False, make_figure=True)
-# combined_years(years)
-# combined_years(years,threshold=0.33)
-#remake_profile_seam()
+separate_years(years, threshold=0.33, make_output=True, make_figure=True)
+#combined_years(years)
+combined_years(years,threshold=0.33)
+remake_profile_seam()
 
 
 """net_load = separate_years(1980, add_nontraditional_load=False, make_figure=True, make_output=False, window_size_days=1)
