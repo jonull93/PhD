@@ -1,159 +1,515 @@
 #=
 fingerprintmatching:
 - Julia version: 
-- Author: Jonathan
+- Author: Jonathan Ullmark
 - Date: 2023-01-18
 =#
 import Combinatorics: combinations
 using MAT
 using Optim
+using BlackBoxOptim
+using DataStructures
+using Dates
+using Printf
+using LinearAlgebra
+using Plots
+using JSON
 
-printstyled("Starting test run\n"; color=:cyan)
-# Define the matrices
-m1 = [10 11 12; 4 5 6; 0 2 0]
-m2 = [10 11 12; 13 14 15; 1 1 0]
-m3 = [19 20 21; 22 23 24; 1 0 1]
-m4 = (m1+10*m2+85*m3)/90
+#make it clear in the command prompt that the code is running
+timestamp = Dates.format(now(), "u_dd_HH.MM.SS")
+printstyled("\n ############# -- Starting fingerprintmatching.jl at $(timestamp) -- ############# \n"; color=:yellow)
+const print_lock = ReentrantLock()
 
-# Define the weights
-w1 = 0.5
-w2 = 0.3
-w3 = 0.2
-
-# Set upper and lower limits
-lower = [0, 0, 0]
-upper = [1, 1, 1]
-
-# Calculate the weighted sum of the matrices
-function matrix_SSE(m1,m2,m3,w)
-    m_sum = w[1]*m1 + w[2]*m2 + w[3]*m3
-    # Calculate the difference between the weighted sum and matrix 4
-    diff = m_sum - m4
-    # Calculate the sum of the squares of the differences
-    sse = sum(diff.^2)
-    return sse
-end
-
-println("Initial SSE = $(matrix_SSE(m1,m2,m3,[w1,w2,w3]))")
-# Use an optimization algorithm to find the best weights
-using Optim
-function sse_func(x)
-    w1 = x[1]
-    w2 = x[2]
-    w3 = x[3]
-    m_sum = w1*m1 + w2*m2 + w3*m3
-    diff = m_sum - m4
-    sse = sum(diff.^2)
-    return sse
-end
-res = optimize(sse_func, lower, upper, [w1, w2, w3])
-w1_new = res.minimizer[1]
-w2_new = res.minimizer[2]
-w3_new = res.minimizer[3]
-
-# Print the best weights
-println("The best weights are:")
-println("w1 = $(w1_new)")
-println("w2 = $(w2_new)")
-println("w3 = $(w3_new)")
-
-println("Final SSE = $(matrix_SSE(m1,m2,m3,[w1_new,w2_new,w3_new]))")
-printstyled("Finished test run\n"; color=:cyan)
-#The output of the code will be the best weights that can be used to match matrices 1,2,3 to matrix 4.
-
-# Parameters
+#set parameters
 amplitude_resolution = 1
 window = 12
-years = 1980:2019#1980:2019
+years = 1980:2018
+# from years, remove 1985, 1993,1994,1995,1996,1998,2001,2005,2017
+if false
+    to_remove = [1985, 1993,1994,1995,1996,1998,2001,2005,2017]
+    years = [i for i in years if !(i in to_remove)]
+    println("Removed years: $(to_remove)")
+end
 most_interesting_years = ["2010-2011","2002-2003",]
+maxtime = 60*30
+algs_size = "small" # "small" or "large" or "single" or "adaptive"
+years_to_add = 1 # number of years to add to the most interesting year for each combination
+# ask the user whether to import the 100 best combinations from the previous run
+# if no input is given in 10 seconds, assume import_combinations is false
+
+printstyled("Attempt to import combinations from previous run? (y/n) "; color=:yellow)
+input = readline()
+if input == "y"
+    import_combinations = true
+else
+    import_combinations = false
+end
+
+# years_to_add scales insanely with the number of years, so it is not recommended to use more than 2
+
 years_list = map(x -> string(x, "-", x+1), years)
 years_list = vcat(years_list,[i for i in most_interesting_years if !(i in years_list)])
 
 # Load mat data
 total_year = "1980-2019"
-ref_full = matread("input\\heatmap_values_$(total_year)_amp$(amplitude_resolution)_area.mat")
+ref_full = matread("output\\heatmap_values_$(total_year)_amp$(amplitude_resolution)_window$(window)_area.mat")
 ref_mat = ref_full["recurrance"]
 ref_y = ref_full["duration"][:,1]
 ref_x = ref_full["amplitude"][1,:]
 printstyled("Imported total matrix $(size(ref_mat)) for $(total_year) \n"; color=:green)
+# load weight matrices to be used with the error func sum_weight_mat, see git\python\figures\weight_matrix#.png for visuals
+weight_matrices = matread("output/weight_matrices.mat")
+weight_matrix_lin19diff = weight_matrices["Z_lin19diff"]
+weight_matrix_lin190diff = weight_matrices["Z_lin190diff"]
+weight_matrix_sqrt = weight_matrices["Z_sqrt"]  # min = 1, max = 14
+
+# Generate combinations of years to optimize match for
+year_combinations = Dict()
+final_SSE = Dict()
+weights = Dict()
+queue = Queue{Any}()
+cores = Threads.nthreads()
+all_combinations = []
+if import_combinations
+    # read folder_name from results/most_recent_results.txt
+    folder_name = readlines("results/most_recent_results.txt")[1]
+    # read folder_name/best_100.json, or skip to the else-block if the file does not exist
+    if !isfile("$(folder_name)/best_100.json")
+        println("File $(folder_name)/best_100.json does not exist, skipping import of combinations")
+        @goto skip_import
+    end
+    best_100 = JSON.parsefile("$(folder_name)/best_100.json")
+    # add each item in best_100 to all_combinations and queue
+    for item in best_100
+        enqueue!(queue,item)
+        push!(all_combinations,item)
+    end
+    # remove all items from years if they are not found in any list in all_combinations
+else
+    @label skip_import
+    printstyled("Building combinations instead of importing! \n"; color=:red)
+    println("Years: $(years_list)")
+    println("Number of years: $(length(years_list))")
+
+    for interesting_year in most_interesting_years
+        #printstyled("Starting optimization that include year $(interesting_year)\n"; color=:cyan)
+        year_combinations[interesting_year] = combinations(filter(!=(interesting_year),years_list), years_to_add)  # a generator instead of a list until collect() is used
+        for combination in year_combinations[interesting_year]
+            case = [interesting_year]
+            append!(case,combination)
+            enqueue!(queue,case)
+            push!(all_combinations,case)
+        end
+    end
+end
+
 
 ref_mat[isnan.(ref_mat)].= 0
 cfd_data = Dict()
 y_data = Dict()
 x_data = Dict()
 for year in years_list
-    filename = "input\\heatmap_values_$(year)_amp$(amplitude_resolution)_area.mat"
-    temp = matread(filename)
+    filename = "output\\heatmap_values_$(year)_amp$(amplitude_resolution)_window$(window)_area_padded.mat"
+    filename2 = "output\\heatmap_values_$(year)_amp$(amplitude_resolution)_window$(window)_area.mat"
+    filename3 = "input\\heatmap_values_$(year)_amp$(amplitude_resolution)_area.mat"
+    try
+        global temp = matread(filename)
+    catch e
+        try
+            global temp = matread(filename2)
+        catch e
+            try
+                global temp = matread(filename3)
+            catch e
+                error("Could not find file for $(year)")
+            end
+        end
+    end
     cfd_data[year] = replace(temp["recurrance"], NaN => 0)
-    x_data[year] = temp["amplitude"][1,:]
-    y_data[year] = temp["duration"][:,1]
-    xlim = [minimum(x_data[year]), minimum(x_data[year])]
-    ylim = [minimum(y_data[year]), minimum(y_data[year])]
+    #take [:,1]or [1,:]if ndims==2 otherwise just take the whole thing
+    y_data[year] = getindex(temp["duration"], :, 1)
+    x_data[year] = getindex(temp["amplitude"], 1, :)
+    if size(cfd_data[year]) == size(ref_mat)
+        #println("Matrix for $(year) is already the same size as the reference matrix")
+        continue # move on to the next year
+    end
     if length(findall(in(x_data[year]),ref_x))<length(x_data[year]); error("Non-matching x-axes"); end
     printstyled("Padding the matrix $(size(cfd_data[year])) for $(year) ..\n"; color=:green)
     columns_to_add = count(x -> x > maximum(x_data[year]), ref_x)
-    #end_columns = count(x -> x > maximum(x_data[year]), ref_x)
+    println("Adding $(columns_to_add) columns")
     xpad = zeros((size(cfd_data[year])[1],columns_to_add))
-    #xpad2 = zeros((size(cfd_data[year])[2],end_columns))
     cfd_data[year] = hcat(cfd_data[year],xpad)
     #println("Added columns - new size is $(size(cfd_data[year]))")
     start_rows = count(y -> y < minimum(y_data[year]), ref_y)
     end_columns = count(y -> y > maximum(y_data[year]), ref_y)
+    println("Adding $(start_rows) rows at the top and $(end_columns) rows at the bottom")
     ypad1 = zeros((start_rows,size(cfd_data[year])[2]))
     ypad2 = zeros((end_columns,size(cfd_data[year])[2]))
     cfd_data[year] = vcat(ypad1,cfd_data[year],ypad2)
-    #printstyled("Done with matrix for $(year), new size is $(size(cfd_data[year])) \n"; color=:green)
-
+    if size(cfd_data[year]) != size(ref_mat)
+        #print in red the sizes of cfd_data[year] and ref_mat
+        printstyled("size(cfd_data[year]) = $(size(cfd_data[year])) and size(ref_mat) = $(size(ref_mat))\n"; color=:red)
+        error("The dimensions of the matrix for $(year) are not the same as the reference matrix")
+    end
+    # save padded mat to filename but replace .mat with _padded.mat
+    matwrite("output\\heatmap_values_$(year)_amp$(amplitude_resolution)_window$(window)_area_padded.mat",
+        Dict("recurrance" => cfd_data[year], "duration" => ref_y, "amplitude" => ref_x),
+        compress=true)
 end
 
-# Generate combinations of years to optimize match for
-println(years_list)
-year_combinations = Dict()
-final_SSE = Dict()
-for interesting_year in most_interesting_years
-    printstyled("Starting optimization with year $(interesting_year)\n"; color=:cyan)
-    year_combinations[interesting_year] = combinations(filter(!=(interesting_year),years_list), 2)  # a generator instead of a list until collect() is used
-    printstyled("$(length(year_combinations[interesting_year])) combinations to consider\n"; color=:green)
-    for combination in year_combinations[interesting_year]
-        case = [interesting_year,combination[1],combination[2]]
-        printstyled("Year combination = $(case)\n"; color=:white)
-        matrices = [cfd_data[year] for year in combination]
-        #println([year for year in combination])
-        #print(matrices[1]*0.2+matrices[2]*0.3)
-        #println(sum(matrices[1]))
-        #println(typeof(matrices[1]))
-        # Use an optimization algorithm to find the best weights
-        function sse_func(x)
-            w1 = x[1]
-            w2 = x[2]
-            w3 = x[3]
-            m1 = cfd_data[interesting_year]
-            m2 = matrices[1]
-            m3 = matrices[2]
-            m_sum = w1*m1 + w2*m2 + w3*m3
-            diff = m_sum - ref_mat/40
-            sse = sum(diff.^2)
-            return sse
-        end
-        local res = optimize(sse_func, lower, upper, [w1, w2, w3])
-        local w1_new = res.minimizer[1]
-        local w2_new = res.minimizer[2]
-        local w3_new = res.minimizer[3]
-
-        # Print the best weights
-        println("The best weights are:")
-        println("w1 = $(round(w1_new,sigdigits=2)) for year $(interesting_year)")
-        println("w2 = $(round(w2_new,sigdigits=2)) for year $(combination[1])")
-        println("w3 = $(round(w3_new,sigdigits=2)) for year $(combination[2])")
-        #println("The weights are $(w1_new), $(w2_new), $(w3_new) for years $(combination) and $(interesting_year) with SSE $(res.minimum)")
-        println("Final SSE = $(matrix_SSE(m1,m2,m3,[w1_new,w2_new,w3_new]))")
-        final_SSE[case] = matrix_SSE(m1,m2,m3,[w1_new,w2_new,w3_new])
+#dequeue!(queue)  # remove the first element
+#dequeue!(queue)  # remove the second element
+#print number of all_combinations
+println("Number of combinations: $(length(queue))")
+threads_to_start = min(length(queue),cores)
+consequtive_runs = div(length(queue),threads_to_start,RoundUp)
+for i in threads_to_start-1:-1:1
+    if div(length(queue),threads_to_start-i,RoundUp) == consequtive_runs
+        printstyled("Reducing number of threads to $(threads_to_start-i) since this wont affect time to complete queue\n"; color=:red)
+        global threads_to_start -= i
+        break
     end
 end
 
-min_val = minimum(values(final_SSE))
-for (key, value) in final_SSE
-    if value == min_val
-        println("Minimum value is $(value) for key $(key)")
+#printstyled("At around 25 s per combination, this will take $(round(length(queue)*25/60)) minutes\n"; color=:green)
+#printstyled("At around 25 s per combination and $(cores) cores, this will take $(round(length(queue)*25/60/min(length(queue),cores),sigdigits=2)) minutes with multi-threading\n"; color=:green)
+scaled_ref_mat = ref_mat ./ 40
+function sigmoid(x)
+    return 1 / (1 + exp(-x))
+end
+
+function diff_sum_weighted_mats(matrices,weights)
+    m_sum = zeros(size(matrices[1]))
+    for i in 1:length(matrices)
+        m_sum .+= weights[i] .* matrices[i]
+    end
+    diff = m_sum .- scaled_ref_mat
+    return diff
+end
+
+println("Starting $(threads_to_start) threads (use ´julia --threads $(Sys.CPU_THREADS) script_name.jl´ to use max cores)") # returns "Starting 63 threads"
+
+best_weights = Dict()
+best_errors = Dict()
+best_alg = Dict()
+BBO_algs_large = [:generating_set_search,
+:adaptive_de_rand_1_bin_radiuslimited,
+:simulated_annealing,
+:probabilistic_descent,
+:pso,
+:adaptive_de_rand_1_bin,
+:dxnes,
+]
+BBO_algs_small = [:pso,
+:adaptive_de_rand_1_bin,
+:probabilistic_descent,]
+BBO_algs_single = [:pso]
+if maxtime>120
+    BBO_algs_adaptive = [:probabilistic_descent, :adaptive_de_rand_1_bin]
+else
+    BBO_algs_adaptive = [:pso, :probabilistic_descent]
+end
+if typeof(algs_size) == String
+    BBO_algs = eval(Meta.parse("BBO_algs_$(algs_size)"))
+else
+    BBO_algs = [algs_size]
+end
+printstyled("At $maxtime s per solve, $(length(BBO_algs)) algs and $(threads_to_start) threads, this will take $(round(length(queue)*maxtime/60/threads_to_start*length(BBO_algs),digits=1)) minutes with multi-threading\n"; color=:green)
+longest_alg_name = maximum([length(string(alg)) for alg in BBO_algs])
+#print, in yellow and with ######-separation, the maxtime and algs that the loop is ran with
+global_best = 9e9
+printstyled("############# -- Starting optimization loop with maxtime=$(maxtime)s and algs_size '$(algs_size)' -- #############\n"; color=:yellow)
+Threads.@threads for thread = 1:threads_to_start
+    #sleep for 250 ms to stagger thread starts
+    time_to_sleep = 0.1*thread
+    sleep(time_to_sleep)
+    global global_best
+    while true
+        if length(queue) == 0
+            #println("Nothing to do")
+            break
+        end
+        case = dequeue!(queue)
+        start_time = Dates.now()
+        printstyled("Thread $(thread) started working on $(case) at $(Dates.format(now(), "HH:MM:SS")), $(length(queue)) left in queue\n"; color=:cyan)
+        matrices = [cfd_data[year] for year in case]
+        # Use an optimization algorithm to find the best weights
+        function sse(x)
+           diff = diff_sum_weighted_mats(matrices,x)
+           return dot(diff,diff)
+        end
+        function abs_sum(x)
+            diff = diff_sum_weighted_mats(matrices,x)
+            result = 0.0
+            @inbounds @simd for i in eachindex(diff)
+                result += abs(diff[i])
+            end
+            return result
+        end
+        function sqrt_sum(x)
+            diff = diff_sum_weighted_mats(matrices,x)
+            result = 0.0
+            @inbounds @simd for i in eachindex(diff)
+                result += sqrt(abs(diff[i]))
+            end
+            return result
+        end
+        function log_sum(x)
+           diff = diff_sum_weighted_mats(matrices,x)
+           diff = replace(diff, 0 => NaN)
+           e = abs.(log10.(abs.(diff)))
+           # return sum of e but ignoring NaN
+           #penalty = sigmoid((sum(x)-1.011)*1000)+sigmoid((0.989-sum(x))*1000)
+           return sum(e[.!isnan.(e)])#+penalty*100000
+        end
+        function weighted_mat_sum(x, weight_matrix=weight_matrix_lin19diff)
+              diff = diff_sum_weighted_mats(matrices,x).*weight_matrix'
+            return sum(abs.(diff[.!isnan.(diff)]))
+        end
+        # a vector w that is the same length as the number of matrices and equals 1/number of matrices
+        w = ones(length(matrices)) ./ length(matrices)
+        upper = ones(length(matrices))
+        lower = zeros(length(matrices))
+        ###----------------------------
+        ### SET THE ERROR FUNCTION TO OPTIMIZE WITH HERE
+        ###----------------------------
+        global opt_func_str = "sqrt_sum(x) + (sigmoid((sum(x)-1.011)*1000) + sigmoid((0.989-sum(x))*1000))*100000" #sigmoid((sum(x)-1.011)*1000) +
+        opt_func(x) = sqrt_sum(x) + (sigmoid((sum(x)-1.011)*1000) + sigmoid((0.989-sum(x))*1000))*100000 #sigmoid((sum(x)-1.011)*1000) +
+        local initial_guesses_2 = [
+            # considering the solution space as a triangle where each corner is 100% of one axis such as (1,0,0)
+            # let some initial guesses be the center of the triangle and on the center of the edges of the triangle
+            [1/3,1/3,1/3], [19/40, 19/40, 2/40], [2/40, 19/40, 19/40], [19/40, 2/40, 19/40],
+            # then divide the triangle into 4 new triangles (like a triforce) and do the same again
+            [2/3, 1/6, 1/6], [1/6, 2/3, 1/6], [1/6, 1/6, 2/3], # center of smaller triangles
+            [1/2, 1/4, 1/4], [1/4, 1/2, 1/4], [1/4, 1/4, 1/2], # center of inner edges of smaller triangles
+            [29, 9, 2]./40, [2, 29, 9]./40, [9, 2, 29]./40, # center of outer edges of smaller triangles
+            [29, 2, 9]./40, [9, 29, 2]./40, [2, 9, 29]./40, # center of outer edges of smaller triangles
+            ]
+        local initial_guesses_3 = [
+            [1/4,1/4,1/4,1/4], [15/40,15/40,5/40,5/40], [15/40,5/40,15/40,5/40],
+            [15/40,5/40,5/40,15/40], [5/40,15/40,15/40,5/40], [5/40,15/40,5/40,15/40],
+            [5/40,5/40,15/40,15/40]
+            ]
+        local initial_guesses_1 = [
+            [1/2, 1/2], [1/3, 2/3], [2/3, 1/3], [2/40, 38/40], [38/40, 2/40]
+            ]
+        local initial_guesses = initial_guesses_2
+        years_to_add == 3 && (initial_guesses = initial_guesses_3)
+        years_to_add == 1 && (initial_guesses = initial_guesses_1)
+        local init
+        local alg_solutions = Dict()
+        for alg in BBO_algs
+            #print the next line only tif thread==1
+            if thread == 1
+                printstyled("Trying $(alg)..\n"; color=:cyan)
+            end
+            local res = bboptimize(opt_func, initial_guesses; method=alg, NumDimensions=length(matrices),
+                                    SearchRange=(0,1), MaxTime=maxtime, TraceInterval=2, TraceMode=:silent) #TargetFitness=88355.583298,FitnessTolerance=0.0001
+            local weights_list = best_candidate(res)
+            local e = opt_func(weights_list)
+            alg_solutions[alg] = (e, weights_list)
+        end
+        #print each alg's solution
+        lock(print_lock) do
+            _best_alg = BBO_algs[argmin([alg_solutions[alg][1] for alg in BBO_algs])]
+            best_errors[case] = alg_solutions[_best_alg][1]
+            best_weights[case] = alg_solutions[_best_alg][2]
+            best_alg[case] = _best_alg
+            if alg_solutions[_best_alg][1] < global_best
+                printstyled("years: $(case)"; color=:green)
+                printstyled("       <-- best so far\n"; color=:red)
+                global_best = best_errors[case]
+            else
+                printstyled("years: $(case)\n"; color=:green)
+            end
+            # find for which alg the error is the lowest
+            for alg in BBO_algs
+                print("$(round(alg_solutions[alg][1],digits=3)) $(round.(alg_solutions[alg][2],digits=3)) $(rpad(round(sum(alg_solutions[alg][2]),digits=2),4)) $(alg)")
+                if alg == _best_alg
+                    printstyled(" <-\n"; color=:green)
+                else
+                    print("\n")
+                end
+
+            end
+        end
+        #if case not in best_errors
+        if !(case in keys(best_errors))
+            printstyled("did not find $case in best_errors\n"; color=:red)
+            best_errors[case] = alg_solutions[_best_alg][1]
+            best_weights[case] = alg_solutions[_best_alg][2]
+            best_alg[case] = _best_alg
+        end
+        if !(case in keys(best_errors))
+            printstyled("AGAIN did not find $case in best_weights\n"; color=:red)
+            lock(print_lock) do
+                best_errors[case] = alg_solutions[_best_alg][1]
+                best_weights[case] = alg_solutions[_best_alg][2]
+                best_alg[case] = _best_alg
+            end
+        end
+        if !(case in keys(best_errors))
+            printstyled("AGAIN AGAIN did not find $case in best_alg\n"; color=:red)
+            error("failed to add $case to best_errors")
+        end
+    end
+end
+for comb in all_combinations
+    #if comb not in best_errors
+    if !(comb in keys(best_errors))
+        best_errors[comb] = Inf
+        best_weights[comb] = zeros(length(comb))
+        best_alg[comb] = "none"
+    end
+end
+# sum finc should be the text in opt_func_str before the first +
+sum_func = split(opt_func_str, "(")[1]
+
+# Find the 3 best combinations (lowest SSE), print their SSE and weights
+println("Done optimizing all combinations at $(Dates.format(now(), "HH:MM:SS"))")
+printstyled("The 3 best combinations are ($(years[1])-$(years[end])) [sum_func=$(sum_func)()]:\n", color=:cyan)
+try
+    global sorted_cases = sort(collect(best_errors), by=x->x[2])
+    for (case, error) in sorted_cases[1:3]
+        printstyled("$(case) with error $(round(error,digits=1))\n", color=:green)
+        println("weights: $(round.(best_weights[case],digits=3)) (sum: $(round(sum(best_weights[case]),digits=3)))")
+        # print each item in the case and its respective weight
+    end
+    #sort all_combinations by its value in the dictionary best_errors
+    global all_combinations = sort(collect(all_combinations), by=x->best_errors[x])
+catch e
+    printstyled("!Error: $(e)\n", color=:red)
+end
+
+# Save the results as a .json file
+folder_name = "results/FP $sum_func $timestamp"
+mkpath(folder_name)
+
+results = Dict("combinations" => all_combinations, "best_weights" => best_weights,
+    "best_errors" => best_errors, "opt_func" => opt_func_str, "sum_func" => sum_func,
+    "maxtime" => maxtime, "best_alg" => best_alg)
+
+#Create a file named after the range years
+years_filename = joinpath(folder_name, "$(minimum(years)) to $(maximum(years))")
+open(years_filename, "w") do f
+    write(f, "")# You can write any content related to the years range here if needed
+end
+#Create a file named after the best case
+best_case_filename = joinpath(folder_name, "Best= $(join(sorted_cases[1][1], ","))")
+open(best_case_filename, "w") do f
+    write(f, "")# You can write any content related to the best case here if needed
+end
+#Create a file named after the maxtime
+maxtime_filename = joinpath(folder_name, "Maxtime= $maxtime")
+open(maxtime_filename, "w") do f
+    write(f, "")# You can write any content related to the maxtime here if needed
+end
+
+open(joinpath(folder_name, "results.json"), "w") do f
+    write(f, JSON.json(results))
+end
+
+parameters = Dict("maxtime" => maxtime, "opt_func" => opt_func_str, "BBO_algs" => BBO_algs)
+parameters_json = JSON.json(parameters)
+
+open(joinpath(folder_name, "parameters.txt"), "w") do f
+    write(f, parameters_json)
+end
+
+#=using XLSX
+XLSX.openxlsx(joinpath(folder_name, "results $sum_func $timestamp.xlsx"), mode="w") do xf
+    sheet = xf[1] # Add sheet
+    XLSX.rename!(sheet, "Results $maxtime s") # Rename sheet
+
+    # Step 6.3: Write the headers for the columns
+    headers = ["Error", "Year 1", "Year 2", "Year 3", "W1", "W2", "W3", "Algorithm"]
+    sheet["A1",dim=2] = headers
+
+    # Step 6.4: Iterate through the combinations and write the results to the worksheet
+    for i in 1:length(all_combinations)
+        combination = all_combinations[i]
+        error = best_errors[combination]
+        weight = best_weights[combination]
+        alg = best_alg[combination]
+        row = i + 1
+        sheet["A$row"] = error
+        sheet["B$row"] = combination[1]
+        sheet["C$row"] = combination[2]
+        sheet["D$row"] = combination[3]
+        sheet["E$row"] = weight[1]
+        sheet["F$row"] = weight[2]
+        sheet["G$row"] = weight[3]
+        sheet["H$row"] = string(alg)
+    end
+end=#
+using XLSX
+XLSX.openxlsx(joinpath(folder_name, "results $sum_func $timestamp.xlsx"), mode="w") do xf
+    sheet = xf[1] # Add sheet
+    XLSX.rename!(sheet, "Results $maxtime s") # Rename sheet
+
+    # Step 6.3: Write the headers for the columns
+    n = length(all_combinations[1]) # Assuming all_combinations is non-empty
+    year_headers = ["Year $i" for i in 1:n]
+    weight_headers = ["W$i" for i in 1:n]
+    headers = vcat(["Error"], year_headers, weight_headers, ["Algorithm"])
+    sheet["A1", dim=2] = headers
+
+    # Step 6.4: Iterate through the combinations and write the results to the worksheet
+    for i in 1:length(all_combinations)
+        combination = all_combinations[i]
+        error = best_errors[combination]
+        weight = best_weights[combination]
+        alg = best_alg[combination]
+        row = i + 1
+        sheet["A$row"] = error
+        for j in 1:n
+            sheet["$(Char('A' + j))$row"] = combination[j]
+        end
+        for j in 1:n
+            sheet["$(Char('A' + n + j))$row"] = weight[j]
+        end
+        sheet["$(Char('A' + 2 * n + 1))$row"] = string(alg)
+    end
+end
+
+
+
+#=using XLSX
+XLSX.openxlsx(joinpath(folder_name, "results $timestamp.xlsx"), mode="w") do xf
+    sheet = xf[1] # Add sheet
+    XLSX.rename!(sheet, "Results $maxtime s") # Rename sheet
+
+    # Step 6.3: Write the headers for the columns
+    headers = ["Combination", "Error", "Weights", "Algorithm"]
+    sheet["A1", dim=2] = headers
+
+    # Step 6.4: Iterate through the combinations and write the results to the worksheet
+    for i in 1:length(all_combinations)
+        combination = all_combinations[i]
+        error = best_errors[combination]
+        weight = best_weights[combination]
+        alg = best_alg[combination]
+        row = i + 1
+        sheet["A$row"] = join(combination, ", ")
+        sheet["B$row"] = error
+        sheet["C$row"] = join(round.(weight,digits=3), ", ")
+        sheet["D$row"] = string(alg)
+    end
+end
+=#
+
+# Update the most recent results file
+open("results/most_recent_results.txt", "w") do f
+    write(f, folder_name)
+end
+
+# Call Script 1 from Script 2
+#see if any one the following files exist:
+#C:/Users/jonathan/.conda/envs/py311/python.exe
+#C:/Users/jonull/.conda/envs/py311/python.exe
+for path in ["C:/Users/jonathan/.conda/envs/py311/python.exe", "C:/Users/jonull/.conda/envs/py311/python.exe"]
+    if isfile(path)
+        println("To make figures of these results, run `$(path) figure_cfd.py`")
+        break
     end
 end
