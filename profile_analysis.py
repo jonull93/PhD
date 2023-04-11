@@ -60,14 +60,14 @@ def make_gams_profiles(year, VRE_profiles, load, pot_cap, ):
     timestamp = datetime.now().strftime("%d-%m-%Y, %H:%M:%S")
     comment = [f"Made by Jonathan Ullmark at {timestamp}"] + \
               [
-                  f"Through profile_analysis.py (quality-of-life scripts repo) with data gathered from globalenergygis\\dev"]
+                  f"Through profile_analysis.py (personal scripts repo) with data gathered from globalenergygis\\dev"]
     path = "output\\"
     VRE_filename = f"gen_profile_VRE_{year}.inc"
     load_filename = f"hourly_load_{year}.inc"
     cap_filename = f"potential_cap_VRE_{year}.inc"
     VRE_df = pd.DataFrame(VRE_profiles.unstack())
     VRE_df.index.names = ["tech", "I_reg", "timestep"]
-    VRE_df.index.set_levels(timesteps, level="timestep", inplace=True)
+    VRE_df.index = VRE_df.index.set_levels(timesteps, level="timestep")
     VRE_df = VRE_df.dropna().clip(lower=1e-7).round(5)
     write_inc_from_df_columns(path, VRE_filename, VRE_df, comment)
     if type(load) != pd.DataFrame:
@@ -78,8 +78,8 @@ def make_gams_profiles(year, VRE_profiles, load, pot_cap, ):
         load_df = load
     load_df = pd.DataFrame(load_df.round(4).unstack())
     load_df.index.names = ["I_reg", "timestep"]
-    load_df.index.set_levels(timesteps, level="timestep", inplace=True)
-    load_df.index.set_levels(regions, level="I_reg", inplace=True)
+    load_df.index = load_df.index.set_levels(timesteps, level="timestep")
+    load_df.index = load_df.index.set_levels(regions, level="I_reg")
     # print_cyan(load_df)
     write_inc_from_df_columns(path, load_filename, load_df, comment=comment)
     write_inc_from_df_columns(path, cap_filename, pot_cap.to_frame(), comment=comment)
