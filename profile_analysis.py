@@ -255,12 +255,12 @@ regions = ["SE_NO_N", "SE_S", "NO_S", "FI", "DE_N", "DE_S"]
 # non_traditional_load = initial_results[scenario_name]["o_yearly_nontraditional_load"]
 # non_traditional_load = non_traditional_load[non_traditional_load.index.get_level_values(level="stochastic_scenario")[0]]
 non_traditional_load = pd.Series([
-    8285.78,
-    51514.8,
-    93605.4,
-    1148.72,
-    7659.52,
-    9178.34,
+    9_034,
+    26_763,
+    9_947,
+    19_249,
+    136_453,
+    217_235,
 ], index=regions)
 WON = ["WONA" + str(i) for i in range(1, 6)]
 WOFF = ["WOFF" + str(i) for i in range(1, 6)]
@@ -489,10 +489,10 @@ def combined_years(years, threshold=0.5, window_size_days=3):
     make_pickles(f"{years[0]}-{years[-1]}", VRE_profiles, all_cap, demands, non_traditional_load)
 
 
-separate_years(years, threshold=0.33, make_output=False, make_figure=True)
+separate_years(years,threshold=0.33, make_output=True, make_figure=True)
 # combined_years(years)
-# combined_years(years,threshold=0.33)
-#remake_profile_seam()
+combined_years(years,threshold=0.33)
+remake_profile_seam()
 
 
 """net_load = separate_years(1980, add_nontraditional_load=False, make_figure=True, make_output=False, window_size_days=1)
