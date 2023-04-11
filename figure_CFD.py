@@ -185,6 +185,7 @@ def make_cfd_plot(ax, Xnetload, Ynetload, Znetload, xmin=False, xmax=False, ymin
     return cm
 
 def main(year, amp_length=1, rolling_hours=12, area_mode_in_cfd=True, write_files=True, read_pickle=True, xmin=0, xmax=0, ymin=0, ymax=0, weights=False):
+    global thread_nr
     if type(year) != list and type(year) != tuple:
         print_cyan(f"\nStarting loop for year -- {year} --")
         pickle_read_name = rf"PickleJar\{year}_CFD_netload_df_amp{amp_length}_window{rolling_hours}{'_area'*area_mode_in_cfd}.pickle"
@@ -324,14 +325,14 @@ if __name__ == "__main__":
     test_mode = False
     write_pickle = not test_mode
     area_mode_in_cfd = True
-    read_pickle = True
+    read_pickle = False
     years = range(1980, 1980)
     years_iter2 = [f"{years[i]}-{years[i+1]}" for i in range(len(years)-1)]
     long_period = f"1980-2019"
 
     xmax= 0
     xmin, xmax, ymin, ymax = main(long_period, amp_length=amp_length, rolling_hours=rolling_hours, area_mode_in_cfd=area_mode_in_cfd,
-                                  write_files=False, read_pickle=True)
+                                  write_files=False, read_pickle=False)
     print("Xmin =", xmin, "Xmax =", xmax, "Ymin =", ymin, "Ymax =", ymax)
     queue_years = Queue(maxsize=0)
     # Load results from most recent fingerprinting run

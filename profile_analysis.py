@@ -39,7 +39,7 @@ def make_pickles(year, VRE_profiles, cap, load, non_traditional_load):
     pickle.dump(large, open("PickleJar\\" + large_name, 'wb'))
 
 
-def make_gams_profiles(year, VRE_profiles, load, pot_cap, ):
+def make_gams_profiles(year, VRE_profiles, load, pot_cap=False, ):
     """
 
     Parameters
@@ -82,7 +82,7 @@ def make_gams_profiles(year, VRE_profiles, load, pot_cap, ):
     load_df.index = load_df.index.set_levels(regions, level="I_reg")
     # print_cyan(load_df)
     write_inc_from_df_columns(path, load_filename, load_df, comment=comment)
-    write_inc_from_df_columns(path, cap_filename, pot_cap.to_frame(), comment=comment)
+    if pot_cap: write_inc_from_df_columns(path, cap_filename, pot_cap.to_frame(), comment=comment)
 
 
 def get_FLH(profile, weights=False):
@@ -326,7 +326,7 @@ def remake_profile_seam(new_profile_seam=4344, profile_starts_in_winter=False, y
         # print_cyan(VRE_profile_dict[years[i_y - 1]], VRE_profile_dict[years[i_y]])
         print_green(VRE_df)
         # print_cyan(load)
-        make_gams_profiles(f"{years[i_y - 1]}-{year}", VRE_df, load_df, all_cap)
+        make_gams_profiles(f"{years[i_y - 1]}-{year}", VRE_df, load_df)
         make_pickles(f"{years[i_y - 1]}-{year}", VRE_df, all_cap, load_df, non_traditional_load)
     return None
 
