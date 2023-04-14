@@ -10,6 +10,7 @@ import pandas
 from order_cap import order_cap
 from order_gen import order_gen
 
+os.system('color')
 
 class TECH(str, Enum):
     ELECTROLYZER = 'efuel'
