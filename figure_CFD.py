@@ -185,7 +185,6 @@ def make_cfd_plot(ax, Xnetload, Ynetload, Znetload, xmin=False, xmax=False, ymin
     return cm
 
 def main(year, amp_length=1, rolling_hours=12, area_mode_in_cfd=True, write_files=True, read_pickle=True, xmin=0, xmax=0, ymin=0, ymax=0, weights=False):
-    global thread_nr
     if type(year) != list and type(year) != tuple:
         print_cyan(f"\nStarting loop for year -- {year} --")
         pickle_read_name = rf"PickleJar\{year}_CFD_netload_df_amp{amp_length}_window{rolling_hours}{'_area'*area_mode_in_cfd}.pickle"
@@ -200,7 +199,9 @@ def main(year, amp_length=1, rolling_hours=12, area_mode_in_cfd=True, write_file
             df_out_tot, xmin, xmax = create_df_out_tot(year, xmin, xmax, rolling_hours=rolling_hours)
             # 248s at 1 year then more changes and now 156-157s at 1 year
             end_time = timer()
-            print(f"elapsed time to build CFD in thread {thread_nr[threading.get_ident()]} = {round(end_time - start_time, 1)}")
+            try: this_thread = thread_nr[threading.get_ident()]
+            except: this_thread = "MAIN"
+            print(f"elapsed time to build CFD in thread {this_thread} = {round(end_time - start_time, 1)}")
             if write_files: pickle.dump(df_out_tot, open(pickle_dump_name, 'wb'))
         df_reset = df_out_tot.reset_index()
         df_reset.columns = ['Amplitude', 'Duration', 'Occurrence']
@@ -325,14 +326,15 @@ if __name__ == "__main__":
     test_mode = False
     write_pickle = not test_mode
     area_mode_in_cfd = True
-    read_pickle = False
-    years = range(1980, 1980)
+    read_pickle = True
+    years = range(1980, 2018)
     years_iter2 = [f"{years[i]}-{years[i+1]}" for i in range(len(years)-1)]
+    print(f"{years_iter2 = }")
     long_period = f"1980-2019"
 
     xmax= 0
     xmin, xmax, ymin, ymax = main(long_period, amp_length=amp_length, rolling_hours=rolling_hours, area_mode_in_cfd=area_mode_in_cfd,
-                                  write_files=False, read_pickle=False)
+                                  write_files=True, read_pickle=True)
     print("Xmin =", xmin, "Xmax =", xmax, "Ymin =", ymin, "Ymax =", ymax)
     queue_years = Queue(maxsize=0)
     # Load results from most recent fingerprinting run
@@ -395,10 +397,10 @@ if __name__ == "__main__":
     #    errors[comb] = errors[combinations_strings[i]]
 
     combined_results = [(comb, [round(weights[key][i], 3) for i in range(len(weights[key]))]) for key, comb in zip(combinations_strings, combinations) if sum(weights[key]) > 0]
-    print(combined_results)
-
+    #print(combined_results)
     for i in combined_results:
-        queue_years.put(i)
+        #queue_years.put(i)
+        continue
     for year in years_iter2:
         queue_years.put(year)
     print("Queue contains", queue_years.qsize(), "years")
