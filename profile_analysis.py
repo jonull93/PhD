@@ -39,6 +39,10 @@ def make_pickles(year, VRE_profiles, cap, load, non_traditional_load):
     pickle.dump(large, open("PickleJar\\" + large_name, 'wb'))
 
 
+def create_new_tuple(t, year):
+    return (t[1], year, t[0], t[2])
+
+
 def make_gams_profiles(year, VRE_profiles, load, pot_cap=False, ):
     """
 
@@ -64,12 +68,17 @@ def make_gams_profiles(year, VRE_profiles, load, pot_cap=False, ):
     path = "output\\"
     VRE_filename = f"gen_profile_VRE_{year}.inc"
     load_filename = f"hourly_load_{year}.inc"
-    cap_filename = f"potential_cap_VRE_{year}.inc"
+    cap_filename = f"potential_cap_VRE.inc"
     VRE_df = pd.DataFrame(VRE_profiles.unstack())
     VRE_df.index.names = ["tech", "I_reg", "timestep"]
     VRE_df.index = VRE_df.index.set_levels(timesteps, level="timestep")
     VRE_df = VRE_df.dropna().clip(lower=1e-7).round(5)
-    write_inc_from_df_columns(path, VRE_filename, VRE_df, comment)
+    # add year to the index so that the resulting .inc includes the year and can be used in the gams model with multiple profile years
+    new_tuples = [(t[0], t[1], t[2], str(year)) for t in VRE_df.index]
+    new_index = pd.MultiIndex.from_tuples(new_tuples, names=VRE_df.index.names + ["profileyear"])
+    VRE_df = VRE_df.set_index(new_index)
+    VRE_df = VRE_df.reorder_levels(["I_reg", "profileyear", "tech", "timestep"]) #I_reg,profile_years,allPV,allhours
+    write_inc_from_df_columns(path, VRE_filename, VRE_df, comment=comment)
     if type(load) != pd.DataFrame:
         load = np.around(load, 4)
         # print_red(load,pd.DataFrame(load))
@@ -82,7 +91,7 @@ def make_gams_profiles(year, VRE_profiles, load, pot_cap=False, ):
     load_df.index = load_df.index.set_levels(regions, level="I_reg")
     # print_cyan(load_df)
     write_inc_from_df_columns(path, load_filename, load_df, comment=comment)
-    if pot_cap: write_inc_from_df_columns(path, cap_filename, pot_cap.to_frame(), comment=comment)
+    if pot_cap: write_inc(path, cap_filename, pot_cap, comment=comment, flip=False)
 
 
 def get_FLH(profile, weights=False):
@@ -341,15 +350,20 @@ def separate_years(years, add_nontraditional_load=True, make_output=True, make_f
         VRE_profiles = pd.DataFrame(index=range(8760 + leap * 24),
                                     columns=pd.MultiIndex.from_product([VRE_tech, regions], names=["tech", "I_reg"]))
         FLHs = {}
+        pot_cap = {reg: {} for reg in regions}
         for VRE in VREs:
             filename = filenames[VRE].replace("YEAR", str(year))
             VRE_mat = mat73.loadmat(mat_folder + filename)
             # [site,region]
             # if there is a time dimension, the dimensions are [time,region,site]
             profiles = VRE_mat[profile_keys[VRE]]
+            # VRE_mat[capacity_keys[VRE]] is a 2D array with dimensions [region,site
             for site in sites:  # need another loop which wont break
                 tech_name = VRE_tech_name_dict[VRE] + str(site)
                 VRE_profiles[tech_name] = profiles[:, :, site - 1]
+                capacities = VRE_mat[capacity_keys[VRE]]
+                for i_r, region in enumerate(regions):
+                    pot_cap[region][tech_name] = capacities[i_r, site - 1]
                 # pot_cap = pd.DataFrame(capacities.T, index=sites, columns=regions, )
             FLHs[VRE] = get_FLH(profiles[:, :, :])
         demand_filename = f'SyntheticDemand_nordic_L_ssp2-26-2050_{year}.mat'
@@ -403,7 +417,7 @@ def separate_years(years, add_nontraditional_load=True, make_output=True, make_f
         # print_red(prepped_tot_demand)
         if make_output:
             make_pickles(year, VRE_profiles, all_cap, prepped_demand, non_traditional_load)
-            make_gams_profiles(year, VRE_profiles, prepped_demand, all_cap)
+            make_gams_profiles(year, VRE_profiles, prepped_demand, pot_cap)
             VRE_profile_dict = {}
             load_dict = {}
     return net_load
@@ -489,10 +503,10 @@ def combined_years(years, threshold=0.5, window_size_days=3):
     make_pickles(f"{years[0]}-{years[-1]}", VRE_profiles, all_cap, demands, non_traditional_load)
 
 
-separate_years(years,threshold=0.33, make_output=True, make_figure=True)
+separate_years(years,threshold=0.33, make_output=True, make_figure=False)
 # combined_years(years)
-combined_years(years,threshold=0.33)
-remake_profile_seam()
+#combined_years(years,threshold=0.33)
+#remake_profile_seam()
 
 
 """net_load = separate_years(1980, add_nontraditional_load=False, make_figure=True, make_output=False, window_size_days=1)
