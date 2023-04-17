@@ -248,7 +248,7 @@ def find_year_and_hour(index, start_year=1980):
         year += 1
 
 
-pickle_file = "PickleJar\\data_results_3h.pickle"
+# pickle_file = "PickleJar\\data_results_3h.pickle"
 mat_folder = f"input\\"
 # initial_results = pickle.load(open(pickle_file, "rb"))
 # scenario_name = "nordic_lowFlex_noFC_2040_3h"
@@ -256,7 +256,7 @@ mat_folder = f"input\\"
 # all_cap = initial_results[scenario_name]["tot_cap"]
 # all_cap["WOFF3","DE_N"]=60
 # all_cap["WONA4","DE_S"]=45
-cap_df = pd.read_excel("input\\cap_ref.xlsx", sheet_name="ref1", header=0, index_col=[0, 1], engine="openpyxl")
+cap_df = pd.read_excel("input\\cap_ref.xlsx", sheet_name="ref2", header=0, index_col=[0, 1], engine="openpyxl")
 # print(cap_df)
 all_cap = cap_df.squeeze()
 regions = ["SE_NO_N", "SE_S", "NO_S", "FI", "DE_N", "DE_S"]
@@ -264,13 +264,14 @@ regions = ["SE_NO_N", "SE_S", "NO_S", "FI", "DE_N", "DE_S"]
 # non_traditional_load = initial_results[scenario_name]["o_yearly_nontraditional_load"]
 # non_traditional_load = non_traditional_load[non_traditional_load.index.get_level_values(level="stochastic_scenario")[0]]
 non_traditional_load = pd.Series([
-    9_034,
-    26_763,
-    9_947,
-    19_249,
+    34_912,
+    40_146,
+    15_357,
+    21_133,
     136_453,
-    217_235,
+    217_235
 ], index=regions)
+
 WON = ["WONA" + str(i) for i in range(1, 6)]
 WOFF = ["WOFF" + str(i) for i in range(1, 6)]
 PV = ["PVPA" + str(i) for i in range(1, 6)]
