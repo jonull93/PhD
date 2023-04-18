@@ -89,6 +89,10 @@ def make_gams_profiles(year, VRE_profiles, load, pot_cap=False, ):
     load_df.index.names = ["I_reg", "timestep"]
     load_df.index = load_df.index.set_levels(timesteps, level="timestep")
     load_df.index = load_df.index.set_levels(regions, level="I_reg")
+    new_tuples = [(t[0], t[1], str(year)) for t in load_df.index]
+    new_index = pd.MultiIndex.from_tuples(new_tuples, names=load_df.index.names + ["profileyear"])
+    load_df = load_df.set_index(new_index)
+    load_df = load_df.reorder_levels(["I_reg", "profileyear", "timestep"])  # I_reg,profile_years,allhours
     # print_cyan(load_df)
     write_inc_from_df_columns(path, load_filename, load_df, comment=comment)
     if pot_cap: write_inc(path, cap_filename, pot_cap, comment=comment, flip=False)
@@ -185,15 +189,17 @@ def get_high_netload(threshold, rolling_average_days, VRE_profiles, all_cap, dem
 
     if demand_profile.max() > 1000: demand_profile = demand_profile / 1000
     total_VRE_prod = (VRE_profiles * all_cap).sum(axis=1)
-    print(f"Total VRE prod: {round(total_VRE_prod.sum() / 1000)} TWh")
+    print(f"Total VRE prod: {round(total_VRE_prod.sum() / 1000)} TWh")  # validated for separate_years
     try:
         demand = demand_profile.sum(axis=1)
     except np.AxisError:
         demand = demand_profile
+    print(f"Trad. demand: {round(demand.sum() / 1000)} TWh")
     if type(extra_demand) in [list, np.ndarray]:
         demand += extra_demand
     else:
         demand += extra_demand / 8760
+    print(f"Total demand: {round(demand.sum() / 1000)} TWh")
     net_load = demand - total_VRE_prod
     net_load_RA = fast_rolling_average(net_load, rolling_average_days * 24)
     try:
@@ -264,12 +270,12 @@ regions = ["SE_NO_N", "SE_S", "NO_S", "FI", "DE_N", "DE_S"]
 # non_traditional_load = initial_results[scenario_name]["o_yearly_nontraditional_load"]
 # non_traditional_load = non_traditional_load[non_traditional_load.index.get_level_values(level="stochastic_scenario")[0]]
 non_traditional_load = pd.Series([
-    34_912,
-    40_146,
-    15_357,
-    21_133,
-    136_453,
-    217_235
+    50_192,
+    48_160,
+    16_555,
+    23_230,
+    157_632,
+    242_925,
 ], index=regions)
 
 WON = ["WONA" + str(i) for i in range(1, 6)]
@@ -314,6 +320,7 @@ def remake_profile_seam(new_profile_seam=4344, profile_starts_in_winter=False, y
         load_dict[year] = netload_components["load"]
         if year == years[0]: continue  # make new VRE_profiles with seam in summer
         print_cyan(f" - Making profiles for years {years[i_y - 1]}-{year}")
+        print_cyan(f" - A new year now begins at hour {new_profile_seam} (h{(4344*profile_starts_in_winter):04d} in the profile)")
         # VRE_profile = pd.concat([VRE_profile_dict[years[i_y-1]].loc[4464:], VRE_profile_dict[years[i_y]].loc[:4464]])
         VRE_df_fall = pd.DataFrame(VRE_profile_dict[years[i_y - 1]][new_profile_seam:])
         VRE_df_spring = pd.DataFrame(VRE_profile_dict[years[i_y]][:new_profile_seam])
@@ -334,7 +341,7 @@ def remake_profile_seam(new_profile_seam=4344, profile_starts_in_winter=False, y
             load_df_spring.index = pd.RangeIndex(len(load_df_fall), new_profile_seam + len(load_df_fall))
             load_df = pd.concat([load_df_fall, load_df_spring])
         # print_cyan(VRE_profile_dict[years[i_y - 1]], VRE_profile_dict[years[i_y]])
-        print_green(VRE_df)
+        # print_green(VRE_df)
         # print_cyan(load)
         make_gams_profiles(f"{years[i_y - 1]}-{year}", VRE_df, load_df)
         make_pickles(f"{years[i_y - 1]}-{year}", VRE_df, all_cap, load_df, non_traditional_load)
@@ -370,7 +377,7 @@ def separate_years(years, add_nontraditional_load=True, make_output=True, make_f
         demand_filename = f'SyntheticDemand_nordic_L_ssp2-26-2050_{year}.mat'
         mat_demand = mat73.loadmat(mat_folder + demand_filename)
         demand = mat_demand["demand"]
-        prepped_tot_demand = demand.sum(axis=1) / 1000
+        prepped_tot_demand = demand.sum(axis=1) / 1000 # MW to GW
         if add_nontraditional_load: prepped_tot_demand += non_traditional_load.sum() / len(prepped_tot_demand)
         # print_red(demand.shape,non_traditional_load.shape)
         # print_red(type(demand), type(non_traditional_load))
@@ -429,7 +436,7 @@ def combined_years(years, threshold=0.5, window_size_days=3):
     VRE_profiles = pd.DataFrame(columns=pd.MultiIndex.from_product([VRE_tech, regions], names=["tech", "I_reg"]))
     demands = {}
     for year in years:
-        print_green(f"- Reading data for Year {year}")
+        print_green(f"\n- Reading data for Year {year}")
         leap = year % 4 == 0
         VRE_profile = pd.DataFrame(index=range(8760 + 24 * leap),
                                    columns=pd.MultiIndex.from_product([VRE_tech, regions], names=["tech", "I_reg"]))
@@ -461,9 +468,8 @@ def combined_years(years, threshold=0.5, window_size_days=3):
         demand = mat_demand["demand"]  # np.ndarray
         if len(set([type(i) for i in demand])) > 1:
             print_red("! More than one datatype in demand in combined_years()")
-        print_green("\nAverage net-load per region:")
-        print_green(regions)
-        print_green((-(VRE_profile * all_cap).sum(axis=0).sum(level="I_reg") + demand.sum(
+        print_green("Average net-load per region:")
+        print_green((-(VRE_profile * all_cap).sum(axis=0).groupby(level="I_reg").sum() + demand.sum(
             axis=0) / 1000 + non_traditional_load) / 8760)
         prepped_tot_demand = demand.sum(axis=1) / 1000
         prepped_tot_demand += non_traditional_load.sum() / len(prepped_tot_demand)
@@ -503,11 +509,10 @@ def combined_years(years, threshold=0.5, window_size_days=3):
     # print(net_load)
     make_pickles(f"{years[0]}-{years[-1]}", VRE_profiles, all_cap, demands, non_traditional_load)
 
-
-separate_years(years,threshold=0.33, make_output=True, make_figure=False)
-# combined_years(years)
 #combined_years(years,threshold=0.33)
-#remake_profile_seam()
+separate_years(years,threshold=0.33, make_output=True, make_figure=True)
+# combined_years(years)
+remake_profile_seam()
 
 
 """net_load = separate_years(1980, add_nontraditional_load=False, make_figure=True, make_output=False, window_size_days=1)
