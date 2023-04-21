@@ -309,7 +309,11 @@ def write_inc_from_df_columns(path, filename, df: pandas.DataFrame, comment=Fals
            writer.write(f"* ---\n")
         #dim = len(df.columns)
         for index, value in df.iterrows():
-            line = " . ".join(index) + f"  {value[0]}\n"
+            if type(index) == tuple:
+                line = " . ".join(index) + f"  {value[0]}\n"
+            else:
+                value = [str(i) for i in value[:-1]] + [value[-1]]
+                line = " . ".join(value[:-1]) + f"  {value[-1]}\n"
             writer.write(line)
     return None
 
