@@ -5,7 +5,8 @@ import pandas as pd
 import numpy as np
 from os import mkdir
 from statistics import mean
-from my_utils import print_red, print_green, print_cyan, fast_rolling_average
+from my_utils import print_red, print_green, print_cyan, fast_rolling_average, write_inc_from_df_columns, write_inc
+from datetime import datetime
 
 """
 
@@ -22,6 +23,55 @@ accumulated net-load deficiency
 CFD-plots for 40-year period and for individual years
 
 """
+mat_folder = f"input\\"
+
+def make_heat_profiles(years="1980-2019"):
+    import pycountry
+    timestamp = datetime.now().strftime("%d-%m-%Y, %H:%M:%S")
+    comment = [f"Made by Jonathan Ullmark at {timestamp}"] + \
+              [
+                  f"Through profile_analysis.py (personal scripts repo) with data gathered from globalenergygis\\dev"]
+    path = "output\\"
+    csv_file = f"{mat_folder}SyntheticHeatDemand_{years}.csv"
+    df = pd.read_csv(csv_file)
+    #make a new column with the year, based on the 1980-01-01T01:00:00.0 in 'localtime'
+    df["year"] = df["localtime"].apply(lambda x: int(x.split("-")[0]))
+    #make a new column with the hour of the year, e.g. h0001, increasing until year increases
+    df["hour"] = 0
+    for year in df["year"].unique():
+        df.loc[df["year"] == year, "hour"] = range(1, len(df.loc[df["year"] == year]) + 1)
+    #pad the hour column with an h and then zeros to make it 4 digits long
+    df["hour"] = df["hour"].apply(lambda x: "h" + str(x).zfill(4))
+    #remove the localtime column
+    df = df.drop(columns=["localtime"])
+    #remake the index into a multiindex (year, hour)
+    df = df.set_index(["year", "hour"])
+    df = df.T.unstack().reset_index()
+    df.columns = ["year", "hour", "region", "heat_demand"]
+    # make a new column with the country name, based on the country_code
+    df["region"] = df["region"].apply(lambda x: pycountry.countries.get(alpha_2=x).name)
+    df = df.reindex(columns=["region", "year", "hour", "heat_demand"])
+    #sort df by region
+    df = df.sort_values(by=["region", "year", "hour"])
+    pickle.dump(df, open("PickleJar\\heat_demand.pickle", 'wb'))
+    #split df into separate dataframes for each year
+    dfs = {year: df.loc[df["year"] == year] for year in df["year"].unique()}
+    #split df into separate dataframes starting at hour 4344 and ending at hour 4343 next year
+    dfs2 = {}
+    for year in [i for i in dfs.keys()][:-1]:
+        dfs2[year] = dfs[year].loc[dfs[year]["hour"] >= "h4344"]
+        #dfs2[year] = dfs2[year].append(dfs[year+1].loc[dfs[year+1]["hour"] <= "h4343"])
+        dfs2[year] = pd.concat([dfs2[year], dfs[year + 1].loc[dfs[year + 1]["hour"] <= "h4343"]])
+        #change all values in the year column to "year-year+1"
+        dfs2[year]["year"] = f"{year}-{year+1}"
+
+    for year, df in dfs.items():
+        filename = f"hourly_heat_demand_{year}.inc"
+        write_inc_from_df_columns(path, filename, df, comment=comment)
+    for year, df in dfs2.items():
+        filename = f"hourly_heat_demand_{year}-{year+1}.inc"
+        write_inc_from_df_columns(path, filename, df, comment=comment)
+
 
 
 def make_pickles(year, VRE_profiles, cap, load, non_traditional_load):
@@ -57,8 +107,6 @@ def make_gams_profiles(year, VRE_profiles, load, pot_cap=False, ):
     -------
 
     """
-    from datetime import datetime
-    from my_utils import write_inc_from_df_columns, write_inc
     global regions
     timesteps = ['h' + str(i + 1).zfill(4) for i in range(len(VRE_profiles.index))]
     timestamp = datetime.now().strftime("%d-%m-%Y, %H:%M:%S")
@@ -255,7 +303,6 @@ def find_year_and_hour(index, start_year=1980):
 
 
 # pickle_file = "PickleJar\\data_results_3h.pickle"
-mat_folder = f"input\\"
 # initial_results = pickle.load(open(pickle_file, "rb"))
 # scenario_name = "nordic_lowFlex_noFC_2040_3h"
 # print(initial_results[scenario_name].keys())
@@ -510,6 +557,7 @@ def combined_years(years, threshold=0.5, window_size_days=3):
     make_pickles(f"{years[0]}-{years[-1]}", VRE_profiles, all_cap, demands, non_traditional_load)
 
 #combined_years(years,threshold=0.33)
+make_heat_profiles()
 separate_years(years,threshold=0.33, make_output=True, make_figure=True)
 # combined_years(years)
 remake_profile_seam()
