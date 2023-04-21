@@ -73,6 +73,76 @@ def make_heat_profiles(years="1980-2019"):
         write_inc_from_df_columns(path, filename, df, comment=comment)
 
 
+def make_hydro_profiles(years="1980-2019"):
+    print("Making hydro profiles")
+    timestamp = datetime.now().strftime("%d-%m-%Y, %H:%M:%S")
+    comment = [f"Made by Jonathan Ullmark at {timestamp}"] + \
+              [
+                  f"Through profile_analysis.py (personal scripts repo) with data gathered from globalenergygis\\dev"]
+    path = "output\\"
+    input_file = r"C:\Users\jonathan\git\python\input\vattenkraft.xlsx"
+    df = pd.read_excel(input_file)
+    df.columns = ["time", "SE4", "SE3", "SE2", "SE1"]
+    #expand the df to have a row for each hour of the year
+    df = df.set_index("time")
+    df = df/1000
+    df = df.resample("H").asfreq()
+    #add hours also for the last day
+    #df = df.append(pd.DataFrame(index=pd.date_range(start="2019-12-31 01:00:00", end="2019-12-31 23:00:00", freq="H")))
+    df = pd.concat([df, pd.DataFrame(index=pd.date_range(start="2019-12-31 01:00:00", end="2019-12-31 23:00:00", freq="H"))])
+    # make a new column with the year, based on the '1963-01-01 00:00' Timestamp object in 'time'
+    df["year"] = df.index.year
+    #make a new column with the hour of the year, e.g. h0001, increasing until year increases
+    df["hour"] = 0
+    for year in df["year"].unique():
+        df.loc[df["year"] == year, "hour"] = range(1, len(df.loc[df["year"] == year]) + 1)
+    df["hour_of_day"] = df.index.hour
+    #replace nans with 0
+    df = df.fillna(0)
+    #take each 24th value in columns 0:-2, divide it by 24 and add it to the next 23 values
+    for col in df.columns[0:4]:
+        df[col] = df[col].rolling(24).sum() / 24
+    df.iloc[0:24,0:4] = df.iloc[24,0:4]/24
+    #pad the hour column with an h and then zeros to make it 4 digits long
+    df["hour"] = df["hour"].apply(lambda x: "h" + str(x).zfill(4))
+    #remove the index and hour_of_day columns
+    pickle.dump(df, open("PickleJar\\hydro_inflow.pickle", 'wb'))
+    df = df.reset_index()
+    df = df.drop(columns=["index", "hour_of_day"])
+    #drop all rows where the year is less than 1980
+    df = df.loc[df["year"] >= 1980]
+    #remake the index into a multiindex (year, hour)
+    df = df.set_index(["year", "hour"])
+    df = df.T.unstack().reset_index()
+    df.columns = ["year", "hour", "region", "hydro_inflow"]
+    #round all values to 4 decimals
+    df["hydro_inflow"] = df["hydro_inflow"].apply(lambda x: round(x, 4))
+    # clip all values to >0
+    df["hydro_inflow"] = df["hydro_inflow"].clip(lower=0)
+    # make a new column with the country name, based on the country_code
+    df = df.reindex(columns=["region", "year", "hour", "hydro_inflow"])
+    #sort df by region
+    df = df.sort_values(by=["region", "year", "hour"])
+    #split df into separate dataframes for each year
+    dfs = {year: df.loc[df["year"] == year] for year in df["year"].unique()}
+    #split df into separate dataframes starting at hour 4344 and ending at hour 4343 next year
+    dfs2 = {}
+    print(f"Making hydro profiles for reseamed years")
+    for year in [i for i in dfs.keys()][:-1]:
+        dfs2[year] = dfs[year].loc[dfs[year]["hour"] >= "h4344"]
+        #dfs2[year] = dfs2[year].append(dfs[year+1].loc[dfs[year+1]["hour"] <= "h4343"])
+        dfs2[year] = pd.concat([dfs2[year], dfs[year + 1].loc[dfs[year + 1]["hour"] <= "h4343"]])
+        #change all values in the year column to "year-year+1"
+        dfs2[year]["year"] = f"{year}-{year+1}"
+    print(f"Making .inc files for non-reseamed years")
+    for year, df in dfs.items():
+        filename = f"hourly_hydro_inflow_{year}.inc"
+        write_inc_from_df_columns(path, filename, df, comment=comment)
+    print(f"Making .inc files for reseamed years")
+    for year, df in dfs2.items():
+        filename = f"hourly_hydro_inflow_{year}-{year+1}.inc"
+        write_inc_from_df_columns(path, filename, df, comment=comment)
+
 
 def make_pickles(year, VRE_profiles, cap, load, non_traditional_load):
     total_VRE_prod = (VRE_profiles * cap).sum(axis=1)
@@ -557,10 +627,11 @@ def combined_years(years, threshold=0.5, window_size_days=3):
     make_pickles(f"{years[0]}-{years[-1]}", VRE_profiles, all_cap, demands, non_traditional_load)
 
 #combined_years(years,threshold=0.33)
-make_heat_profiles()
-separate_years(years,threshold=0.33, make_output=True, make_figure=True)
+#make_heat_profiles()
+make_hydro_profiles()
+#separate_years(years,threshold=0.33, make_output=True, make_figure=True)
 # combined_years(years)
-remake_profile_seam()
+#remake_profile_seam()
 
 
 """net_load = separate_years(1980, add_nontraditional_load=False, make_figure=True, make_output=False, window_size_days=1)
