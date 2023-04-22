@@ -50,6 +50,9 @@ def make_heat_profiles(years="1980-2019"):
     df.columns = ["year", "hour", "region", "heat_demand"]
     # make a new column with the country name, based on the country_code
     df["region"] = df["region"].apply(lambda x: pycountry.countries.get(alpha_2=x).name)
+    # rename "United Kingdom" to "UK", and "Czechia" to "Czech_Republic"
+    df["region"] = df["region"].apply(lambda x: "UK" if x == "United Kingdom" else x)
+    df["region"] = df["region"].apply(lambda x: "Czech_Republic" if x == "Czechia" else x)
     df = df.reindex(columns=["region", "year", "hour", "heat_demand"])
     #sort df by region
     df = df.sort_values(by=["region", "year", "hour"])
@@ -78,9 +81,9 @@ def make_hydro_profiles(years="1980-2019"):
     timestamp = datetime.now().strftime("%d-%m-%Y, %H:%M:%S")
     comment = [f"Made by Jonathan Ullmark at {timestamp}"] + \
               [
-                  f"Through profile_analysis.py (personal scripts repo) with data gathered from globalenergygis\\dev"]
+                  f"Through profile_analysis.py (personal scripts repo) with data from Energiföretagen (thanks Richard Scharff for processing it!)"]
     path = "output\\"
-    input_file = r"C:\Users\jonathan\git\python\input\vattenkraft.xlsx"
+    input_file = r"\input\vattenkraft.xlsx"
     df = pd.read_excel(input_file)
     df.columns = ["time", "SE4", "SE3", "SE2", "SE1"]
     #expand the df to have a row for each hour of the year
@@ -627,8 +630,8 @@ def combined_years(years, threshold=0.5, window_size_days=3):
     make_pickles(f"{years[0]}-{years[-1]}", VRE_profiles, all_cap, demands, non_traditional_load)
 
 #combined_years(years,threshold=0.33)
-#make_heat_profiles()
-make_hydro_profiles()
+make_heat_profiles()
+#make_hydro_profiles()
 #separate_years(years,threshold=0.33, make_output=True, make_figure=True)
 # combined_years(years)
 #remake_profile_seam()
