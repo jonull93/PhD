@@ -390,12 +390,13 @@ regions = ["SE_NO_N", "SE_S", "NO_S", "FI", "DE_N", "DE_S"]
 # non_traditional_load = initial_results[scenario_name]["o_yearly_nontraditional_load"]
 # non_traditional_load = non_traditional_load[non_traditional_load.index.get_level_values(level="stochastic_scenario")[0]]
 non_traditional_load = pd.Series([
-    50_192,
-    48_160,
-    16_555,
-    23_230,
-    157_632,
-    242_925,
+    34_677,
+    38_450,
+    14_791,
+    20_092,
+    129_826,
+    206_243,
+# values from 2023-05-02 after setting H2_veh=yes
 ], index=regions)
 
 # heat demand
