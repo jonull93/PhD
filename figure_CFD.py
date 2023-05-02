@@ -377,7 +377,7 @@ if __name__ == "__main__":
         # each element in best_keys is a list of strings, save each string in a list
         best_years = [key.replace('"', '').replace('[', '').replace(']', '').replace(' ', '').split(',') for key in best_keys]
         # each element in best_years is a list of strings, save each string in a list
-        best_years = list(set([int(year[:4]) for sublist in best_years for year in sublist]))
+        best_years = list(set([year for sublist in best_years for year in sublist])) # [int(year[:4]) for sublist in best_years for year in sublist]))
         best_years.sort()
         print(f"Unique years within {percent} of the best case: {len(best_years)}")
         print(f"Combinations that {len(best_years)} years can make: {math.comb(len(best_years)-1, 3)*2}")
