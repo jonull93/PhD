@@ -361,40 +361,34 @@ def crawl_resource_usage(timer=5):
         time.sleep(timer * 60)
 
 
-def print_red(to_print: str, *argv):
+def print_red(to_print, replace_this_line=False, *argv):
     from termcolor import colored
-    try:
+    if type(to_print) != str:
+        to_print = str(to_print)
+    if len(argv) > 0:
         for arg in argv:
             to_print += " "+str(arg)
-        print(colored(to_print, "red"))
-    except:
-        print(colored(to_print, "red"))
-        for arg in argv:
-            print(colored(arg, "red"))
+    print(colored(to_print, "red"), end='\r' if replace_this_line else '\n')
 
 
-def print_green(to_print: str, *argv):
+def print_green(to_print, replace_this_line=False, *argv):
     from termcolor import colored
-    try:
+    if type(to_print) != str:
+        to_print = str(to_print)
+    if len(argv) > 0:
         for arg in argv:
             to_print += " "+str(arg)
-        print(colored(to_print, "green"))
-    except:
-        print(colored(to_print, "green"))
-        for arg in argv:
-            print(colored(arg, "green"))
+    print(colored(to_print, "green"), end='\r' if replace_this_line else '\n')
 
 
-def print_cyan(to_print: str, *argv):
+def print_cyan(to_print, replace_this_line=False, *argv):
     from termcolor import colored
-    try:
+    if type(to_print) != str:
+        to_print = str(to_print)
+    if len(argv) > 0:
         for arg in argv:
             to_print += " "+str(arg)
-        print(colored(to_print, "cyan"))
-    except:
-        print(colored(to_print, "cyan"))
-        for arg in argv:
-            print(colored(arg, "cyan"))
+    print(colored(to_print, "cyan"), end='\r' if replace_this_line else '\n')
 
 
 def fast_rolling_average(my_list, window_size, wraparound=True, **kwargs):
