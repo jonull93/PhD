@@ -401,6 +401,7 @@ non_traditional_load = pd.Series([
 # heat demand
 # load heat demand from SyntheticHeatDemand_1980-2019.csv with the columns localtime,AT,BE,BG,CZ,DE,DK,EE,ES,FI,FR,GB,GR,HR,HU,IE,IT,LT,LU,LV,NL,PL,PT,RO,SE,SI,SK
 # and rows 1980-01-01T00:00:00.0, 1980-01-01T01:00:00.0 etc, i.e. one row per hour
+print_cyan("Making heat demand dataframe..",replace_this_line=True)
 heat_demand = pd.read_csv("input\\SyntheticHeatDemand_1980-2019.csv", header=0, index_col=0, parse_dates=True)
 #convert the country codes to country names
 heat_demand = heat_demand.rename(columns={"AT": "Austria", "BE": "Belgium", "BG": "Bulgaria", "CZ": "Czech_Republic",
@@ -412,26 +413,47 @@ heat_demand = heat_demand.rename(columns={"AT": "Austria", "BE": "Belgium", "BG"
                                           "SI": "Slovenia", "SK": "Slovakia"})
 # sheet load_share in input/EPODreg_load_share.xlsx holds two columns, one with the region name and one with the load share
 # of the region in the EPODreg region
-load_share = pd.read_excel("input\\EPODreg_load_share.xlsx", sheet_name="load_share", header=None, index_col=1, engine="openpyxl")
+load_share = pd.read_excel("input\\EPODreg_load_share.xlsx", sheet_name="load_share", header=None, index_col=0, engine="openpyxl")
+# sheet cluster_to_EPODreg in input/EPODreg_load_share.xlsx holds two columns, one with the cluster name and one with the all EPODregs within that cluster
+cluster_to_EPODreg = pd.read_excel("input\\EPODreg_load_share.xlsx", sheet_name="cluster_to_EPODreg", header=None, index_col=0, engine="openpyxl")
 # sheet country_to_EPODreg in input/EPODreg_load_share.xlsx holds two columns, one with the (sometimes repeating) country name and one with the all EPODregs within that country
 country_to_EPODreg = pd.read_excel("input\\EPODreg_load_share.xlsx", sheet_name="country_to_EPODreg", header=None, index_col=0, engine="openpyxl")
 # print and filter out the ocuntries that are not in the heat demand data
-print(country_to_EPODreg[~country_to_EPODreg.index.isin(heat_demand.columns)])
+# print(country_to_EPODreg[~country_to_EPODreg.index.isin(heat_demand.columns)])
 country_to_EPODreg = country_to_EPODreg[country_to_EPODreg.index.isin(heat_demand.columns)]
 #combine these three to make a series with a multiindex of EPODregs and timestep, and the heat demand
-# make a new dataframe with (EPODreg,year,hour) as multiindex
+# make a new dataframe with (year,hour) as multiindex and EPODreg as columns
 # the hours can be 8760 or 8784, depending on whether the year is a leap year or not
 EPODregs = country_to_EPODreg[1].unique()
+#filter out the nparray EPODregs that are not in the load_share data
+EPODregs = [EPODreg for EPODreg in EPODregs if EPODreg in load_share.index]
 years = heat_demand.index.year.unique()
 hours = [8760 + 24 * (year % 4 == 0) for year in years]
-hours_ranges = [range(hour) for hour in hours]
-mi = pd.MultiIndex.from_product([EPODregs, years, hours_ranges], names=["EPODreg", "year", "hour"])
-heat_demand_EPOD = pd.DataFrame(index=mi)
-# fill the dataframe with the heat demand from the heat_demand dataframe, considering the load share of the EPODreg
-for EPODreg in country_to_EPODreg[1].unique():
+hour_ranges = [range(hour) for hour in hours]
+hours_index = [[hour+1 for hour in hour_range] for hour_range in hour_ranges]
+years_index = [[year for hour in hour_range] for year, hour_range in zip(years, hour_ranges)]
+mi = pd.MultiIndex.from_arrays([np.concatenate(years_index), np.concatenate(hours_index)], names=["year", "hour"])
+heat_demand_EPOD = pd.DataFrame(index=mi, columns=EPODregs, data=0)
+# fill the dataframe with the heat demand from the heat_demand dataframe,
+# considering that the load share in the format of load_share[EPODreg]=x, and heat_demand.loc[time_object, country]=y
+for EPODreg in EPODregs:
     for country in country_to_EPODreg[country_to_EPODreg[1] == EPODreg].index:
-        heat_demand_EPOD.loc[EPODreg] += heat_demand[country] * load_share.loc[country, 0]
+        heat_demand_EPOD.loc[:, EPODreg] += heat_demand[country].values * load_share.loc[EPODreg, 1]
 
+# filter, from the nparray heat_demand_EPOD, columns that are NOT in the regions list or
+# NOT an element in the regions list is in the cluster_to_EPODreg index, and one of the corresponding values is in the heat_demand_EPOD index
+# regions that match condition 1
+cond1 = [region for region in regions if region in heat_demand_EPOD.columns]
+# regions that match condition 2
+for cluster in cluster_to_EPODreg.index:
+    if cluster in regions:
+        cond2 = [region for region in regions if region in cluster_to_EPODreg.loc[cluster, 1]]
+        cond1 += cond2
+
+cond1 = list(set(cond1))
+heat_demand_EPOD = heat_demand_EPOD[cond1]
+
+print_cyan("Done making heat demand dataframe!")
 
 WON = ["WONA" + str(i) for i in range(1, 6)]
 WOFF = ["WOFF" + str(i) for i in range(1, 6)]
@@ -533,7 +555,9 @@ def separate_years(years, add_nontraditional_load=True, make_output=True, make_f
         mat_demand = mat73.loadmat(mat_folder + demand_filename)
         demand = mat_demand["demand"]
         prepped_tot_demand = demand.sum(axis=1) / 1000 # MW to GW
-        if add_nontraditional_load: prepped_tot_demand += non_traditional_load.sum() / len(prepped_tot_demand)
+        if add_nontraditional_load:
+            prepped_tot_demand += non_traditional_load.sum() / len(prepped_tot_demand)
+            # prepped_tot_demand is now a pd.Series with 8760 values
         # print_red(demand.shape,non_traditional_load.shape)
         # print_red(type(demand), type(non_traditional_load))
         # print_red(demand, non_traditional_load)
