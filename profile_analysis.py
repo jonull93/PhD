@@ -1,3 +1,5 @@
+import time
+
 import mat73
 import matplotlib.pyplot as plt
 import pickle
@@ -283,7 +285,8 @@ def get_netload_deficiency(VRE_profiles, all_cap, demand_profile, extra_demand):
     return rolling_average_list"""
 
 
-def get_high_netload(threshold, rolling_average_days, VRE_profiles, all_cap, demand_profile, extra_demand=0):
+def get_high_netload(threshold, rolling_average_days, VRE_profiles, all_cap, demand_profile,
+                     extra_demand_yearly=0, extra_demand_hourly=0):
     """
 
     Parameters
@@ -316,11 +319,21 @@ def get_high_netload(threshold, rolling_average_days, VRE_profiles, all_cap, dem
     except np.AxisError:
         demand = demand_profile
     print(f"Trad. demand: {round(demand.sum() / 1000)} TWh")
-    if type(extra_demand) in [list, np.ndarray]:
-        demand += extra_demand
+    if type(extra_demand_yearly) in [list, np.ndarray, pd.Series]:
+        demand += sum(extra_demand_yearly) / 8760
     else:
-        demand += extra_demand / 8760
+        demand += extra_demand_yearly / 8760
+    if type(extra_demand_hourly) in [list, np.ndarray, int, float, pd.Series]:
+        demand += extra_demand_hourly
+    elif type(extra_demand_hourly) in [pd.DataFrame]:
+        if len(extra_demand_hourly.columns) > 1:
+            demand += extra_demand_hourly.sum(axis=1)
+        else:
+            demand += extra_demand_hourly.iloc[:, 0]
+
     print(f"Total demand: {round(demand.sum() / 1000)} TWh")
+    demand = np.array(demand)
+    VRE_profiles = np.array(VRE_profiles)
     net_load = demand - total_VRE_prod
     net_load_RA = fast_rolling_average(net_load, rolling_average_days * 24)
     try:
@@ -412,6 +425,8 @@ heat_demand = heat_demand.rename(columns={"AT": "Austria", "BE": "Belgium", "BG"
                                           "LT": "Lithuania", "LU": "Luxembourg", "LV": "Latvia", "NL": "Netherlands",
                                           "PL": "Poland", "PT": "Portugal", "RO": "Romania", "SE": "Sweden",
                                           "SI": "Slovenia", "SK": "Slovakia"})
+# copy the data for sweden to Norway and scale it with 185/284 (based on F1.40 in https://www.nordicenergy.org/wp-content/uploads/2016/04/Nordic-Energy-Technology-Perspectives-2016.pdf)
+heat_demand["Norway"] = heat_demand["Sweden"] * 185 / 284
 # sheet load_share in input/EPODreg_load_share.xlsx holds two columns, one with the region name and one with the load share
 # of the region in the EPODreg region
 load_share = pd.read_excel("input\\EPODreg_load_share.xlsx", sheet_name="load_share", header=None, index_col=0, engine="openpyxl")
@@ -441,7 +456,7 @@ for EPODreg in EPODregs:
     for country in country_to_EPODreg[country_to_EPODreg[1] == EPODreg].index:
         heat_demand_EPOD.loc[:, EPODreg] += heat_demand[country].values * load_share.loc[EPODreg, 1]
 
-# filter, from the nparray heat_demand_EPOD, columns that are NOT in the regions list or
+"""# filter, from the nparray heat_demand_EPOD, columns that are NOT in the regions list or
 # NOT an element in the regions list is in the cluster_to_EPODreg index, and one of the corresponding values is in the heat_demand_EPOD index
 # regions that match condition 1
 cond1 = [region for region in regions if region in heat_demand_EPOD.columns]
@@ -452,8 +467,31 @@ for cluster in cluster_to_EPODreg.index:
         cond1 += cond2
 
 cond1 = list(set(cond1))
-heat_demand_EPOD = heat_demand_EPOD[cond1]
+"""
+#make a new dataframe, heat_demand_regions, with the same multiindex as heat_demand_EPOD, but only the regions in the columns
+heat_demand_regions = pd.DataFrame(index=mi, columns=regions, data=0)
+# fill the dataframe with the heat demand from the heat_demand_EPOD dataframe, taking data directly from heat_demand_EPOD if the column matches
+# one of the regions in the regions list, or summing the heat demand from the heat_demand_EPOD dataframe if the column matches one of the clusters
+for region in regions:
+    if region in heat_demand_EPOD.columns:
+        heat_demand_regions.loc[:, region] = heat_demand_EPOD.loc[:, region]
+# now only the clusters are left
+for cluster in cluster_to_EPODreg.index.unique():
+    if cluster in regions:
+        if type(cluster_to_EPODreg.loc[cluster, 1]) not in [list, np.ndarray, pd.Series]:
+            _EPODregs = [cluster_to_EPODreg.loc[cluster, 1]]
+        else:
+            _EPODregs = list(cluster_to_EPODreg.loc[cluster, 1])
+        for region in _EPODregs:
+            heat_demand_regions.loc[:, cluster] += heat_demand_EPOD.loc[:, region]
 
+# in the sheet heatshare_to_electrify in input/EPODreg_load_share.xlsx, the first column holds the EPODregs and the second column holds the heat share
+heatshare_to_electrify = pd.read_excel("input\\EPODreg_load_share.xlsx", sheet_name="heatshare_to_electrify", header=None, index_col=0, engine="openpyxl")
+# heatshare_to_electrify is a series with region as index and heat share as values
+# make a new dataframe electrified_heat_demand which is each column of heat_demand_regions rescaled by the value in heatshare_to_electrify
+electrified_heat_demand = pd.DataFrame(index=mi, columns=heat_demand_regions.columns, data=0)
+for region in heat_demand_regions.columns:
+    electrified_heat_demand.loc[:, region] = heat_demand_regions.loc[:, region] * heatshare_to_electrify.loc[region, 1]
 print_cyan("Done making heat demand dataframe!")
 
 WON = ["WONA" + str(i) for i in range(1, 6)]
@@ -498,7 +536,7 @@ def remake_profile_seam(new_profile_seam=4344, profile_starts_in_winter=False, y
         load_dict[year] = netload_components["load"]
         if year == years[0]: continue  # make new VRE_profiles with seam in summer
         print_cyan(f" - Making profiles for years {years[i_y - 1]}-{year}")
-        print_cyan(f" - A new year now begins at hour {new_profile_seam} (h{(4344*profile_starts_in_winter):04d} in the profile)")
+        print_cyan(f" - A new year now begins at hour {new_profile_seam} (h{(4344*profile_starts_in_winter+1):04d} in the profile)")
         # VRE_profile = pd.concat([VRE_profile_dict[years[i_y-1]].loc[4464:], VRE_profile_dict[years[i_y]].loc[:4464]])
         VRE_df_fall = pd.DataFrame(VRE_profile_dict[years[i_y - 1]][new_profile_seam:])
         VRE_df_spring = pd.DataFrame(VRE_profile_dict[years[i_y]][:new_profile_seam])
@@ -559,17 +597,19 @@ def separate_years(years, add_nontraditional_load=True, make_output=True, make_f
         if add_nontraditional_load:
             prepped_tot_demand += non_traditional_load.sum() / len(prepped_tot_demand)
             # prepped_tot_demand is now a pd.Series with 8760 values
+            # take the rows from electrified_heat_demand where the first level of the multiindex equals year
+            # add the electrified_heat_demand after summing the columns to one column
+            heat_demand_to_add = electrified_heat_demand.loc[year].sum(axis=1)
+            prepped_tot_demand += heat_demand_to_add
+
         # print_red(demand.shape,non_traditional_load.shape)
         # print_red(type(demand), type(non_traditional_load))
         # print_red(demand, non_traditional_load)
         prepped_demand = demand / 1000  # + np.array(non_traditional_load)*np.ones(demand.shape)
         mod = 1
-        net_load, high_netload_durations, high_netload_event_starts, threshold_to_beat = get_high_netload(threshold,
-                                                                                          window_size_days,
-                                                                                          VRE_profiles,
-                                                                                          all_cap * mod,
-                                                                                          demand,
-                                                                                          sum(non_traditional_load))
+        net_load, high_netload_durations, high_netload_event_starts, threshold_to_beat \
+            = get_high_netload(threshold, window_size_days, VRE_profiles, all_cap * mod, demand,
+                               extra_demand_yearly=non_traditional_load, extra_demand_hourly=heat_demand_to_add)
         max_val = max(high_netload_durations)
         max_val_start = high_netload_event_starts[high_netload_durations.index(max_val)]
 
@@ -581,6 +621,9 @@ def separate_years(years, add_nontraditional_load=True, make_output=True, make_f
         # accumulated = get_accumulated_deficiency(VRE_profiles,all_cap,demand)
         # print(net_load)
         if make_figure:
+            #print_red(f"First 10 hours of load: {prepped_tot_demand[:10]}")
+            #print_red(f"First 10 hours of VRE: {VRE_profiles[:10]}")
+            #print_red(f"First 10 hours of net load: {net_load[:10]}")
             plt.plot(fast_rolling_average(net_load, 24 * window_size_days), label="Net load")
             plt.plot(prepped_tot_demand, color="gray", linestyle="--", label="Load" )
             plt.axhline(y=mean(net_load), color="black", linestyle="-.", label="Average net load")
@@ -651,23 +694,24 @@ def combined_years(years, threshold=0.5, window_size_days=3):
         print_green("Average net-load per region:")
         print_green((-(VRE_profile * all_cap).sum(axis=0).groupby(level="I_reg").sum() + demand.sum(
             axis=0) / 1000 + non_traditional_load) / 8760)
-        prepped_tot_demand = demand.sum(axis=1) / 1000
-        prepped_tot_demand += non_traditional_load.sum() / len(prepped_tot_demand)
+        #prepped_tot_demand = demand.sum(axis=1) / 1000
+        #prepped_tot_demand += non_traditional_load.sum() / len(prepped_tot_demand)
+        # take the rows from electrified_heat_demand where the first level of the multiindex equals year
+        # add the electrified_heat_demand after summing the columns to one column
+        #prepped_tot_demand += heat_demand_to_add
         demands[year] = demand.sum(axis=1) / 1000
         # print_red(demands[year].shape)
         print(
             f"VRE_profiles and demands are now appended and the lengths are {len(VRE_profiles)} and {sum([len(load) for load in demands.values()])}, respectively")
+    heat_demand_to_add = electrified_heat_demand.sum(axis=1)
     if len(error_labels) > 0:
         print_red(VRE_profiles[error_labels].loc[(slice(None), "h0012"), :])
     else:
         print_green("No missing profiles :)")
     mod = 1
-    net_load, high_netload_durations, high_netload_event_starts, threshold_to_beat = get_high_netload(threshold,
-                                                                                                      window_size_days,
-                                                                                                      VRE_profiles,
-                                                                                                      all_cap * mod,
-                                                                                                      demands,
-                                                                                                      sum(non_traditional_load))
+    net_load, high_netload_durations, high_netload_event_starts, threshold_to_beat \
+        = get_high_netload(threshold, window_size_days, VRE_profiles, all_cap * mod, demands,
+                           extra_demand_yearly=non_traditional_load, extra_demand_hourly=heat_demand_to_add)
     max_val = max(high_netload_durations)
     max_val_start = high_netload_event_starts[high_netload_durations.index(max_val)]
     print(f"These are the high_netload_durations: {high_netload_durations}")
@@ -689,12 +733,12 @@ def combined_years(years, threshold=0.5, window_size_days=3):
     # print(net_load)
     make_pickles(f"{years[0]}-{years[-1]}", VRE_profiles, all_cap, demands, non_traditional_load)
 
-#combined_years(years,threshold=0.33)
-make_heat_profiles()
+#separate_years(years,threshold=0.33, make_figure=True)
+#make_heat_profiles()
 #make_hydro_profiles()
 #separate_years(years,threshold=0.33, make_output=True, make_figure=True)
-# combined_years(years)
-#remake_profile_seam()
+combined_years(years)
+remake_profile_seam()
 
 
 """net_load = separate_years(1980, add_nontraditional_load=False, make_figure=True, make_output=False, window_size_days=1)
