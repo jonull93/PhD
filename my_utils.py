@@ -367,7 +367,7 @@ def print_red(to_print, replace_this_line=False, *argv):
         to_print = str(to_print)
     if len(argv) > 0:
         for arg in argv:
-            to_print += " "+str(arg)
+            to_print += "\n"+str(arg)
     print(colored(to_print, "red"), end='\r' if replace_this_line else '\n')
 
 
@@ -393,6 +393,10 @@ def print_cyan(to_print, replace_this_line=False, *argv):
 
 def fast_rolling_average(my_list, window_size, wraparound=True, **kwargs):
     import pandas as pd
+    if window_size == 0:
+        if type(my_list) in [list, np.ndarray]:
+            return pd.DataFrame(my_list)
+        return my_list
     if type(my_list) == np.ndarray:
         my_list = list(my_list)
     if wraparound is True:
