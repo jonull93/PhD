@@ -310,8 +310,10 @@ def get_high_netload(threshold, rolling_average_days, VRE_profiles, all_cap, dem
             print_red("! More than one datatype in load_list in get_high_netload()")
             print_red(load[1943:1946])
         demand_profile = np.array(load_list)
-
-    if demand_profile.max() > 1000: demand_profile = demand_profile / 1000
+    try:
+        if demand_profile.max() > 1000: demand_profile = demand_profile / 1000
+    except ValueError:
+        if demand_profile.max().max() > 1000: demand_profile = demand_profile / 1000
     total_VRE_prod = (VRE_profiles * all_cap).sum(axis=1)
     print(f"Total VRE prod: {round(total_VRE_prod.sum() / 1000)} TWh")  # validated for separate_years
     try:
@@ -395,7 +397,12 @@ def find_year_and_hour(index, start_year=1980):
 # all_cap = initial_results[scenario_name]["tot_cap"]
 # all_cap["WOFF3","DE_N"]=60
 # all_cap["WONA4","DE_S"]=45
-cap_df = pd.read_excel("input\\cap_ref.xlsx", sheet_name="ref2", header=0, index_col=[0, 1], engine="openpyxl")
+#get the sheet names from "input\\cap_ref.xlsx"
+sheets = pd.ExcelFile("input\\cap_ref.xlsx").sheet_names
+# make sheet_name the name of the sheet that starts with "ref" and has the highest number after it
+sheet_name = "ref" + str(max([int(i[3:]) for i in sheets if i.startswith("ref")]))
+print_red(f"Reading capacities from sheet {sheet_name}")
+cap_df = pd.read_excel("input\\cap_ref.xlsx", sheet_name=sheet_name, header=0, index_col=[0, 1], engine="openpyxl")
 # print(cap_df)
 all_cap = cap_df.squeeze()
 regions = ["SE_NO_N", "SE_S", "NO_S", "FI", "DE_N", "DE_S"]
@@ -564,6 +571,14 @@ def remake_profile_seam(new_profile_seam=4344, profile_starts_in_winter=False, y
     return None
 
 
+def get_demand_as_df(year):
+    demand_filename = f'SyntheticDemand_nordic_L_ssp2-26-2050_{year}.mat'
+    mat_demand = mat73.loadmat(mat_folder + demand_filename)
+    demand = mat_demand["demand"] # in MW
+    demand_df = pd.DataFrame(demand/1000, columns=regions, index=range(1, len(demand)+1))
+    return demand_df
+
+
 def separate_years(years, add_nontraditional_load=True, make_output=True, make_figure=False, window_size_days=3,
                    threshold=0.5):
     print_cyan(f"Starting the 'separate_years()' script")
@@ -582,7 +597,7 @@ def separate_years(years, add_nontraditional_load=True, make_output=True, make_f
             # if there is a time dimension, the dimensions are [time,region,site]
             profiles = VRE_mat[profile_keys[VRE]]
             # VRE_mat[capacity_keys[VRE]] is a 2D array with dimensions [region,site
-            for site in sites:  # need another loop which wont break
+            for site in sites:
                 tech_name = VRE_tech_name_dict[VRE] + str(site)
                 VRE_profiles[tech_name] = profiles[:, :, site - 1]
                 capacities = VRE_mat[capacity_keys[VRE]]
@@ -590,10 +605,11 @@ def separate_years(years, add_nontraditional_load=True, make_output=True, make_f
                     pot_cap[region][tech_name] = capacities[i_r, site - 1]
                 # pot_cap = pd.DataFrame(capacities.T, index=sites, columns=regions, )
             FLHs[VRE] = get_FLH(profiles[:, :, :])
-        demand_filename = f'SyntheticDemand_nordic_L_ssp2-26-2050_{year}.mat'
-        mat_demand = mat73.loadmat(mat_folder + demand_filename)
-        demand = mat_demand["demand"]
-        prepped_tot_demand = demand.sum(axis=1) / 1000 # MW to GW
+        demand = get_demand_as_df(year)
+        #demand_filename = f'SyntheticDemand_nordic_L_ssp2-26-2050_{year}.mat'
+        #mat_demand = mat73.loadmat(mat_folder + demand_filename)
+        #demand = mat_demand["demand"]
+        prepped_tot_demand = demand.sum(axis=1)
         if add_nontraditional_load:
             prepped_tot_demand += non_traditional_load.sum() / len(prepped_tot_demand)
             # prepped_tot_demand is now a pd.Series with 8760 values
@@ -605,7 +621,6 @@ def separate_years(years, add_nontraditional_load=True, make_output=True, make_f
         # print_red(demand.shape,non_traditional_load.shape)
         # print_red(type(demand), type(non_traditional_load))
         # print_red(demand, non_traditional_load)
-        prepped_demand = demand / 1000  # + np.array(non_traditional_load)*np.ones(demand.shape)
         mod = 1
         net_load, high_netload_durations, high_netload_event_starts, threshold_to_beat \
             = get_high_netload(threshold, window_size_days, VRE_profiles, all_cap * mod, demand,
@@ -647,8 +662,8 @@ def separate_years(years, add_nontraditional_load=True, make_output=True, make_f
         # print_green(all_cap)
         # print_red(prepped_tot_demand)
         if make_output:
-            make_pickles(year, VRE_profiles, all_cap, prepped_demand, non_traditional_load)
-            make_gams_profiles(year, VRE_profiles, prepped_demand, pot_cap)
+            make_pickles(year, VRE_profiles, all_cap, demand + electrified_heat_demand.loc[year], non_traditional_load)
+            make_gams_profiles(year, VRE_profiles, demand, pot_cap)
             VRE_profile_dict = {}
             load_dict = {}
     return net_load
@@ -699,7 +714,7 @@ def combined_years(years, threshold=0.5, window_size_days=3):
         # take the rows from electrified_heat_demand where the first level of the multiindex equals year
         # add the electrified_heat_demand after summing the columns to one column
         #prepped_tot_demand += heat_demand_to_add
-        demands[year] = demand.sum(axis=1) / 1000
+        demands[year] = demand.sum(axis=1) / 1000 + electrified_heat_demand.loc[year].sum(axis=1)
         # print_red(demands[year].shape)
         print(
             f"VRE_profiles and demands are now appended and the lengths are {len(VRE_profiles)} and {sum([len(load) for load in demands.values()])}, respectively")
@@ -733,10 +748,10 @@ def combined_years(years, threshold=0.5, window_size_days=3):
     # print(net_load)
     make_pickles(f"{years[0]}-{years[-1]}", VRE_profiles, all_cap, demands, non_traditional_load)
 
-#separate_years(years,threshold=0.33, make_figure=True)
+#separate_years(2012,threshold=0.33, make_figure=True, make_output=True)
 #make_heat_profiles()
 #make_hydro_profiles()
-#separate_years(years,threshold=0.33, make_output=True, make_figure=True)
+separate_years(years,threshold=0.33, make_output=True, make_figure=True)
 combined_years(years)
 remake_profile_seam()
 
