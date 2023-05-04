@@ -2,4 +2,8 @@
 *
 # Except this file
 !.gitignore
-!*/
+
+!*padded.mat
+!*small*
+!*compressed*
+!*annotated*
