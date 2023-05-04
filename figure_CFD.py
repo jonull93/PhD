@@ -101,7 +101,7 @@ def fast_cfd(df_netload, xmin, xmax, amp_length=0.1, area_method=False):
         s = df_netload.count2.value_counts()
         df_freq = pd.DataFrame(data=s)
         output[amp] = df_freq
-    print(f"time to build output[amp] = {round(timer() - start_time, 1)} seconds. Now building df_out_tot")
+    print(f"Done building output[amp] after {round((timer() - start_time)/60, 1)} minutes. Now building df_out_tot")
     if area_method and False:
         for amp in amps:  # smidge and add all edges towards the vertical middle
             my_range = range(0, amp, amp_length*sign(amp))
@@ -326,7 +326,7 @@ if __name__ == "__main__":
     test_mode = False
     write_pickle = not test_mode
     area_mode_in_cfd = True
-    read_pickle = True
+    read_pickle = False
     years = range(1980, 2018)
     years_iter2 = [f"{years[i]}-{years[i+1]}" for i in range(len(years)-1)]
     print(f"{years_iter2 = }")
@@ -337,70 +337,71 @@ if __name__ == "__main__":
                                   write_files=True, read_pickle=True)
     print("Xmin =", xmin, "Xmax =", xmax, "Ymin =", ymin, "Ymax =", ymax)
     queue_years = Queue(maxsize=0)
-    # Load results from most recent fingerprinting run
-    with open("results/most_recent_results.txt", "r") as f:
-        results_folder_name = f.read().strip()
-    print_cyan(f"Loading results from {results_folder_name}...")
-    import json
-    with open(f"{results_folder_name}/results.json", "r") as f:
-        results = json.load(f)
-    with open(f"{results_folder_name}/parameters.txt", "r") as f:
-        parameters = json.load(f)
-    combinations = results["combinations"]
-    combinations_strings = [str(comb).replace("'",'"') for comb in combinations]
-    weights = results["best_weights"]
-    errors = results["best_errors"]
-    sum_func = results["sum_func"]
-    maxtime = parameters["maxtime"]
-    #find all non-float values in errors and remove the corresponding key from weights, errors, combinations and combinations_strings
-    for key in list(errors.keys()):
-        try:
-            float(errors[key])
-        except TypeError:
-            print_red(f"Bad value for {key} = {errors[key]}")
-            del weights[key]
-            del errors[key]
-            del combinations[combinations_strings.index(key)]
-            del combinations_strings[combinations_strings.index(key)]
-    #errors is a dictionary, sort it by value
-    errors_sorted = sorted(errors.items(), key=lambda x: x[1])
-    #save the best 100 combinations to a JSON file
-    with open(f"{results_folder_name}/best_100.json", "w") as f:
-        to_dump = [key.replace('"', '').replace('[', '').replace(']', '').replace(' ', '').split(',') for key, value in errors_sorted[:100]]
-        json.dump(to_dump, f, indent=4)
 
-    # save the keys to the items in errors_sorted where the value is at most 5% higher than the best error
-    for percent in range(5,55,5):
-        percent = percent/10
-        best_keys = [key for key, value in errors_sorted if value <= errors_sorted[0][1] * (1 + percent/100)]
-        print_green(f"-- Combinations within {percent}% of the best case: {len(best_keys)}")
-        # each element in best_keys is a list of strings, save each string in a list
-        best_years = [key.replace('"', '').replace('[', '').replace(']', '').replace(' ', '').split(',') for key in best_keys]
-        # each element in best_years is a list of strings, save each string in a list
-        best_years = list(set([year for sublist in best_years for year in sublist])) # [int(year[:4]) for sublist in best_years for year in sublist]))
-        best_years.sort()
-        print(f"Unique years within {percent} of the best case: {len(best_years)}")
-        print(f"Combinations that {len(best_years)} years can make: {math.comb(len(best_years)-1, 3)*2}")
-        print(f"Years: {best_years}")
-    #if combinations is longer than 8, only take the first 4 and last 4
-    if len(combinations) > 8:
-        combinations = combinations[:6] + combinations[-2:]
-        combinations_strings = combinations_strings[:6] + combinations_strings[-2:]
-        weights = {key: weights[key] for key in combinations_strings}
-        errors = {key: errors[key] for key in combinations_strings}
-    # make errors also accept keys with only ' instead of "
-    for comb in combinations_strings:
-        alt_comb = comb.replace('"',"'")
-        errors[alt_comb] = errors[comb]
-    print(f"{combinations_strings[0] = }")
-    #for i, comb in enumerate(combinations):
-    #    errors[comb] = errors[combinations_strings[i]]
+    if False: # Load results from most recent fingerprinting run
+        with open("results/most_recent_results.txt", "r") as f:
+            results_folder_name = f.read().strip()
+        print_cyan(f"Loading results from {results_folder_name}...")
+        import json
+        with open(f"{results_folder_name}/results.json", "r") as f:
+            results = json.load(f)
+        with open(f"{results_folder_name}/parameters.txt", "r") as f:
+            parameters = json.load(f)
+        combinations = results["combinations"]
+        combinations_strings = [str(comb).replace("'",'"') for comb in combinations]
+        weights = results["best_weights"]
+        errors = results["best_errors"]
+        sum_func = results["sum_func"]
+        maxtime = parameters["maxtime"]
+        #find all non-float values in errors and remove the corresponding key from weights, errors, combinations and combinations_strings
+        for key in list(errors.keys()):
+            try:
+                float(errors[key])
+            except TypeError:
+                print_red(f"Bad value for {key} = {errors[key]}")
+                del weights[key]
+                del errors[key]
+                del combinations[combinations_strings.index(key)]
+                del combinations_strings[combinations_strings.index(key)]
+        #errors is a dictionary, sort it by value
+        errors_sorted = sorted(errors.items(), key=lambda x: x[1])
+        #save the best 100 combinations to a JSON file
+        with open(f"{results_folder_name}/best_100.json", "w") as f:
+            to_dump = [key.replace('"', '').replace('[', '').replace(']', '').replace(' ', '').split(',') for key, value in errors_sorted[:100]]
+            json.dump(to_dump, f, indent=4)
 
-    combined_results = [(comb, [round(weights[key][i], 3) for i in range(len(weights[key]))]) for key, comb in zip(combinations_strings, combinations) if sum(weights[key]) > 0]
-    #print(combined_results)
-    for i in combined_results:
-        #queue_years.put(i)
-        continue
+        # save the keys to the items in errors_sorted where the value is at most 5% higher than the best error
+        for percent in range(5,55,5):
+            percent = percent/10
+            best_keys = [key for key, value in errors_sorted if value <= errors_sorted[0][1] * (1 + percent/100)]
+            print_green(f"-- Combinations within {percent}% of the best case: {len(best_keys)}")
+            # each element in best_keys is a list of strings, save each string in a list
+            best_years = [key.replace('"', '').replace('[', '').replace(']', '').replace(' ', '').split(',') for key in best_keys]
+            # each element in best_years is a list of strings, save each string in a list
+            best_years = list(set([year for sublist in best_years for year in sublist])) # [int(year[:4]) for sublist in best_years for year in sublist]))
+            best_years.sort()
+            print(f"Unique years within {percent} of the best case: {len(best_years)}")
+            print(f"Combinations that {len(best_years)} years can make: {math.comb(len(best_years)-1, 3)*2}")
+            print(f"Years: {best_years}")
+        #if combinations is longer than 8, only take the first 4 and last 4
+        if len(combinations) > 8:
+            combinations = combinations[:6] + combinations[-2:]
+            combinations_strings = combinations_strings[:6] + combinations_strings[-2:]
+            weights = {key: weights[key] for key in combinations_strings}
+            errors = {key: errors[key] for key in combinations_strings}
+        # make errors also accept keys with only ' instead of "
+        for comb in combinations_strings:
+            alt_comb = comb.replace('"',"'")
+            errors[alt_comb] = errors[comb]
+        print(f"{combinations_strings[0] = }")
+        #for i, comb in enumerate(combinations):
+        #    errors[comb] = errors[combinations_strings[i]]
+
+        combined_results = [(comb, [round(weights[key][i], 3) for i in range(len(weights[key]))]) for key, comb in zip(combinations_strings, combinations) if sum(weights[key]) > 0]
+        #print(combined_results)
+        for i in combined_results:
+            #queue_years.put(i)
+            continue
     for year in years_iter2:
         queue_years.put(year)
     print("Queue contains", queue_years.qsize(), "years")
