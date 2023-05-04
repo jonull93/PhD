@@ -63,7 +63,7 @@ weight_matrix_sqrt = weight_matrices["Z_sqrt"]  # min = 1, max = 14
 
 ref_mat[isnan.(ref_mat)].= 0
 scaled_ref_mat = ref_mat ./ 40
-combination = ["2010-2011", "1981-1982", "2013-2014"]
+combination = ["1984-1985", "1991-1992", "2015-2016"]
 #["2010-2011", "2000-2001", "2006-2007"]
 #["1983-1984", "2000-2001", "2007-2008"]#["2002-2003","2000-2001","2004-2005"]
 cfd_data = Dict()
@@ -75,7 +75,7 @@ end
 matrices = [cfd_data[year] for year in combination]
 printstyled("M1[1:2,1:2] = $(matrices[1][1:2,1:2]) \n"; color=:cyan)
 
-res = 11  # make sure res+1 is divisible by 3
+res = 14  # make sure res+1 is divisible by 3
 center = (res-1)÷3+1
 
 function create_filled_triangle_matrix2(n::Int)
@@ -144,57 +144,64 @@ path = "figures/$combination_string"
 mkpath(path)
 
 printstyled("Making square error plot where min = $(minimum(square_error[.!isnan.(square_error)])) and max = $(maximum(square_error[.!isnan.(square_error)])) \n"; color=:green)
-heatmap(square_error, color=:Reds, title="square error", size=(600,600))
+heatmap(square_error, color=:Reds, title="square error", size=(600,600), ticks=false)
+#add the labels for the min and max
+annotate!([(-1,-1,text("$(Int.(m[1,1]))",8,:center))])
 annotate!([(1,1,text("$(Int.(m[1,1]))",8,:center))])
 annotate!([(res,1,text("$(Int.(m[res,1]))",8,:center))])
 annotate!([(1,res,text("$(Int.(m[1,res]))",8,:center))])
-annotate!([(center,center,text("<--(⅓,⅓,⅓)",7,:center))])
-annotate!([(square_best_index[2],square_best_index[1],text("+",16,:center))])
+annotate!([(center,center,text("   <--(⅓,⅓,⅓)",7,:center))])
+annotate!([(square_best_index[2],square_best_index[1],text("+",18,:center))])
 savefig(joinpath(path,"res$(res)_square_error_triangle.png"))
 
 printstyled("Making abs plot where min = $(minimum(abs_errors[.!isnan.(abs_errors)])) and max = $(maximum(abs_errors[.!isnan.(abs_errors)])) \n"; color=:green)
 heatmap(abs_errors, color=:Reds, title="abs error", size=(600,600))
+#add the labels for the min and max
 annotate!([(1,1,text("$(Int.(m[1,1]))",8,:center))])
 annotate!([(res,1,text("$(Int.(m[res,1]))",8,:center))])
 annotate!([(1,res,text("$(Int.(m[1,res]))",8,:center))])
-annotate!([(center,center,text("<--(⅓,⅓,⅓)",7,:center))])
-annotate!([(abs_best_index[2],abs_best_index[1],text("+",16,:center))])
+annotate!([(center,center,text("   <--(⅓,⅓,⅓)",7,:center))])
+annotate!([(abs_best_index[2],abs_best_index[1],text("+",18,:center))])
 savefig(joinpath(path,"res$(res)_abs_error_triangle.png"))
 
 printstyled("Making sqrt plot where min = $(minimum(sqrt_errors[.!isnan.(sqrt_errors)])) and max = $(maximum(sqrt_errors[.!isnan.(sqrt_errors)])) \n"; color=:green)
 heatmap(sqrt_errors, color=:Reds, title="sqrt error", size=(600,600))
+#add the labels for the min and max
 annotate!([(1,1,text("$(Int.(m[1,1]))",8,:center))])
 annotate!([(res,1,text("$(Int.(m[res,1]))",8,:center))])
 annotate!([(1,res,text("$(Int.(m[1,res]))",8,:center))])
-annotate!([(center,center,text("<--(⅓,⅓,⅓)",7,:center))])
-annotate!([(sqrt_best_index[2],sqrt_best_index[1],text("+",16,:center))])
+annotate!([(center,center,text("   <--(⅓,⅓,⅓)",7,:center))])
+annotate!([(sqrt_best_index[2],sqrt_best_index[1],text("+",18,:center))])
 savefig(joinpath(path,"res$(res)_sqrt_error_triangle.png"))
 
 printstyled("Making log plot where min = $(minimum(log_errors[.!isnan.(log_errors)])) and max = $(maximum(log_errors[.!isnan.(log_errors)])) \n"; color=:green)
 heatmap(log_errors, color=:Reds, title="log error", size=(600,600))
+#add the labels for the min and max
 annotate!([(1,1,text("$(Int.(m[1,1]))",8,:center))])
 annotate!([(res,1,text("$(Int.(m[res,1]))",8,:center))])
 annotate!([(1,res,text("$(Int.(m[1,res]))",8,:center))])
-annotate!([(center,center,text("<--(⅓,⅓,⅓)",7,:center))])
-annotate!([(log_best_index[2],log_best_index[1],text("+",16,:center))])
+annotate!([(center,center,text("   <--(⅓,⅓,⅓)",7,:center))])
+annotate!([(log_best_index[2],log_best_index[1],text("+",18,:center))])
 savefig(joinpath(path,"res$(res)_log_error_triangle.png"))
 
 printstyled("Making wmat plot where min = $(minimum(wmat_errors[.!isnan.(wmat_errors)])) and max = $(maximum(wmat_errors[.!isnan.(wmat_errors)])) \n"; color=:green)
 heatmap(wmat_errors, color=:Reds, title="wmatlin19 error", size=(600,600))
+#add the labels for the min and max
 annotate!([(1,1,text("$(Int.(m[1,1]))",8,:center))])
 annotate!([(res,1,text("$(Int.(m[res,1]))",8,:center))])
 annotate!([(1,res,text("$(Int.(m[1,res]))",8,:center))])
-annotate!([(center,center,text("<--(⅓,⅓,⅓)",7,:left))])
-annotate!([(wmat_best_index[2],wmat_best_index[1],text("+",16,:center))])
+annotate!([(center,center,text("   <--(⅓,⅓,⅓)",7,:left))])
+annotate!([(wmat_best_index[2],wmat_best_index[1],text("+",18,:center))])
 savefig(joinpath(path,"res$(res)_wmatlin19_error_triangle.png"))
 
 printstyled("Making wmat2 plot where min = $(minimum(wmat2_errors[.!isnan.(wmat2_errors)])) and max = $(maximum(wmat2_errors[.!isnan.(wmat2_errors)])) \n"; color=:green)
 heatmap(wmat2_errors, color=:Reds, title="wmatlinsqrt error", size=(600,600))
+#add the labels for the min and max
 annotate!([(1,1,text("$(Int.(m[1,1]))",8,:center))])
 annotate!([(res,1,text("$(Int.(m[res,1]))",8,:center))])
 annotate!([(1,res,text("$(Int.(m[1,res]))",8,:center))])
-annotate!([(center,center,text("<--(⅓,⅓,⅓)",7,:center))])
-annotate!([(wmat2_best_index[2],wmat2_best_index[1],text("+",16,:center))])
+annotate!([(center,center,text("   <--(⅓,⅓,⅓)",7,:center))])
+annotate!([(wmat2_best_index[2],wmat2_best_index[1],text("+",18,:center))])
 savefig(joinpath(path,"res$(res)_wmatsqrt_error_triangle.png"))
 
 println("Done with $combination_string after $(round((time()-starttime)/60,digits=2)) minutes")
