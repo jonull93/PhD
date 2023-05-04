@@ -30,10 +30,10 @@ if false
     years = [i for i in years if !(i in to_remove)]
     println("Removed years: $(to_remove)")
 end
-most_interesting_years = ["2010-2011","2002-2003",]
-maxtime = 60*30
+most_interesting_years = ["1984-1985", "1995-1996"]#["2010-2011","2002-2003",]
+maxtime = 60*3 # 60*30=30 minutes
 algs_size = "small" # "small" or "large" or "single" or "adaptive"
-years_to_add = 1 # number of years to add to the most interesting year for each combination
+years_to_add = 2 # number of years to add to the most interesting year for each combination
 # ask the user whether to import the 100 best combinations from the previous run
 # if no input is given in 10 seconds, assume import_combinations is false
 
