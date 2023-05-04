@@ -539,16 +539,13 @@ def remake_profile_seam(new_profile_seam=4344, profile_starts_in_winter=False, y
     for i_y, year in enumerate(years):
         #print(f"Year {year}")
         netload_components = pickle.load(open(f"PickleJar\\netload_components_{year}.pickle", "rb"))
-        VRE_profile_dict[year] = netload_components["VRE_profiles"]
-        load_dict[year] = netload_components["load"]
+        VRE_profile_dict[year] = netload_components["VRE_profiles"]  # type: pd.DataFrame
+        load_dict[year] = netload_components["load"]  # type: pd.DataFrame
         if year == years[0]: continue  # make new VRE_profiles with seam in summer
         print_cyan(f" - Making profiles for years {years[i_y - 1]}-{year}")
         print_cyan(f" - A new year now begins at hour {new_profile_seam} (h{(4344*profile_starts_in_winter+1):04d} in the profile)")
-        # VRE_profile = pd.concat([VRE_profile_dict[years[i_y-1]].loc[4464:], VRE_profile_dict[years[i_y]].loc[:4464]])
         VRE_df_fall = pd.DataFrame(VRE_profile_dict[years[i_y - 1]][new_profile_seam:])
         VRE_df_spring = pd.DataFrame(VRE_profile_dict[years[i_y]][:new_profile_seam])
-        # print(load_dict[years[i_y - 1]],load_dict[years[i_y - 1]].shape)
-        # print_green(pd.DataFrame(load_dict[years[i_y - 1]]))
         load_df_fall = pd.DataFrame(load_dict[years[i_y - 1]][new_profile_seam:])
         load_df_spring = pd.DataFrame(load_dict[years[i_y]][:new_profile_seam])
         if profile_starts_in_winter:
@@ -571,11 +568,15 @@ def remake_profile_seam(new_profile_seam=4344, profile_starts_in_winter=False, y
     return None
 
 
-def get_demand_as_df(year):
-    demand_filename = f'SyntheticDemand_nordic_L_ssp2-26-2050_{year}.mat'
-    mat_demand = mat73.loadmat(mat_folder + demand_filename)
-    demand = mat_demand["demand"] # in MW
-    demand_df = pd.DataFrame(demand/1000, columns=regions, index=range(1, len(demand)+1))
+def get_demand_as_df(year, reseamed=False):
+    if not reseamed:
+        demand_filename = f'SyntheticDemand_nordic_L_ssp2-26-2050_{year}.mat'
+        mat_demand = mat73.loadmat(mat_folder + demand_filename)
+        demand = mat_demand["demand"] # in MW
+        demand_df = pd.DataFrame(demand/1000, columns=regions, index=range(1, len(demand)+1))
+    else:
+        demand_filename = f'netload_components_{year}.pickle'
+        demand_df = pd.read_pickle("PickleJar\\"+demand_filename)["load"]
     return demand_df
 
 
@@ -603,12 +604,8 @@ def separate_years(years, add_nontraditional_load=True, make_output=True, make_f
                 capacities = VRE_mat[capacity_keys[VRE]]
                 for i_r, region in enumerate(regions):
                     pot_cap[region][tech_name] = capacities[i_r, site - 1]
-                # pot_cap = pd.DataFrame(capacities.T, index=sites, columns=regions, )
             FLHs[VRE] = get_FLH(profiles[:, :, :])
         demand = get_demand_as_df(year)
-        #demand_filename = f'SyntheticDemand_nordic_L_ssp2-26-2050_{year}.mat'
-        #mat_demand = mat73.loadmat(mat_folder + demand_filename)
-        #demand = mat_demand["demand"]
         prepped_tot_demand = demand.sum(axis=1)
         if add_nontraditional_load:
             prepped_tot_demand += non_traditional_load.sum() / len(prepped_tot_demand)
@@ -618,55 +615,100 @@ def separate_years(years, add_nontraditional_load=True, make_output=True, make_f
             heat_demand_to_add = electrified_heat_demand.loc[year].sum(axis=1)
             prepped_tot_demand += heat_demand_to_add
 
-        # print_red(demand.shape,non_traditional_load.shape)
-        # print_red(type(demand), type(non_traditional_load))
-        # print_red(demand, non_traditional_load)
         mod = 1
         net_load, high_netload_durations, high_netload_event_starts, threshold_to_beat \
             = get_high_netload(threshold, window_size_days, VRE_profiles, all_cap * mod, demand,
                                extra_demand_yearly=non_traditional_load, extra_demand_hourly=heat_demand_to_add)
         max_val = max(high_netload_durations)
         max_val_start = high_netload_event_starts[high_netload_durations.index(max_val)]
-
-        # print(f"These are the high_netload_durations: {high_netload_durations}")
-        # print(f"These are the start times: {high_netload_event_starts}")
         sorted_high_netload_durations = high_netload_durations.copy()
         sorted_high_netload_durations.sort(reverse=True)
         print_red(f"Sorted high_netload_durations: {sorted_high_netload_durations}")
         # accumulated = get_accumulated_deficiency(VRE_profiles,all_cap,demand)
         # print(net_load)
         if make_figure:
-            #print_red(f"First 10 hours of load: {prepped_tot_demand[:10]}")
-            #print_red(f"First 10 hours of VRE: {VRE_profiles[:10]}")
-            #print_red(f"First 10 hours of net load: {net_load[:10]}")
-            plt.plot(fast_rolling_average(net_load, 24 * window_size_days), label="Net load")
-            plt.plot(prepped_tot_demand, color="gray", linestyle="--", label="Load" )
+            plt.plot(prepped_tot_demand, color="gray", linestyle="-", label="Total load")
+            plt.plot(prepped_tot_demand-heat_demand_to_add, color="darkviolet", linestyle=":",
+                     label="Load (excl. new heat)", linewidth=0.5)
+            plt.plot(demand.sum(axis=1), color="hotpink", linestyle=":",
+                     label="Traditional load", linewidth=0.5)
             plt.axhline(y=mean(net_load), color="black", linestyle="-.", label="Average net load")
-            plt.axhline(y=threshold_to_beat, color="red", label=f"{threshold}% of peak load")
+            plt.plot(fast_rolling_average(net_load, 24 * window_size_days), label="Net load (roll. mean, 3d)")
+            plt.axhline(y=threshold_to_beat, color="red", label=f"{threshold*100:.0f}% of peak load")
             plt.axvline(x=max_val_start, color="red", label="Start of longest period")
             plt.xticks(range(0, 8760, 730),
-                       labels=["1 Jan.", "1 Feb.", "1 Mar.", "1 Apr.", "1 May", "1 Jun.", "1 Jul.", "1 Aug.",
-                               "1 Sep.", "1 Oct.", "1 Nov.", "1 Dec."])
-            # plt.legend(labels=regions)
+                       labels=["Jan.", "Feb.", "Mar.", "Apr.", "May", "Jun.", "Jul.", "Aug.",
+                               "Sep.", "Oct.", "Nov.", "Dec."])
             plt.title(
                 f"Longest event in Year {year} is: {round(max(high_netload_durations) / 24)} days and starts day {round(max_val_start / 24)}")
             plt.ylabel("Load [GW]")
             plt.xlabel("Date")
             plt.legend()
-            # plt.xlim([0,168*3])
             plt.tight_layout()
             # plt.show()
             plt.savefig(f"{fig_path}over{int(threshold * 100)}_netload_events_{year}.png", dpi=400)
             plt.close()
-        # print_cyan(VRE_profiles)
-        # print_green(all_cap)
-        # print_red(prepped_tot_demand)
         if make_output:
             make_pickles(year, VRE_profiles, all_cap, demand + electrified_heat_demand.loc[year], non_traditional_load)
             make_gams_profiles(year, VRE_profiles, demand, pot_cap)
-            VRE_profile_dict = {}
-            load_dict = {}
     return net_load
+
+
+def plot_reseamed_years(years, threshold=0.33, window_size_days=3):
+    print_cyan(f"Starting the 'plot_reseamed_years()' script")
+    # make a plot, similar to separate_years, but with the reseamed data found in netload_components_YEAR1-YEAR2.pickle
+    # build a list of year combinations, e.g. "1980-1981", "1981-1982", "1982-1983", etc.
+    year_combinations = []
+    for i in range(len(years) - 1):
+        year_combinations.append(f"{years[i]}-{years[i + 1]}")
+
+    # Make a plot for each year combination
+    for year_combination in year_combinations:
+        # Load the reseamed data from netload_components_YEAR1-YEAR2.pickle
+        netload_components = pickle.load(open(f"PickleJar\\netload_components_{year_combination}.pickle", "rb"))
+        VRE_profiles = netload_components["VRE_profiles"]
+        #demand = get_demand_as_df(year_combination, reseamed=True)
+        demand = netload_components["demand"]
+        #non_traditional_load
+        #electrified_heat_demand.loc[year].sum(axis=1)
+        #heat_demand_to_add should be a combination of hour 4344: from year 1, hour :4344 from year 2
+        heat_demand_to_add = pd.concat([electrified_heat_demand.loc[int(year_combination.split("-")[0])].iloc[:4344],
+                                        electrified_heat_demand.loc[int(year_combination.split("-")[1])].iloc[4344:]])
+
+        net_load, high_netload_durations, high_netload_event_starts, threshold_to_beat \
+            = get_high_netload(threshold, window_size_days, VRE_profiles, all_cap, demand,
+                               extra_demand_yearly=non_traditional_load, extra_demand_hourly=heat_demand_to_add)
+        max_val = max(high_netload_durations)
+        max_val_start = high_netload_event_starts[high_netload_durations.index(max_val)]
+        sorted_high_netload_durations = high_netload_durations.copy()
+        sorted_high_netload_durations.sort(reverse=True)
+        print_red(f"Sorted high_netload_durations: {sorted_high_netload_durations}")
+
+        # Calculate the net load
+        _net_load = demand.sum(axis=1) + non_traditional_load.sum() / len(demand) + heat_demand_to_add.sum(axis=1) \
+                   - VRE_profiles.sum(axis=1) * all_cap
+        rolling_mean = fast_rolling_average(net_load, 24 * window_size_days)
+        threshold_to_beat = threshold * max(demand.sum(axis=1))
+
+        # Plot the data
+        plt.plot(demand.sum(axis=1), color="hotpink", linestyle=":", label="Traditional load", linewidth=0.5)
+        plt.plot(demand.sum(axis=1) + non_traditional_load.sum() / len(demand), color="gray", linestyle="-",
+                 label="Total load")
+        plt.plot(rolling_mean, label="Net load (roll. mean, 3d)")
+        plt.axhline(y=net_load.mean(), color="black", linestyle="-.", label="Average net load")
+        plt.axhline(y=threshold_to_beat, color="red", linestyle="--", label=f"{threshold * 100:.0f}% of peak load")
+
+        # Customize plot appearance
+        plt.title(f"Reseamed Data for {year_combination}")
+        plt.ylabel("Load [GW]")
+        plt.xlabel("Hour")
+        plt.legend()
+        plt.tight_layout()
+
+        # Save the plot as an image file
+        plt.savefig(f"over{int(threshold * 100)}_netload_events_{year_combination}.png", dpi=400)
+        plt.close()
+
 
 
 def combined_years(years, threshold=0.5, window_size_days=3):
@@ -751,9 +793,10 @@ def combined_years(years, threshold=0.5, window_size_days=3):
 #separate_years(2012,threshold=0.33, make_figure=True, make_output=True)
 #make_heat_profiles()
 #make_hydro_profiles()
-separate_years(years,threshold=0.33, make_output=True, make_figure=True)
-combined_years(years)
-remake_profile_seam()
+#separate_years(years,threshold=0.33, make_output=True, make_figure=True)
+plot_reseamed_years(range(1980,1985))
+#combined_years(years)
+#remake_profile_seam()
 
 
 """net_load = separate_years(1980, add_nontraditional_load=False, make_figure=True, make_output=False, window_size_days=1)
