@@ -31,8 +31,8 @@ if false
     println("Removed years: $(to_remove)")
 end
 most_interesting_years = ["1984-1985", "1995-1996"]#["2010-2011","2002-2003",]
-maxtime = 60*3 # 60*30=30 minutes
-algs_size = "small" # "small" or "large" or "single" or "adaptive"
+maxtime = 60*20 # 60*30=30 minutes
+algs_size = "single" # "small" or "large" or "single" or "adaptive"
 years_to_add = 2 # number of years to add to the most interesting year for each combination
 # ask the user whether to import the 100 best combinations from the previous run
 # if no input is given in 10 seconds, assume import_combinations is false
@@ -221,7 +221,7 @@ global_best = 9e9
 printstyled("############# -- Starting optimization loop with maxtime=$(maxtime)s and algs_size '$(algs_size)' -- #############\n"; color=:yellow)
 Threads.@threads for thread = 1:threads_to_start
     #sleep for 250 ms to stagger thread starts
-    time_to_sleep = 0.1*thread
+    time_to_sleep = 0.2*thread
     sleep(time_to_sleep)
     global global_best
     while true
@@ -229,9 +229,12 @@ Threads.@threads for thread = 1:threads_to_start
             #println("Nothing to do")
             break
         end
-        case = dequeue!(queue)
         start_time = Dates.now()
-        printstyled("Thread $(thread) started working on $(case) at $(Dates.format(now(), "HH:MM:SS")), $(length(queue)) left in queue\n"; color=:cyan)
+        local case = ""
+        lock(print_lock) do # for some reason, julia would freeze and the dequeue would bug out if this was not locked
+            case = dequeue!(queue)
+            printstyled("Thread $(thread) started working on $(case) at $(Dates.format(now(), "HH:MM:SS")), $(length(queue)) left in queue\n"; color=:cyan)
+        end
         matrices = [cfd_data[year] for year in case]
         # Use an optimization algorithm to find the best weights
         function sse(x)
