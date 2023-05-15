@@ -23,7 +23,7 @@ const print_lock = ReentrantLock()
 #set parameters
 amplitude_resolution = 1
 window = 12
-years = 1980:2018
+years = 1980:2018 # cannot include 2019
 # from years, remove 1985, 1993,1994,1995,1996,1998,2001,2005,2017
 if false
     to_remove = [1985, 1993,1994,1995,1996,1998,2001,2005,2017]
@@ -31,7 +31,7 @@ if false
     println("Removed years: $(to_remove)")
 end
 most_interesting_years = ["1984-1985", "1995-1996"]#["2010-2011","2002-2003",]
-maxtime = 60*20 # 60*30=30 minutes
+maxtime = 60*15 # 60*30=30 minutes
 algs_size = "single" # "small" or "large" or "single" or "adaptive"
 years_to_add = 2 # number of years to add to the most interesting year for each combination
 # ask the user whether to import the 100 best combinations from the previous run
@@ -230,11 +230,12 @@ Threads.@threads for thread = 1:threads_to_start
             break
         end
         start_time = Dates.now()
-        local case = ""
+        local case = []
         lock(print_lock) do # for some reason, julia would freeze and the dequeue would bug out if this was not locked
             case = dequeue!(queue)
             printstyled("Thread $(thread) started working on $(case) at $(Dates.format(now(), "HH:MM:SS")), $(length(queue)) left in queue\n"; color=:cyan)
         end
+        convert(Vector{String},case)
         matrices = [cfd_data[year] for year in case]
         # Use an optimization algorithm to find the best weights
         function sse(x)
@@ -276,8 +277,8 @@ Threads.@threads for thread = 1:threads_to_start
         ###----------------------------
         ### SET THE ERROR FUNCTION TO OPTIMIZE WITH HERE
         ###----------------------------
-        global opt_func_str = "sqrt_sum(x) + (sigmoid((sum(x)-1.011)*1000) + sigmoid((0.989-sum(x))*1000))*100000" #sigmoid((sum(x)-1.011)*1000) +
-        opt_func(x) = sqrt_sum(x) + (sigmoid((sum(x)-1.011)*1000) + sigmoid((0.989-sum(x))*1000))*100000 #sigmoid((sum(x)-1.011)*1000) +
+        global opt_func_str = "abs_sum(x) + (sigmoid((sum(x)-1.011)*1000) + sigmoid((0.989-sum(x))*1000))*100000" #sigmoid((sum(x)-1.011)*1000) +
+        opt_func(x) = abs_sum(x) + (sigmoid((sum(x)-1.011)*1000) + sigmoid((0.989-sum(x))*1000))*100000 #sigmoid((sum(x)-1.011)*1000) +
         local initial_guesses_2 = [
             # considering the solution space as a triangle where each corner is 100% of one axis such as (1,0,0)
             # let some initial guesses be the center of the triangle and on the center of the edges of the triangle
