@@ -4,8 +4,8 @@ import math
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-from multiprocessing import cpu_count
-from queue import Queue
+from multiprocessing import cpu_count, Process, Queue
+#from queue import Queue
 import threading
 import time as tm
 from timeit import default_timer as timer
@@ -47,7 +47,8 @@ def get_contour(Z, transpose=False):
     return contour
 
 
-def fast_cfd(df_netload, xmin, xmax, amp_length=0.1, area_method=False):
+def fast_cfd(df_netload, xmin, xmax, amp_length=0.1, area_method=False, thread=False, debugging=False):
+    if not thread: thread = "main"
     df_freq = pd.DataFrame()
     output = {}
     net_loads_array = np.array(df_netload["net load"].values)
@@ -184,7 +185,10 @@ def make_cfd_plot(ax, Xnetload, Ynetload, Znetload, xmin=False, xmax=False, ymin
     ax.set_ylabel("Duration [days]")
     return cm
 
-def main(year, amp_length=1, rolling_hours=12, area_mode_in_cfd=True, write_files=True, read_pickle=True, xmin=0, xmax=0, ymin=0, ymax=0, weights=False):
+def main(year, amp_length=1, rolling_hours=12, area_mode_in_cfd=True, write_files=True, read_pickle=True, xmin=0,
+         xmax=0, ymin=0, ymax=0, weights=False, thread_nr=False, debugging=False):
+    if not thread_nr:
+        thread_nr = "MAIN"
     if type(year) != list and type(year) != tuple:
         print_cyan(f"\nStarting loop for year -- {year} --")
         pickle_read_name = rf"PickleJar\{year}_CFD_netload_df_amp{amp_length}_window{rolling_hours}{'_area'*area_mode_in_cfd}.pickle"
@@ -196,7 +200,7 @@ def main(year, amp_length=1, rolling_hours=12, area_mode_in_cfd=True, write_file
         except Exception as e:
             if read_pickle: print_red(f"Failed to read {pickle_read_name} due to {type(e)}")
             start_time = timer()
-            df_out_tot, xmin, xmax = create_df_out_tot(year, xmin, xmax, rolling_hours=rolling_hours)
+            df_out_tot, xmin, xmax = create_df_out_tot(year, xmin, xmax, rolling_hours=rolling_hours, amp_length=amp_length, debugging=debugging)
             # 248s at 1 year then more changes and now 156-157s at 1 year
             end_time = timer()
             try: this_thread = thread_nr[threading.get_ident()]
@@ -305,19 +309,18 @@ def main(year, amp_length=1, rolling_hours=12, area_mode_in_cfd=True, write_file
     return xmin, xmax, ymin, ymax
 
 
-def crawler():
-    thread_nr[threading.get_ident()] = len(thread_nr) + 1
+def crawler(queue_years,thread_nr,amp_length,rolling_hours,area_mode_in_cfd,write_pickle,read_pickle,xmin,xmax,ymin,ymax):
     while not queue_years.empty():
         year = queue_years.get()  # fetch new work from the Queue
         weights = False
         if type(year) == list:
             year, weights = year
-        print_green(f"Starting Year {year} in thread {thread_nr[threading.get_ident()]}. Remaining years: {queue_years.qsize()}")
+        print_green(f"Starting Year {year} in thread {thread_nr}. Remaining years: {queue_years.qsize()}")
         start_time_thread = timer()
         main(year,amp_length=amp_length,rolling_hours=rolling_hours,area_mode_in_cfd=area_mode_in_cfd,write_files=write_pickle,
-             read_pickle=read_pickle,xmin=xmin,xmax=xmax,ymin=ymin,ymax=ymax,weights=weights)
+             read_pickle=read_pickle,xmin=xmin,xmax=xmax,ymin=ymin,ymax=ymax,weights=weights,thread_nr=thread_nr)
         print_green(f"   Finished Year {year} after {round(timer() - start_time_thread, 1)} seconds")
-        queue_years.task_done()
+        #queue_years.task_done()
     return None
 
 if __name__ == "__main__":
@@ -407,12 +410,13 @@ if __name__ == "__main__":
     print("Queue contains", queue_years.qsize(), "years")
     threads = {}
     thread_nr = {}
-    num_threads = min(max(cpu_count() - 2, 4), len(queue_years.queue))
+    num_threads = min(max(cpu_count() - 2, 4), int(queue_years.qsize()))
 
     for i in range(num_threads):
-        print_cyan(f'Starting thread {i + 1}')
-        worker = threading.Thread(target=crawler, args=(), daemon=False)
+        #print_cyan(f'Starting thread {i + 1}')
+        #worker = threading.Thread(target=crawler, args=(), daemon=False)
+        worker = Process(target=crawler, args=(queue_years,i,amp_length,rolling_hours,area_mode_in_cfd,write_pickle,read_pickle,xmin,xmax,ymin,ymax))
         # setting threads as "daemon" allows main program to exit eventually even if these dont finish correctly
         worker.start()
-        tm.sleep(1)  # staggering gdx threads shouldnt matter as long as the excel process has something to work on
+        tm.sleep(0.05)
 
