@@ -75,7 +75,7 @@ end
 matrices = [cfd_data[year] for year in combination]
 printstyled("M1[1:2,1:2] = $(matrices[1][1:2,1:2]) \n"; color=:cyan)
 
-res = 14  # make sure res+1 is divisible by 3
+res = 20  # make sure res+1 is divisible by 3
 center = (res-1)÷3+1
 
 function create_filled_triangle_matrix2(n::Int)
@@ -103,9 +103,9 @@ m = create_filled_triangle_matrix2(res)
 square_error = fill(NaN,res,res)
 abs_errors = fill(NaN,res,res)
 sqrt_errors = fill(NaN,res,res)
-log_errors = fill(NaN,res,res)
-wmat_errors = fill(NaN,res,res)
-wmat2_errors = fill(NaN,res,res)
+#log_errors = fill(NaN,res,res)
+#wmat_errors = fill(NaN,res,res)
+#wmat2_errors = fill(NaN,res,res)
 diff_mats = Dict()
 # numbers if elements in the diagonal of a matrix with res rows
 printstyled("Calculating errors for $(res) x $(res) matrix \n"; color=:green)
@@ -118,9 +118,9 @@ for x in 1:res
             square_error[x,y] = sse(diff_mat)
             abs_errors[x,y] = abs_sum(diff_mat)
             sqrt_errors[x,y] = sqrt_sum(diff_mat)
-            log_errors[x,y] = log_sum(diff_mat)
-            wmat_errors[x,y] = weighted_mat_sum(diff_mat,weight_matrix_lin19diff)
-            wmat2_errors[x,y] = weighted_mat_sum(diff_mat,weight_matrix_sqrt)
+            #log_errors[x,y] = log_sum(diff_mat)
+            #wmat_errors[x,y] = weighted_mat_sum(diff_mat,weight_matrix_lin19diff)
+            #wmat2_errors[x,y] = weighted_mat_sum(diff_mat,weight_matrix_sqrt)
         end
     end
 end
@@ -134,9 +134,9 @@ square_best_index = indexmins2(square_error,1)[1]
 abs_best_index = indexmins2(abs_errors,1)[1]
 println("abs_best_index = $abs_best_index")
 sqrt_best_index = [indexmins2(sqrt_errors,1)[1][i] for i in 1:2]
-log_best_index = [indexmins2(log_errors,1)[1][i] for i in 1:2]
-wmat_best_index = [indexmins2(wmat_errors,1)[1][i] for i in 1:2]
-wmat2_best_index = [indexmins2(wmat2_errors,1)[1][i] for i in 1:2]
+#log_best_index = [indexmins2(log_errors,1)[1][i] for i in 1:2]
+#wmat_best_index = [indexmins2(wmat_errors,1)[1][i] for i in 1:2]
+#wmat2_best_index = [indexmins2(wmat2_errors,1)[1][i] for i in 1:2]
 
 #plot heatmap of the errors
 combination_string = join(combination,", ")
@@ -144,36 +144,36 @@ path = "figures/$combination_string"
 mkpath(path)
 
 printstyled("Making square error plot where min = $(minimum(square_error[.!isnan.(square_error)])) and max = $(maximum(square_error[.!isnan.(square_error)])) \n"; color=:green)
-heatmap(square_error, color=:Reds, title="square error", size=(600,600), ticks=false)
+heatmap(square_error, color=:Reds, title="square error", size=(600,600), ticks=false, right_margin = 6Plots.mm)
 #add the labels for the min and max
 annotate!([(-1,-1,text("$(Int.(m[1,1]))",8,:center))])
 annotate!([(1,1,text("$(Int.(m[1,1]))",8,:center))])
 annotate!([(res,1,text("$(Int.(m[res,1]))",8,:center))])
 annotate!([(1,res,text("$(Int.(m[1,res]))",8,:center))])
-annotate!([(center,center,text("   <--(⅓,⅓,⅓)",7,:center))])
+annotate!([(center,center,text(" <--(⅓,⅓,⅓)",8,:left))])
 annotate!([(square_best_index[2],square_best_index[1],text("+",18,:center))])
 savefig(joinpath(path,"res$(res)_square_error_triangle.png"))
 
 printstyled("Making abs plot where min = $(minimum(abs_errors[.!isnan.(abs_errors)])) and max = $(maximum(abs_errors[.!isnan.(abs_errors)])) \n"; color=:green)
-heatmap(abs_errors, color=:Reds, title="abs error", size=(600,600))
+heatmap(abs_errors, color=:Reds, title="abs error", size=(600,600), ticks=false, right_margin = 6Plots.mm)
 #add the labels for the min and max
 annotate!([(1,1,text("$(Int.(m[1,1]))",8,:center))])
 annotate!([(res,1,text("$(Int.(m[res,1]))",8,:center))])
 annotate!([(1,res,text("$(Int.(m[1,res]))",8,:center))])
-annotate!([(center,center,text("   <--(⅓,⅓,⅓)",7,:center))])
+annotate!([(center,center,text(" <--(⅓,⅓,⅓)",8,:left))])
 annotate!([(abs_best_index[2],abs_best_index[1],text("+",18,:center))])
 savefig(joinpath(path,"res$(res)_abs_error_triangle.png"))
 
 printstyled("Making sqrt plot where min = $(minimum(sqrt_errors[.!isnan.(sqrt_errors)])) and max = $(maximum(sqrt_errors[.!isnan.(sqrt_errors)])) \n"; color=:green)
-heatmap(sqrt_errors, color=:Reds, title="sqrt error", size=(600,600))
+heatmap(sqrt_errors, color=:Reds, title="sqrt error", size=(600,600), ticks=false, right_margin = 6Plots.mm)
 #add the labels for the min and max
 annotate!([(1,1,text("$(Int.(m[1,1]))",8,:center))])
 annotate!([(res,1,text("$(Int.(m[res,1]))",8,:center))])
 annotate!([(1,res,text("$(Int.(m[1,res]))",8,:center))])
-annotate!([(center,center,text("   <--(⅓,⅓,⅓)",7,:center))])
+annotate!([(center,center,text(" <--(⅓,⅓,⅓)",8,:left))])
 annotate!([(sqrt_best_index[2],sqrt_best_index[1],text("+",18,:center))])
 savefig(joinpath(path,"res$(res)_sqrt_error_triangle.png"))
-
+#=
 printstyled("Making log plot where min = $(minimum(log_errors[.!isnan.(log_errors)])) and max = $(maximum(log_errors[.!isnan.(log_errors)])) \n"; color=:green)
 heatmap(log_errors, color=:Reds, title="log error", size=(600,600))
 #add the labels for the min and max
@@ -203,5 +203,5 @@ annotate!([(1,res,text("$(Int.(m[1,res]))",8,:center))])
 annotate!([(center,center,text("   <--(⅓,⅓,⅓)",7,:center))])
 annotate!([(wmat2_best_index[2],wmat2_best_index[1],text("+",18,:center))])
 savefig(joinpath(path,"res$(res)_wmatsqrt_error_triangle.png"))
-
+=#
 println("Done with $combination_string after $(round((time()-starttime)/60,digits=2)) minutes")
