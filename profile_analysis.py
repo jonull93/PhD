@@ -10,6 +10,8 @@ from statistics import mean
 from my_utils import print_red, print_green, print_cyan, fast_rolling_average, write_inc_from_df_columns, write_inc
 from datetime import datetime
 
+print_cyan(f"Starting profile_analysis.py at {datetime.now().strftime('%d-%m-%Y, %H:%M:%S')}")
+
 """
 
 - VRE profile analysis -
@@ -149,18 +151,36 @@ def make_hydro_profiles(years="1980-2019"):
         write_inc_from_df_columns(path, filename, df, comment=comment)
 
 
-def make_pickles(year, VRE_profiles, cap, load, non_traditional_load):
-    total_VRE_prod = (VRE_profiles * cap).sum(axis=1)
+def make_pickles(year, VRE_profiles, cap, load, yearly_nontraditional_load, hourly_nontraditional_load, net_load):
+    VRE_gen = (VRE_profiles * cap).sum(axis=1)
+    if type(load) == dict:
+        total_hourly_load_regional = {}
+        total_hourly_load = {}
+        for _year in load:
+            total_hourly_load_regional[_year] = load[_year] + hourly_nontraditional_load.loc[_year] + yearly_nontraditional_load / 8766
+            total_hourly_load[_year] = total_hourly_load_regional[_year].sum(axis=1)
+        #the second level of the multiindex for VRE_gen has to be reset to range(1,8761)
+        VRE_gen.index = pd.MultiIndex.from_tuples([(i, int(j[1:])) for i, j in VRE_gen.index], names=VRE_gen.index.names)
+        constructed_netload = pd.concat(total_hourly_load) - VRE_gen
+    else:
+        total_hourly_load_regional = load + hourly_nontraditional_load + yearly_nontraditional_load / 8766
+        total_hourly_load = total_hourly_load_regional.sum(axis=1)
+        constructed_netload = total_hourly_load - VRE_gen
     # net_load = load - total_VRE_prod
     # leap_year = year % 4 == 0
     # mi = pd.MultiIndex.from_product([[year], range(1, 8761 + 24 * leap_year)], names=["year", "hour"])
     # df_small = pd.DataFrame(index=mi)
     # df_small["net_load"] = list(net_load)
-    # small = {"netload": df_small, "cap": cap}
-    # small_name = f"netload_{year}.pickle"
-    # pickle.dump(small, open("PickleJar\\" + small_name, 'wb'))
-    large = {"VRE_profiles": VRE_profiles, "cap": cap, "load": load, "non_traditional_load": non_traditional_load}
-    large_name = f"netload_components_{year}.pickle"
+    #print(net_load)
+    #print(net_load.values.mean())
+    print(f"Making pickle files for {year}, where net_load.mean() = {net_load.values.mean():.2f} GW and the constructed mean is {constructed_netload.mean():.2f} GW")
+    small = {"VRE_gen": VRE_gen, "total_hourly_load": total_hourly_load, "net_load": net_load}
+    small_name = f"netload_components_small_{year}.pickle"
+    pickle.dump(small, open("PickleJar\\" + small_name, 'wb'))
+    large = {"VRE_profiles": VRE_profiles, "cap": cap, "yearly_nontraditional_load": yearly_nontraditional_load,
+             "hourly_nontraditional_load": hourly_nontraditional_load, "traditional_load": load,
+             "total_hourly_load": total_hourly_load_regional, "net_load": net_load}
+    large_name = f"netload_components_large_{year}.pickle"
     pickle.dump(large, open("PickleJar\\" + large_name, 'wb'))
 
 
@@ -286,7 +306,7 @@ def get_netload_deficiency(VRE_profiles, all_cap, demand_profile, extra_demand):
 
 
 def get_high_netload(threshold, rolling_average_days, VRE_profiles, all_cap, demand_profile,
-                     extra_demand_yearly=0, extra_demand_hourly=0):
+                     extra_demand_yearly=0, extra_demand_hourly=0, year=False):
     """
 
     Parameters
@@ -305,26 +325,34 @@ def get_high_netload(threshold, rolling_average_days, VRE_profiles, all_cap, dem
     if type(demand_profile) == dict:
         load_list = []
         for year, load in demand_profile.items():
+            if load.ndim == 2:
+                load = load.sum(axis=1)
             load_list += list(load)
         if len(set([type(i) for i in load_list])) > 1:
             print_red("! More than one datatype in load_list in get_high_netload()")
             print_red(load[1943:1946])
         demand_profile = np.array(load_list)
     try:
-        if demand_profile.max() > 1000: demand_profile = demand_profile / 1000
+        if demand_profile.max() > 1000: raise ValueError("Demand profile should be in GW, not MW")
     except ValueError:
-        if demand_profile.max().max() > 1000: demand_profile = demand_profile / 1000
+        if demand_profile.max().max() > 1000: raise ValueError("Demand profile should be in GW, not MW")
     total_VRE_prod = (VRE_profiles * all_cap).sum(axis=1)
     print(f"Total VRE prod: {round(total_VRE_prod.sum() / 1000)} TWh")  # validated for separate_years
+    #print_red(demand_profile)
     try:
         demand = demand_profile.sum(axis=1)
     except np.AxisError:
         demand = demand_profile
+    #demand is at this point a 1-dim array of hourly demand, NOT regional
+    #print_red(demand)
     print(f"Trad. demand: {round(demand.sum() / 1000)} TWh")
     if type(extra_demand_yearly) in [list, np.ndarray, pd.Series]:
-        demand += sum(extra_demand_yearly) / 8760
+        demand += sum(extra_demand_yearly) / 8766
     else:
-        demand += extra_demand_yearly / 8760
+        demand += extra_demand_yearly / 8766
+    #print(extra_demand_yearly)
+    #print_red(demand)
+    #print(extra_demand_hourly)
     if type(extra_demand_hourly) in [list, np.ndarray, int, float, pd.Series]:
         demand += extra_demand_hourly
     elif type(extra_demand_hourly) in [pd.DataFrame]:
@@ -332,15 +360,19 @@ def get_high_netload(threshold, rolling_average_days, VRE_profiles, all_cap, dem
             demand += extra_demand_hourly.sum(axis=1)
         else:
             demand += extra_demand_hourly.iloc[:, 0]
-
     print(f"Total demand: {round(demand.sum() / 1000)} TWh")
     demand = np.array(demand)
-    VRE_profiles = np.array(VRE_profiles)
+    total_VRE_prod = np.array(total_VRE_prod)
     net_load = demand - total_VRE_prod
-    net_load_RA = fast_rolling_average(net_load, rolling_average_days * 24)
+    print_green(f"Mean net-load: {round(net_load.mean(),3)} GW")
+    if year:
+        data_small = pickle.load(open(f"PickleJar/netload_components_small_{year}.pickle", "rb"))
+        net_load2 = data_small["total_hourly_load"] - data_small["VRE_gen"]
+        print_green(f"Mean net-load 2: {round(net_load2.mean(), 3)} GW")
+    net_load_RA = fast_rolling_average(net_load, rolling_average_days * 24, min_periods=1, wraparound=False)
     try:
         print(
-            f"Max / Mean / Min rolling average net-load: {round(max(net_load_RA))} / {round(mean(net_load_RA))} / {round(min(net_load_RA))}")
+            f"Max / Mean / Min rolling average net-load: {round(max(net_load_RA[0]))} / {round(mean(net_load_RA[0]))} / {round(min(net_load_RA[0]))}")
     except ValueError as e:
         print_red(sum(net_load_RA))
         print_red(len(net_load_RA))
@@ -354,12 +386,15 @@ def get_high_netload(threshold, rolling_average_days, VRE_profiles, all_cap, dem
         raise e
     # print(f"Min RA net-load: {min(net_load_RA)}")
     # print(f"Mean net-load: {mean(net_load_RA)}")
-    rolling_average_netload = fast_rolling_average(demand, rolling_average_days * 24).stack().tolist()
+    # rolling_average_netload = fast_rolling_average(demand, rolling_average_days * 24).stack().tolist()
     # convert dataframe rolling_average_netload to list
-    threshold_to_beat = threshold * max(rolling_average_netload)
-    print(f"Threshold to beat: {round(threshold_to_beat)}")
+    if not threshold:
+        threshold_to_beat = mean(net_load)
+    else:
+        threshold_to_beat = threshold * max(demand)
+    if threshold: print(f"Threshold to beat: {round(threshold_to_beat)}")
     # print_cyan(threshold,rolling_average_netload.max(), threshold*float(rolling_average_netload.max()))
-    high_netload = [i > threshold_to_beat for i in net_load_RA]  # list of True and False
+    high_netload = [i > threshold_to_beat for i in net_load_RA.values]  # list of True and False
     high_netload_durations = []
     high_netload_event_starts = []
     counter = 0
@@ -406,6 +441,7 @@ cap_df = pd.read_excel("input\\cap_ref.xlsx", sheet_name=sheet_name, header=0, i
 # print(cap_df)
 all_cap = cap_df.squeeze()
 regions = ["SE_NO_N", "SE_S", "NO_S", "FI", "DE_N", "DE_S"]
+remake_heat_dataframes = False
 
 # non_traditional_load = initial_results[scenario_name]["o_yearly_nontraditional_load"]
 # non_traditional_load = non_traditional_load[non_traditional_load.index.get_level_values(level="stochastic_scenario")[0]]
@@ -423,82 +459,86 @@ non_traditional_load = pd.Series([
 # load heat demand from SyntheticHeatDemand_1980-2019.csv with the columns localtime,AT,BE,BG,CZ,DE,DK,EE,ES,FI,FR,GB,GR,HR,HU,IE,IT,LT,LU,LV,NL,PL,PT,RO,SE,SI,SK
 # and rows 1980-01-01T00:00:00.0, 1980-01-01T01:00:00.0 etc, i.e. one row per hour
 print_cyan("Making heat demand dataframe..",replace_this_line=True)
-heat_demand = pd.read_csv("input\\SyntheticHeatDemand_1980-2019.csv", header=0, index_col=0, parse_dates=True)
-#convert the country codes to country names
-heat_demand = heat_demand.rename(columns={"AT": "Austria", "BE": "Belgium", "BG": "Bulgaria", "CZ": "Czech_Republic",
-                                          "DE": "Germany", "DK": "Denmark", "EE": "Estonia", "ES": "Spain",
-                                          "FI": "Finland", "FR": "France", "GB": "UK", "GR": "Greece",
-                                          "HR": "Croatia", "HU": "Hungary", "IE": "Ireland", "IT": "Italy",
-                                          "LT": "Lithuania", "LU": "Luxembourg", "LV": "Latvia", "NL": "Netherlands",
-                                          "PL": "Poland", "PT": "Portugal", "RO": "Romania", "SE": "Sweden",
-                                          "SI": "Slovenia", "SK": "Slovakia"})
-# copy the data for sweden to Norway and scale it with 185/284 (based on F1.40 in https://www.nordicenergy.org/wp-content/uploads/2016/04/Nordic-Energy-Technology-Perspectives-2016.pdf)
-heat_demand["Norway"] = heat_demand["Sweden"] * 185 / 284
-# sheet load_share in input/EPODreg_load_share.xlsx holds two columns, one with the region name and one with the load share
-# of the region in the EPODreg region
-load_share = pd.read_excel("input\\EPODreg_load_share.xlsx", sheet_name="load_share", header=None, index_col=0, engine="openpyxl")
-# sheet cluster_to_EPODreg in input/EPODreg_load_share.xlsx holds two columns, one with the cluster name and one with the all EPODregs within that cluster
-cluster_to_EPODreg = pd.read_excel("input\\EPODreg_load_share.xlsx", sheet_name="cluster_to_EPODreg", header=None, index_col=0, engine="openpyxl")
-# sheet country_to_EPODreg in input/EPODreg_load_share.xlsx holds two columns, one with the (sometimes repeating) country name and one with the all EPODregs within that country
-country_to_EPODreg = pd.read_excel("input\\EPODreg_load_share.xlsx", sheet_name="country_to_EPODreg", header=None, index_col=0, engine="openpyxl")
-# print and filter out the ocuntries that are not in the heat demand data
-# print(country_to_EPODreg[~country_to_EPODreg.index.isin(heat_demand.columns)])
-country_to_EPODreg = country_to_EPODreg[country_to_EPODreg.index.isin(heat_demand.columns)]
-#combine these three to make a series with a multiindex of EPODregs and timestep, and the heat demand
-# make a new dataframe with (year,hour) as multiindex and EPODreg as columns
-# the hours can be 8760 or 8784, depending on whether the year is a leap year or not
-EPODregs = country_to_EPODreg[1].unique()
-#filter out the nparray EPODregs that are not in the load_share data
-EPODregs = [EPODreg for EPODreg in EPODregs if EPODreg in load_share.index]
-years = heat_demand.index.year.unique()
-hours = [8760 + 24 * (year % 4 == 0) for year in years]
-hour_ranges = [range(hour) for hour in hours]
-hours_index = [[hour+1 for hour in hour_range] for hour_range in hour_ranges]
-years_index = [[year for hour in hour_range] for year, hour_range in zip(years, hour_ranges)]
-mi = pd.MultiIndex.from_arrays([np.concatenate(years_index), np.concatenate(hours_index)], names=["year", "hour"])
-heat_demand_EPOD = pd.DataFrame(index=mi, columns=EPODregs, data=0)
-# fill the dataframe with the heat demand from the heat_demand dataframe,
-# considering that the load share in the format of load_share[EPODreg]=x, and heat_demand.loc[time_object, country]=y
-for EPODreg in EPODregs:
-    for country in country_to_EPODreg[country_to_EPODreg[1] == EPODreg].index:
-        heat_demand_EPOD.loc[:, EPODreg] += heat_demand[country].values * load_share.loc[EPODreg, 1]
+if remake_heat_dataframes:
+    heat_demand = pd.read_csv("input\\SyntheticHeatDemand_1980-2019.csv", header=0, index_col=0, parse_dates=True)
+    #convert the country codes to country names
+    heat_demand = heat_demand.rename(columns={"AT": "Austria", "BE": "Belgium", "BG": "Bulgaria", "CZ": "Czech_Republic",
+                                              "DE": "Germany", "DK": "Denmark", "EE": "Estonia", "ES": "Spain",
+                                              "FI": "Finland", "FR": "France", "GB": "UK", "GR": "Greece",
+                                              "HR": "Croatia", "HU": "Hungary", "IE": "Ireland", "IT": "Italy",
+                                              "LT": "Lithuania", "LU": "Luxembourg", "LV": "Latvia", "NL": "Netherlands",
+                                              "PL": "Poland", "PT": "Portugal", "RO": "Romania", "SE": "Sweden",
+                                              "SI": "Slovenia", "SK": "Slovakia"})
+    # copy the data for sweden to Norway and scale it with 185/284 (based on F1.40 in https://www.nordicenergy.org/wp-content/uploads/2016/04/Nordic-Energy-Technology-Perspectives-2016.pdf)
+    heat_demand["Norway"] = heat_demand["Sweden"] * 185 / 284
+    # sheet load_share in input/EPODreg_load_share.xlsx holds two columns, one with the region name and one with the load share
+    # of the region in the EPODreg region
+    load_share = pd.read_excel("input\\EPODreg_load_share.xlsx", sheet_name="load_share", header=None, index_col=0, engine="openpyxl")
+    # sheet cluster_to_EPODreg in input/EPODreg_load_share.xlsx holds two columns, one with the cluster name and one with the all EPODregs within that cluster
+    cluster_to_EPODreg = pd.read_excel("input\\EPODreg_load_share.xlsx", sheet_name="cluster_to_EPODreg", header=None, index_col=0, engine="openpyxl")
+    # sheet country_to_EPODreg in input/EPODreg_load_share.xlsx holds two columns, one with the (sometimes repeating) country name and one with the all EPODregs within that country
+    country_to_EPODreg = pd.read_excel("input\\EPODreg_load_share.xlsx", sheet_name="country_to_EPODreg", header=None, index_col=0, engine="openpyxl")
+    # print and filter out the ocuntries that are not in the heat demand data
+    # print(country_to_EPODreg[~country_to_EPODreg.index.isin(heat_demand.columns)])
+    country_to_EPODreg = country_to_EPODreg[country_to_EPODreg.index.isin(heat_demand.columns)]
+    #combine these three to make a series with a multiindex of EPODregs and timestep, and the heat demand
+    # make a new dataframe with (year,hour) as multiindex and EPODreg as columns
+    # the hours can be 8760 or 8784, depending on whether the year is a leap year or not
+    EPODregs = country_to_EPODreg[1].unique()
+    #filter out the nparray EPODregs that are not in the load_share data
+    EPODregs = [EPODreg for EPODreg in EPODregs if EPODreg in load_share.index]
+    years = heat_demand.index.year.unique()
+    hours = [8760 + 24 * (year % 4 == 0) for year in years]
+    hour_ranges = [range(hour) for hour in hours]
+    hours_index = [[hour+1 for hour in hour_range] for hour_range in hour_ranges]
+    years_index = [[year for hour in hour_range] for year, hour_range in zip(years, hour_ranges)]
+    mi = pd.MultiIndex.from_arrays([np.concatenate(years_index), np.concatenate(hours_index)], names=["year", "hour"])
+    heat_demand_EPOD = pd.DataFrame(index=mi, columns=EPODregs, data=0)
+    # fill the dataframe with the heat demand from the heat_demand dataframe,
+    # considering that the load share in the format of load_share[EPODreg]=x, and heat_demand.loc[time_object, country]=y
+    for EPODreg in EPODregs:
+        for country in country_to_EPODreg[country_to_EPODreg[1] == EPODreg].index:
+            heat_demand_EPOD.loc[:, EPODreg] += heat_demand[country].values * load_share.loc[EPODreg, 1]
 
-"""# filter, from the nparray heat_demand_EPOD, columns that are NOT in the regions list or
-# NOT an element in the regions list is in the cluster_to_EPODreg index, and one of the corresponding values is in the heat_demand_EPOD index
-# regions that match condition 1
-cond1 = [region for region in regions if region in heat_demand_EPOD.columns]
-# regions that match condition 2
-for cluster in cluster_to_EPODreg.index:
-    if cluster in regions:
-        cond2 = [region for region in regions if region in cluster_to_EPODreg.loc[cluster, 1]]
-        cond1 += cond2
+    """# filter, from the nparray heat_demand_EPOD, columns that are NOT in the regions list or
+    # NOT an element in the regions list is in the cluster_to_EPODreg index, and one of the corresponding values is in the heat_demand_EPOD index
+    # regions that match condition 1
+    cond1 = [region for region in regions if region in heat_demand_EPOD.columns]
+    # regions that match condition 2
+    for cluster in cluster_to_EPODreg.index:
+        if cluster in regions:
+            cond2 = [region for region in regions if region in cluster_to_EPODreg.loc[cluster, 1]]
+            cond1 += cond2
+    
+    cond1 = list(set(cond1))
+    """
+    #make a new dataframe, heat_demand_regions, with the same multiindex as heat_demand_EPOD, but only the regions in the columns
+    heat_demand_regions = pd.DataFrame(index=mi, columns=regions, data=0)
+    # fill the dataframe with the heat demand from the heat_demand_EPOD dataframe, taking data directly from heat_demand_EPOD if the column matches
+    # one of the regions in the regions list, or summing the heat demand from the heat_demand_EPOD dataframe if the column matches one of the clusters
+    for region in regions:
+        if region in heat_demand_EPOD.columns:
+            heat_demand_regions.loc[:, region] = heat_demand_EPOD.loc[:, region]
+    # now only the clusters are left
+    for cluster in cluster_to_EPODreg.index.unique():
+        if cluster in regions:
+            if type(cluster_to_EPODreg.loc[cluster, 1]) not in [list, np.ndarray, pd.Series]:
+                _EPODregs = [cluster_to_EPODreg.loc[cluster, 1]]
+            else:
+                _EPODregs = list(cluster_to_EPODreg.loc[cluster, 1])
+            for region in _EPODregs:
+                heat_demand_regions.loc[:, cluster] += heat_demand_EPOD.loc[:, region]
 
-cond1 = list(set(cond1))
-"""
-#make a new dataframe, heat_demand_regions, with the same multiindex as heat_demand_EPOD, but only the regions in the columns
-heat_demand_regions = pd.DataFrame(index=mi, columns=regions, data=0)
-# fill the dataframe with the heat demand from the heat_demand_EPOD dataframe, taking data directly from heat_demand_EPOD if the column matches
-# one of the regions in the regions list, or summing the heat demand from the heat_demand_EPOD dataframe if the column matches one of the clusters
-for region in regions:
-    if region in heat_demand_EPOD.columns:
-        heat_demand_regions.loc[:, region] = heat_demand_EPOD.loc[:, region]
-# now only the clusters are left
-for cluster in cluster_to_EPODreg.index.unique():
-    if cluster in regions:
-        if type(cluster_to_EPODreg.loc[cluster, 1]) not in [list, np.ndarray, pd.Series]:
-            _EPODregs = [cluster_to_EPODreg.loc[cluster, 1]]
-        else:
-            _EPODregs = list(cluster_to_EPODreg.loc[cluster, 1])
-        for region in _EPODregs:
-            heat_demand_regions.loc[:, cluster] += heat_demand_EPOD.loc[:, region]
-
-# in the sheet heatshare_to_electrify in input/EPODreg_load_share.xlsx, the first column holds the EPODregs and the second column holds the heat share
-heatshare_to_electrify = pd.read_excel("input\\EPODreg_load_share.xlsx", sheet_name="heatshare_to_electrify", header=None, index_col=0, engine="openpyxl")
-# heatshare_to_electrify is a series with region as index and heat share as values
-# make a new dataframe electrified_heat_demand which is each column of heat_demand_regions rescaled by the value in heatshare_to_electrify
-electrified_heat_demand = pd.DataFrame(index=mi, columns=heat_demand_regions.columns, data=0)
-for region in heat_demand_regions.columns:
-    electrified_heat_demand.loc[:, region] = heat_demand_regions.loc[:, region] * heatshare_to_electrify.loc[region, 1]
+    # in the sheet heatshare_to_electrify in input/EPODreg_load_share.xlsx, the first column holds the EPODregs and the second column holds the heat share
+    heatshare_to_electrify = pd.read_excel("input\\EPODreg_load_share.xlsx", sheet_name="heatshare_to_electrify", header=None, index_col=0, engine="openpyxl")
+    # heatshare_to_electrify is a series with region as index and heat share as values
+    # make a new dataframe electrified_heat_demand which is each column of heat_demand_regions rescaled by the value in heatshare_to_electrify
+    electrified_heat_demand = pd.DataFrame(index=mi, columns=heat_demand_regions.columns, data=0)
+    for region in heat_demand_regions.columns:
+        electrified_heat_demand.loc[:, region] = heat_demand_regions.loc[:, region] * heatshare_to_electrify.loc[region, 1]
+    pickle.dump(electrified_heat_demand, open("output\\electrified_heat_demand_dataframe.pickle", "wb"))
+else:
+    electrified_heat_demand = pickle.load(open("output\\electrified_heat_demand_dataframe.pickle", "rb"))
 print_cyan("Done making heat demand dataframe!")
 
 WON = ["WONA" + str(i) for i in range(1, 6)]
@@ -533,38 +573,58 @@ except FileExistsError:
     None
 
 
-def remake_profile_seam(new_profile_seam=4344, profile_starts_in_winter=False, years=range(1980,2020)):
+def remake_profile_seam(new_profile_seam=4344, profile_starts_in_winter=False, years=range(1980,2020), verbose=False):
     VRE_profile_dict = {}
     load_dict = {}
+    net_load_dict = {}
     for i_y, year in enumerate(years):
-        #print(f"Year {year}")
-        netload_components = pickle.load(open(f"PickleJar\\netload_components_{year}.pickle", "rb"))
-        VRE_profile_dict[year] = netload_components["VRE_profiles"]  # type: pd.DataFrame
-        load_dict[year] = netload_components["load"]  # type: pd.DataFrame
         if year == years[0]: continue  # make new VRE_profiles with seam in summer
+        #print(f"Year {year}")
+        netload_components = pickle.load(open(f"PickleJar\\netload_components_large_{year}.pickle", "rb"))
+        VRE_profile_dict[year] = netload_components["VRE_profiles"]  # type: pd.DataFrame
+        load_dict[year] = netload_components["traditional_load"]  # type: pd.DataFrame
+        net_load_dict[year] = netload_components["net_load"]  # type: pd.DataFrame
         print_cyan(f" - Making profiles for years {years[i_y - 1]}-{year}")
-        print_cyan(f" - A new year now begins at hour {new_profile_seam} (h{(4344*profile_starts_in_winter+1):04d} in the profile)")
+        if verbose:
+            print_cyan(f"Monthly mean demand for year {year}(GWh)")
+            print(load_dict[year].sum(axis=1).groupby(load_dict[year].index // 730).mean())
+            print_cyan(f" - A new year now begins at hour {new_profile_seam} (h{(4344*profile_starts_in_winter+1):04d} in the profile)")
         VRE_df_fall = pd.DataFrame(VRE_profile_dict[years[i_y - 1]][new_profile_seam:])
         VRE_df_spring = pd.DataFrame(VRE_profile_dict[years[i_y]][:new_profile_seam])
         load_df_fall = pd.DataFrame(load_dict[years[i_y - 1]][new_profile_seam:])
         load_df_spring = pd.DataFrame(load_dict[years[i_y]][:new_profile_seam])
+        net_load_df_fall = pd.DataFrame(net_load_dict[years[i_y - 1]][new_profile_seam:])
+        net_load_df_spring = pd.DataFrame(net_load_dict[years[i_y]][:new_profile_seam])
         if profile_starts_in_winter:
+            heat_demand_to_add = pd.concat(
+                [electrified_heat_demand.loc[years[i_y]].iloc[:new_profile_seam],
+                 electrified_heat_demand.loc[years[i_y - 1]].iloc[new_profile_seam:]])  # type: pd.DataFrame
             VRE_df_fall.index = pd.RangeIndex(new_profile_seam, new_profile_seam + len(VRE_df_fall))
             VRE_df = pd.concat([VRE_df_spring, VRE_df_fall])
             load_df_fall.index = pd.RangeIndex(new_profile_seam, new_profile_seam + len(load_df_fall))
             load_df = pd.concat([load_df_spring, load_df_fall])
+            net_load_df_fall.index = pd.RangeIndex(new_profile_seam, new_profile_seam + len(net_load_df_fall))
+            net_load_df = pd.concat([net_load_df_spring, net_load_df_fall])
         else:
+            heat_demand_to_add = pd.concat(
+                [electrified_heat_demand.loc[years[i_y-1]].iloc[new_profile_seam:],
+                 electrified_heat_demand.loc[years[i_y]].iloc[:new_profile_seam]])
+            heat_demand_to_add.reset_index(inplace=True, drop=True)
             VRE_df_fall.index = pd.RangeIndex(len(VRE_df_fall))
             VRE_df_spring.index = pd.RangeIndex(len(VRE_df_fall), new_profile_seam + len(VRE_df_fall))
             VRE_df = pd.concat([VRE_df_fall, VRE_df_spring])
             load_df_fall.index = pd.RangeIndex(len(load_df_fall))
             load_df_spring.index = pd.RangeIndex(len(load_df_fall), new_profile_seam + len(load_df_fall))
             load_df = pd.concat([load_df_fall, load_df_spring])
+            net_load_df_fall.index = pd.RangeIndex(len(net_load_df_fall))
+            net_load_df_spring.index = pd.RangeIndex(len(net_load_df_fall), new_profile_seam + len(net_load_df_fall))
+            net_load_df = pd.concat([net_load_df_fall, net_load_df_spring])
+        print_green(f" Mean net load for years {years[i_y - 1]}-{year}: {net_load_df.values.mean():.2f} GW")
         # print_cyan(VRE_profile_dict[years[i_y - 1]], VRE_profile_dict[years[i_y]])
         # print_green(VRE_df)
         # print_cyan(load)
         make_gams_profiles(f"{years[i_y - 1]}-{year}", VRE_df, load_df)
-        make_pickles(f"{years[i_y - 1]}-{year}", VRE_df, all_cap, load_df, non_traditional_load)
+        make_pickles(f"{years[i_y - 1]}-{year}", VRE_df, all_cap, load_df, non_traditional_load, heat_demand_to_add, net_load_df)
     return None
 
 
@@ -575,13 +635,13 @@ def get_demand_as_df(year, reseamed=False):
         demand = mat_demand["demand"] # in MW
         demand_df = pd.DataFrame(demand/1000, columns=regions, index=range(1, len(demand)+1))
     else:
-        demand_filename = f'netload_components_{year}.pickle'
-        demand_df = pd.read_pickle("PickleJar\\"+demand_filename)["load"]
+        demand_filename = f'netload_components_large_{year}.pickle'
+        demand_df = pd.read_pickle("PickleJar\\"+demand_filename)["traditional_load"]
     return demand_df
 
 
 def separate_years(years, add_nontraditional_load=True, make_output=True, make_figure=False, window_size_days=3,
-                   threshold=0.5):
+                   threshold=False):
     print_cyan(f"Starting the 'separate_years()' script")
     if type(years) == type(1980): years = [years]
     for year in years:
@@ -618,15 +678,16 @@ def separate_years(years, add_nontraditional_load=True, make_output=True, make_f
         mod = 1
         net_load, high_netload_durations, high_netload_event_starts, threshold_to_beat \
             = get_high_netload(threshold, window_size_days, VRE_profiles, all_cap * mod, demand,
-                               extra_demand_yearly=non_traditional_load, extra_demand_hourly=heat_demand_to_add)
+                               extra_demand_yearly=non_traditional_load, extra_demand_hourly=heat_demand_to_add, year=year)
         max_val = max(high_netload_durations)
         max_val_start = high_netload_event_starts[high_netload_durations.index(max_val)]
         sorted_high_netload_durations = high_netload_durations.copy()
         sorted_high_netload_durations.sort(reverse=True)
-        print_red(f"Sorted high_netload_durations: {sorted_high_netload_durations}")
+        print_red(f"Sorted high_netload_durations (days): {[round(x / 24) for x in sorted_high_netload_durations]}")
         # accumulated = get_accumulated_deficiency(VRE_profiles,all_cap,demand)
         # print(net_load)
         if make_figure:
+            print_cyan("Making figure..",replace_this_line=True)
             plt.plot(prepped_tot_demand, color="gray", linestyle="-", label="Total load")
             plt.plot(prepped_tot_demand-heat_demand_to_add, color="darkviolet", linestyle=":",
                      label="Load (excl. new heat)", linewidth=0.5)
@@ -634,7 +695,7 @@ def separate_years(years, add_nontraditional_load=True, make_output=True, make_f
                      label="Traditional load", linewidth=0.5)
             plt.axhline(y=mean(net_load), color="black", linestyle="-.", label="Average net load")
             plt.plot(fast_rolling_average(net_load, 24 * window_size_days), label="Net load (roll. mean, 3d)")
-            plt.axhline(y=threshold_to_beat, color="red", label=f"{threshold*100:.0f}% of peak load")
+            if threshold: plt.axhline(y=threshold_to_beat, color="red", label=f"{threshold*100:.0f}% of peak load")
             plt.axvline(x=max_val_start, color="red", label="Start of longest period")
             plt.xticks(range(0, 8760, 730),
                        labels=["Jan.", "Feb.", "Mar.", "Apr.", "May", "Jun.", "Jul.", "Aug.",
@@ -649,12 +710,14 @@ def separate_years(years, add_nontraditional_load=True, make_output=True, make_f
             plt.savefig(f"{fig_path}over{int(threshold * 100)}_netload_events_{year}.png", dpi=400)
             plt.close()
         if make_output:
-            make_pickles(year, VRE_profiles, all_cap, demand + electrified_heat_demand.loc[year], non_traditional_load)
+            print_cyan("Making output..",replace_this_line=True)
+            net_load = pd.DataFrame(net_load, columns=["net_load"], index=demand.index)
+            make_pickles(year, VRE_profiles, all_cap, demand, non_traditional_load, electrified_heat_demand.loc[year], net_load)
             make_gams_profiles(year, VRE_profiles, demand, pot_cap)
     return net_load
 
 
-def plot_reseamed_years(years, threshold=0.33, window_size_days=3):
+def plot_reseamed_years(years, threshold=False, window_size_days=3):
     print_cyan(f"Starting the 'plot_reseamed_years()' script")
     # make a plot, similar to separate_years, but with the reseamed data found in netload_components_YEAR1-YEAR2.pickle
     # build a list of year combinations, e.g. "1980-1981", "1981-1982", "1982-1983", etc.
@@ -664,17 +727,23 @@ def plot_reseamed_years(years, threshold=0.33, window_size_days=3):
 
     # Make a plot for each year combination
     for year_combination in year_combinations:
+        print_cyan(f"Plotting {year_combination}")
         # Load the reseamed data from netload_components_YEAR1-YEAR2.pickle
         netload_components = pickle.load(open(f"PickleJar\\netload_components_{year_combination}.pickle", "rb"))
         VRE_profiles = netload_components["VRE_profiles"]
-        #demand = get_demand_as_df(year_combination, reseamed=True)
-        demand = netload_components["demand"]
-        #non_traditional_load
-        #electrified_heat_demand.loc[year].sum(axis=1)
-        #heat_demand_to_add should be a combination of hour 4344: from year 1, hour :4344 from year 2
-        heat_demand_to_add = pd.concat([electrified_heat_demand.loc[int(year_combination.split("-")[0])].iloc[:4344],
-                                        electrified_heat_demand.loc[int(year_combination.split("-")[1])].iloc[4344:]])
+        if len(VRE_profiles) > 8760: VRE_profiles = VRE_profiles.iloc[:8760]
+        demand = netload_components["traditional_load"]
+        if len(demand) > 8760: demand = demand.iloc[:8760]
+        #demand.sum(axis=1) is a pandas series with range(8760) as index. group it by month, then take the mean of each month
 
+        #heat_demand_to_add should be a combination of hour 4344: from year 1, hour :4344 from year 2
+        #print(electrified_heat_demand.loc[int(year_combination.split("-")[0])].sum(axis=1).groupby(electrified_heat_demand.loc[int(year_combination.split("-")[0])].index // 730).mean())
+        #print(electrified_heat_demand.loc[int(year_combination.split("-")[1])].sum(axis=1).groupby(
+        #    electrified_heat_demand.loc[int(year_combination.split("-")[1])].index // 730).mean())
+        heat_demand_to_add = pd.concat([electrified_heat_demand.loc[int(year_combination.split("-")[0])].iloc[4344:],
+                                        electrified_heat_demand.loc[int(year_combination.split("-")[1])].iloc[:4344]])
+        heat_demand_to_add.reset_index(inplace=True, drop=True)
+        #print(heat_demand_to_add.sum(axis=1).groupby(heat_demand_to_add.index // 730).mean())
         net_load, high_netload_durations, high_netload_event_starts, threshold_to_beat \
             = get_high_netload(threshold, window_size_days, VRE_profiles, all_cap, demand,
                                extra_demand_yearly=non_traditional_load, extra_demand_hourly=heat_demand_to_add)
@@ -683,35 +752,46 @@ def plot_reseamed_years(years, threshold=0.33, window_size_days=3):
         sorted_high_netload_durations = high_netload_durations.copy()
         sorted_high_netload_durations.sort(reverse=True)
         print_red(f"Sorted high_netload_durations: {sorted_high_netload_durations}")
-
         # Calculate the net load
-        _net_load = demand.sum(axis=1) + non_traditional_load.sum() / len(demand) + heat_demand_to_add.sum(axis=1) \
-                   - VRE_profiles.sum(axis=1) * all_cap
-        rolling_mean = fast_rolling_average(net_load, 24 * window_size_days)
-        threshold_to_beat = threshold * max(demand.sum(axis=1))
+        #_net_load = demand.sum(axis=1) + non_traditional_load.sum() / len(demand) + heat_demand_to_add.sum(axis=1) \
+        #           - (VRE_profiles * all_cap).sum(axis=1)
+        #print_cyan(f"Net load: {net_load}")
+        #print_green(f"_Net load: {_net_load}")
+        hourly_traditional_demand = demand.sum(axis=1)
+        hourly_nonheat_demand = hourly_traditional_demand + non_traditional_load.sum() / len(demand)
+        hourly_total_demand = hourly_nonheat_demand + heat_demand_to_add.sum(axis=1)
+        #rolling_mean = fast_rolling_average(hourly_total_demand, 24 * window_size_days)
+        #threshold_to_beat = threshold * max(hourly_total_demand.values)
 
         # Plot the data
-        plt.plot(demand.sum(axis=1), color="hotpink", linestyle=":", label="Traditional load", linewidth=0.5)
-        plt.plot(demand.sum(axis=1) + non_traditional_load.sum() / len(demand), color="gray", linestyle="-",
-                 label="Total load")
-        plt.plot(rolling_mean, label="Net load (roll. mean, 3d)")
-        plt.axhline(y=net_load.mean(), color="black", linestyle="-.", label="Average net load")
-        plt.axhline(y=threshold_to_beat, color="red", linestyle="--", label=f"{threshold * 100:.0f}% of peak load")
-
-        # Customize plot appearance
-        plt.title(f"Reseamed Data for {year_combination}")
+        plt.plot(hourly_total_demand, color="gray", linestyle="-", label="Total load")
+        plt.plot(hourly_nonheat_demand, color="darkviolet", linestyle=":",
+                 label="Load (excl. new heat)", linewidth=0.5)
+        plt.plot(hourly_traditional_demand, color="hotpink", linestyle=":",
+                 label="Traditional load", linewidth=0.5)
+        plt.axhline(y=mean(net_load), color="black", linestyle="-.", label=f"Average net load ({round(mean(net_load))} GW)")
+        plt.plot(fast_rolling_average(net_load, 24 * window_size_days), label="Net load (roll. mean, 3d)")
+        if threshold:
+            plt.axhline(y=threshold_to_beat, color="red", label=f"{threshold * 100:.0f}% of peak load")
+        plt.axvline(x=max_val_start, color="red", label="Start of longest period")
+        plt.xticks(range(0, 8760, 730),
+                   labels=["Jul.", "Aug.","Sep.", "Oct.", "Nov.", "Dec.","Jan.", "Feb.", "Mar.", "Apr.", "May", "Jun.", ])
+        plt.title(
+            f"Longest event in Year {year_combination} is: {round(max(high_netload_durations) / 24)} days and starts day {round((max_val_start+4344) / 24)}")
         plt.ylabel("Load [GW]")
-        plt.xlabel("Hour")
-        plt.legend()
+        plt.xlabel("Date")
+        #reduce the legend background opacity
+        plt.legend(loc="upper left", fancybox=True, framealpha=0.5)
         plt.tight_layout()
-
-        # Save the plot as an image file
-        plt.savefig(f"over{int(threshold * 100)}_netload_events_{year_combination}.png", dpi=400)
+        # plt.show()
+        threshold_string = f"{int(threshold * 100)}" if threshold else f"avgnetload"
+        filename = f"{fig_path}over{threshold_string}_netload_events_{year_combination}.png"
+        plt.savefig(filename, dpi=400)
         plt.close()
 
 
 
-def combined_years(years, threshold=0.5, window_size_days=3):
+def combined_years(years, threshold=False, window_size_days=3):
     print_cyan(f"Starting the 'combined_years()' script")
     VRE_profiles = pd.DataFrame(columns=pd.MultiIndex.from_product([VRE_tech, regions], names=["tech", "I_reg"]))
     demands = {}
@@ -743,20 +823,21 @@ def combined_years(years, threshold=0.5, window_size_days=3):
             if pd.isna(max(col)) != pd.isna(sum(col)):
                 print_red("inconsistent NA at", label)
                 error_labels.append(label)
-        demand_filename = f'SyntheticDemand_nordic_L_ssp2-26-2050_{year}.mat'
-        mat_demand = mat73.loadmat(mat_folder + demand_filename)
-        demand = mat_demand["demand"]  # np.ndarray
+        demand = get_demand_as_df(year)
+        #demand_filename = f'SyntheticDemand_nordic_L_ssp2-26-2050_{year}.mat'
+        #mat_demand = mat73.loadmat(mat_folder + demand_filename)
+        #demand = mat_demand["demand"]  # np.ndarray
         if len(set([type(i) for i in demand])) > 1:
             print_red("! More than one datatype in demand in combined_years()")
         print_green("Average net-load per region:")
         print_green((-(VRE_profile * all_cap).sum(axis=0).groupby(level="I_reg").sum() + demand.sum(
-            axis=0) / 1000 + non_traditional_load) / 8760)
+            axis=0) + electrified_heat_demand.loc[year].sum(axis=0) + non_traditional_load) / 8766)
         #prepped_tot_demand = demand.sum(axis=1) / 1000
         #prepped_tot_demand += non_traditional_load.sum() / len(prepped_tot_demand)
         # take the rows from electrified_heat_demand where the first level of the multiindex equals year
         # add the electrified_heat_demand after summing the columns to one column
         #prepped_tot_demand += heat_demand_to_add
-        demands[year] = demand.sum(axis=1) / 1000 + electrified_heat_demand.loc[year].sum(axis=1)
+        demands[year] = demand
         # print_red(demands[year].shape)
         print(
             f"VRE_profiles and demands are now appended and the lengths are {len(VRE_profiles)} and {sum([len(load) for load in demands.values()])}, respectively")
@@ -768,34 +849,38 @@ def combined_years(years, threshold=0.5, window_size_days=3):
     mod = 1
     net_load, high_netload_durations, high_netload_event_starts, threshold_to_beat \
         = get_high_netload(threshold, window_size_days, VRE_profiles, all_cap * mod, demands,
-                           extra_demand_yearly=non_traditional_load, extra_demand_hourly=heat_demand_to_add)
-    max_val = max(high_netload_durations)
-    max_val_start = high_netload_event_starts[high_netload_durations.index(max_val)]
-    print(f"These are the high_netload_durations: {high_netload_durations}")
-    print(f"These are the start times: {high_netload_event_starts}")
+                           extra_demand_yearly=non_traditional_load, extra_demand_hourly=heat_demand_to_add.loc[years])
+    print_green(f"For {years}, the mean net load is {net_load.mean():.1f} GW")
+    #print_green(f"For a threshold of {threshold*100:.0f}%, the threshold to beat is {threshold_to_beat:.0f} GW")
+    #print(f"These are the high_netload_durations: {high_netload_durations}")
+    #print(f"These are the start times: {high_netload_event_starts}")
     sorted_high_netload_durations = high_netload_durations.copy()  # event length in days
     sorted_high_netload_durations.sort(reverse=True)
-    print_red(f"Sorted high_netload_durations (days): {sorted_high_netload_durations}")
+    print_red(f"Longest 10 high_netload_durations (days): {[round(i / 24) for i in sorted_high_netload_durations[:10]]}")
     index_longest_event = high_netload_durations.index(sorted_high_netload_durations[0])
     index_second_longest_event = high_netload_durations.index(sorted_high_netload_durations[1])
     year_of_longest_event, starthour_of_longest_event = find_year_and_hour(
         high_netload_event_starts[index_longest_event])
     print_red(
-        f"The longest event ({round(sorted_high_netload_durations[0] / 24)} days) start during Year {year_of_longest_event}, Hour {starthour_of_longest_event}")
+        f"The longest event ({round(sorted_high_netload_durations[0] / 24)} days) starts during Year {year_of_longest_event}, Hour {starthour_of_longest_event}")
     year_of_second_longest_event, starthour_of_second_longest_event = find_year_and_hour(
         high_netload_event_starts[index_second_longest_event])
     print_red(
-        f"The second longest event ({round(sorted_high_netload_durations[1] / 24)} days) start during Year {year_of_second_longest_event}, Hour {starthour_of_second_longest_event}")
+        f"The second longest event ({round(sorted_high_netload_durations[1] / 24)} days) starts during Year {year_of_second_longest_event}, Hour {starthour_of_second_longest_event}")
     # accumulated = get_accumulated_deficiency(VRE_profiles,all_cap,demand)
     # print(net_load)
-    make_pickles(f"{years[0]}-{years[-1]}", VRE_profiles, all_cap, demands, non_traditional_load)
+    net_load = pd.DataFrame(net_load, columns=["net_load"], index=VRE_profiles.index)
+    # the second level of the multiindex is now "h0001" but should just be 1
+    net_load.index = pd.MultiIndex.from_tuples([(i[0], int(i[1][1:])) for i in net_load.index])
+    make_pickles(f"{years[0]}-{years[-1]}", VRE_profiles, all_cap, demands, non_traditional_load, electrified_heat_demand, net_load)
 
-#separate_years(2012,threshold=0.33, make_figure=True, make_output=True)
+#separate_years(2012, make_figure=True, make_output=True)
 #make_heat_profiles()
 #make_hydro_profiles()
-#separate_years(years,threshold=0.33, make_output=True, make_figure=True)
-plot_reseamed_years(range(1980,1985))
+#separate_years(years, make_output=True, make_figure=True)
+plot_reseamed_years(range(1980,2020))
 #combined_years(years)
+#combined_years(range(1980,1982))
 #remake_profile_seam()
 
 
