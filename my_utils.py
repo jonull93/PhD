@@ -361,27 +361,27 @@ def crawl_resource_usage(timer=5):
         time.sleep(timer * 60)
 
 
-def print_red(to_print, replace_this_line=False, *argv):
+def print_red(to_print, *argv, replace_this_line=False, **kwargs):
     from termcolor import colored
     if type(to_print) != str:
         to_print = str(to_print)
     if len(argv) > 0:
         for arg in argv:
             to_print += "\n"+str(arg)
-    print(colored(to_print, "red"), end='\r' if replace_this_line else '\n')
+    print(colored(to_print, "red"), end='\r' if replace_this_line else '\n', **kwargs)
 
 
-def print_green(to_print, replace_this_line=False, *argv):
+def print_green(to_print, *argv, replace_this_line=False, **kwargs):
     from termcolor import colored
     if type(to_print) != str:
         to_print = str(to_print)
     if len(argv) > 0:
         for arg in argv:
             to_print += " "+str(arg)
-    print(colored(to_print, "green"), end='\r' if replace_this_line else '\n')
+    print(colored(to_print, "green"), end='\r' if replace_this_line else '\n', **kwargs)
 
 
-def print_cyan(to_print, replace_this_line=False, *argv):
+def print_cyan(to_print, *argv, replace_this_line=False):
     from termcolor import colored
     if type(to_print) != str:
         to_print = str(to_print)
@@ -399,11 +399,13 @@ def fast_rolling_average(my_list, window_size, wraparound=True, **kwargs):
         return my_list
     if type(my_list) == np.ndarray:
         my_list = list(my_list)
-    if wraparound is True:
+    if wraparound:
         wraparound = int(window_size/2+2)
+        final_index = slice(wraparound,-wraparound)
+    else: final_index = slice(None)
     if type(my_list) == list:
         df = pd.DataFrame(my_list)
     else:
         df = my_list
     if wraparound: df = pd.concat([df.iloc[-wraparound:], df, df.iloc[:wraparound]])
-    return df.rolling(window_size, **kwargs).mean().fillna(method="bfill").iloc[wraparound:-wraparound]
+    return df.rolling(window_size, **kwargs).mean().fillna(method="bfill").iloc[final_index]
