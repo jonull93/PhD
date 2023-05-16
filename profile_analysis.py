@@ -551,7 +551,7 @@ for path in [fig_path, mat_path, pickle_path]:
         None
 
 
-def remake_profile_seam(new_profile_seam=4344, profile_starts_in_winter=False, years=range(1980,2020), verbose=False):
+def remake_profile_seam(new_profile_seam=4344, profile_starts_in_winter=False, years=range(1980,2020), verbose=False, make_profiles=False):
     VRE_profile_dict = {}
     load_dict = {}
     net_load_dict = {}
@@ -601,7 +601,7 @@ def remake_profile_seam(new_profile_seam=4344, profile_starts_in_winter=False, y
         # print_cyan(VRE_profile_dict[years[i_y - 1]], VRE_profile_dict[years[i_y]])
         # print_green(VRE_df)
         # print_cyan(load)
-        make_gams_profiles(f"{years[i_y - 1]}-{year}", VRE_df, load_df)
+        if make_profiles: make_gams_profiles(f"{years[i_y - 1]}-{year}", VRE_df, load_df)
         make_pickles(f"{years[i_y - 1]}-{year}", VRE_df, all_cap, load_df, non_traditional_load, heat_demand_to_add, net_load_df)
     return None
 
@@ -618,7 +618,7 @@ def get_demand_as_df(year, reseamed=False):
     return demand_df
 
 
-def separate_years(years, add_nontraditional_load=True, make_output=True, make_figure=False, window_size_days=3,
+def separate_years(years, add_nontraditional_load=True, make_profiles=False, make_figure=False, window_size_days=3,
                    threshold=False):
     print_cyan(f"Starting the 'separate_years()' script")
     if type(years) == type(1980): years = [years]
@@ -687,10 +687,12 @@ def separate_years(years, add_nontraditional_load=True, make_output=True, make_f
             # plt.show()
             plt.savefig(f"{fig_path}over{int(threshold * 100)}_netload_events_{year}.png", dpi=400)
             plt.close()
-        if make_output:
-            print_cyan("Making output..",replace_this_line=True)
+
+            print_cyan("Making output..", replace_this_line=True)
             net_load = pd.DataFrame(net_load, columns=["net_load"], index=demand.index)
-            make_pickles(year, VRE_profiles, all_cap, demand, non_traditional_load, electrified_heat_demand.loc[year], net_load)
+            make_pickles(year, VRE_profiles, all_cap, demand, non_traditional_load, electrified_heat_demand.loc[year],
+                         net_load)
+        if make_profiles:
             make_gams_profiles(year, VRE_profiles, demand, pot_cap)
     return net_load
 
@@ -855,10 +857,10 @@ def combined_years(years, threshold=False, window_size_days=3):
 #separate_years(2012, make_figure=True, make_output=True)
 #make_heat_profiles()
 #make_hydro_profiles()
-#separate_years(years, make_output=True, make_figure=True)
-#combined_years(years)
+separate_years(years, make_profiles=False, make_figure=True)
+combined_years(years)
 #combined_years(range(1980,1982))
-#remake_profile_seam()
+remake_profile_seam(make_profiles=False)
 plot_reseamed_years(range(1980,2020))
 
 

@@ -347,7 +347,7 @@ def crawler(queue_years,thread_nr,amp_length,rolling_hours,area_mode_in_cfd,writ
     return None
 
 if __name__ == "__main__":
-    amp_length = 3
+    amp_length = 1
     rolling_hours = 12
     test_mode = False
     write_pickle = not test_mode
