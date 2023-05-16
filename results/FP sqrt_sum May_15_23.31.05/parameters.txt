@@ -1,0 +1,1 @@
+{"BBO_algs":["pso","probabilistic_descent"],"opt_func":"sqrt_sum(x) + weights_penalty(x,fixed_weights=years_not_optimized,slack_distance=0.011,amplitude=10000)","maxtime":5}
