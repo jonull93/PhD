@@ -25,6 +25,17 @@ CFD plot and VRE event df for fingerprint matching
 
 os.system('color')
 
+# in \output\ there are subfolders called "ref#", save the name of the ref folder with the highest number
+ref_folders = []
+for folder in os.listdir("output"):
+    if folder.startswith("ref"):
+        ref_folders.append(folder)
+ref_folders.sort()
+ref_folder = ref_folders[-1]
+print(f"ref_folder: {ref_folder}")
+#mkdir figures\\CFD plots\\{ref_folder}
+os.makedirs(f"figures\\CFD plots\\{ref_folder}", exist_ok=True)
+
 
 def sign(num):
     if num==0: return 1
@@ -143,7 +154,7 @@ def fast_cfd(df_netload, xmin, xmax, amp_length=0.1, area_method=False, thread=F
 
 def create_df_out_tot(year, xmin, xmax, rolling_hours=12, amp_length=1, area_mode_in_cfd=True, debugging=False):
     print_cyan(f"create_df_out_tot({year}, {xmin}, {xmax}, {rolling_hours}, {amp_length}, {area_mode_in_cfd})")
-    data = pickle.load(open(f"PickleJar\\netload_components_small_{year}.pickle", "rb"))
+    data = pickle.load(open(f"PickleJar\\{ref_folder}\\netload_components_small_{year}.pickle", "rb"))
     #VRE_profiles = data["VRE_profiles"]
     #load = data["total_hourly_load"]
     #cap = data["cap"]
@@ -205,8 +216,8 @@ def main(year, amp_length=1, rolling_hours=12, area_mode_in_cfd=True, write_file
         thread_nr = "MAIN"
     if type(year) != list and type(year) != tuple:
         print_cyan(f"\nStarting loop for year -- {year} --")
-        pickle_read_name = rf"PickleJar\{year}_CFD_netload_df_amp{amp_length}_window{rolling_hours}{'_area'*area_mode_in_cfd}.pickle"
-        pickle_dump_name = rf"PickleJar\{year}_CFD_netload_df_amp{amp_length}_window{rolling_hours}{'_area'*area_mode_in_cfd}.pickle"
+        pickle_read_name = rf"PickleJar\{ref_folder}\{year}_CFD_netload_df_amp{amp_length}_window{rolling_hours}{'_area'*area_mode_in_cfd}.pickle"
+        pickle_dump_name = rf"PickleJar\{ref_folder}\{year}_CFD_netload_df_amp{amp_length}_window{rolling_hours}{'_area'*area_mode_in_cfd}.pickle"
         # df_netload = df_netload.reset_index()[["net load", "count1", "count2"]]
         try:
             if not read_pickle: raise ImportError
@@ -232,7 +243,7 @@ def main(year, amp_length=1, rolling_hours=12, area_mode_in_cfd=True, write_file
         Z = df_pivot.values
         Ynetload, Xnetload = np.meshgrid(Y, X)
         if write_files:
-            scipy.io.savemat(f"output\\heatmap_values_{year}_amp{amp_length}_window{rolling_hours}{'_area'*area_mode_in_cfd}.mat",
+            scipy.io.savemat(f"output\\{ref_folder}\\heatmap_values_{year}_amp{amp_length}_window{rolling_hours}{'_area'*area_mode_in_cfd}.mat",
                          {"amplitude": Ynetload, "duration": Xnetload, "recurrance": Z})
         if year == "1980-2019":
             Z = Z / 40
@@ -242,7 +253,7 @@ def main(year, amp_length=1, rolling_hours=12, area_mode_in_cfd=True, write_file
         make_cfd_plot(ax, Xnetload, Ynetload, Znetload, xmin=xmin, xmax=xmax, ymin=ymin, ymax=ymax)
         ax.set_title(f"Amplitude-Duration-Recurrence for {year}, {rolling_hours}h window")
         fig.tight_layout()
-        filename = f"figures\\CFD plots\\cfd_{year}_amp{amp_length}_window{rolling_hours}{'_area' * area_mode_in_cfd}.png"
+        filename = f"figures\\CFD plots\\{ref_folder}\\cfd_{year}_amp{amp_length}_window{rolling_hours}{'_area' * area_mode_in_cfd}.png"
         fig.savefig(filename, dpi=500)
         plt.close(fig)
 
@@ -256,7 +267,7 @@ def main(year, amp_length=1, rolling_hours=12, area_mode_in_cfd=True, write_file
         for y in year:
             print_cyan(f"\nReading mat for year -- {y} --")
             with h5py.File(
-                    f"output/heatmap_values_{y}_amp{amp_length}_window{rolling_hours}{'_area' * area_mode_in_cfd}_padded.mat",
+                    f"output/{ref_folder}/heatmap_values_{y}_amp{amp_length}_window{rolling_hours}{'_area' * area_mode_in_cfd}_padded.mat",
                     "r") as f:
                 Ynetload = np.array(f["amplitude"])
                 Xnetload = np.array(f["duration"])
@@ -265,11 +276,11 @@ def main(year, amp_length=1, rolling_hours=12, area_mode_in_cfd=True, write_file
         # load the reference Znetload from 1980-2019
         try:
             with h5py.File(
-                f"output/heatmap_values_1980-2019_amp{amp_length}_window{rolling_hours}{'_area' * area_mode_in_cfd}.mat",
+                f"output/{ref_folder}/heatmap_values_1980-2019_amp{amp_length}_window{rolling_hours}{'_area' * area_mode_in_cfd}.mat",
                 "r") as f:
                 Z_ref = np.array(f["recurrance"])
         except OSError:
-            _ = scipy.io.loadmat(f"output\\heatmap_values_1980-2019_amp{amp_length}_window{rolling_hours}{'_area'*area_mode_in_cfd}.mat")
+            _ = scipy.io.loadmat(f"output/{ref_folder}\\heatmap_values_1980-2019_amp{amp_length}_window{rolling_hours}{'_area'*area_mode_in_cfd}.mat")
             Z_ref = _["recurrance"]
 
         # make sure all matrices in Zs have 0s instead of nans
@@ -343,14 +354,14 @@ if __name__ == "__main__":
     area_mode_in_cfd = True
     read_pickle = False  # should be false if new netload_components have been created since last run
     debugging = False
-    years = range(1980, 2018)
+    years = range(1980, 2020)
     years_iter2 = [f"{years[i]}-{years[i+1]}" for i in range(len(years)-1)]
     print(f"{years_iter2 = }")
     long_period = f"1980-2019"
 
     xmax= 0
     xmin, xmax, ymin, ymax = main(long_period, amp_length=amp_length, rolling_hours=rolling_hours, area_mode_in_cfd=area_mode_in_cfd,
-                                  write_files=True, read_pickle=False, debugging=debugging)
+                                  write_files=True, read_pickle=True, debugging=debugging)
     print("Xmin =", xmin, "Xmax =", xmax, "Ymin =", ymin, "Ymax =", ymax)
     queue_years = Queue(maxsize=0)
 
@@ -417,7 +428,7 @@ if __name__ == "__main__":
         combined_results = [(comb, [round(weights[key][i], 3) for i in range(len(weights[key]))]) for key, comb in zip(combinations_strings, combinations) if sum(weights[key]) > 0]
         #print(combined_results)
         for i in combined_results:
-            #queue_years.put(i)
+            queue_years.put(i)
             continue
     for year in years_iter2:
         queue_years.put(year)

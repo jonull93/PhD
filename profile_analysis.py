@@ -176,12 +176,12 @@ def make_pickles(year, VRE_profiles, cap, load, yearly_nontraditional_load, hour
     print(f"Making pickle files for {year}, where net_load.mean() = {net_load.values.mean():.2f} GW and the constructed mean is {constructed_netload.mean():.2f} GW")
     small = {"VRE_gen": VRE_gen, "total_hourly_load": total_hourly_load, "net_load": net_load}
     small_name = f"netload_components_small_{year}.pickle"
-    pickle.dump(small, open("PickleJar\\" + small_name, 'wb'))
+    pickle.dump(small, open(pickle_path + small_name, 'wb'))
     large = {"VRE_profiles": VRE_profiles, "cap": cap, "yearly_nontraditional_load": yearly_nontraditional_load,
              "hourly_nontraditional_load": hourly_nontraditional_load, "traditional_load": load,
              "total_hourly_load": total_hourly_load_regional, "net_load": net_load}
     large_name = f"netload_components_large_{year}.pickle"
-    pickle.dump(large, open("PickleJar\\" + large_name, 'wb'))
+    pickle.dump(large, open(pickle_path + large_name, 'wb'))
 
 
 def create_new_tuple(t, year):
@@ -284,27 +284,6 @@ def get_netload_deficiency(VRE_profiles, all_cap, demand_profile, extra_demand):
     return accumulated
 
 
-"""def rolling_average(my_list, window_size, wrap_around=True):
-    if type(my_list)==pd.Series: my_list = list(my_list)
-    rolling_average_list = []
-    if window_size % 2 == 0:
-        window_size += 1
-    steps_in_each_direction = int((window_size - 1) / 2)
-    list_length_iterator = range(len(my_list))
-
-    for my_list_index in list_length_iterator:
-        window = []
-        for step in range(-steps_in_each_direction, steps_in_each_direction + 1):
-            i = my_list_index + step  # can be both negative and positive
-            if wrap_around:
-                index = i % len(my_list)  # to wrap around when index>len(mylist)
-                window.append(my_list[index])
-            elif i in list_length_iterator:  # disregard i outside of my_list if not wrapping around
-                window.append(my_list[i])
-        rolling_average_list.append(sum(window) / len(window))
-    return rolling_average_list"""
-
-
 def get_high_netload(threshold, rolling_average_days, VRE_profiles, all_cap, demand_profile,
                      extra_demand_yearly=0, extra_demand_hourly=0, year=False):
     """
@@ -365,10 +344,6 @@ def get_high_netload(threshold, rolling_average_days, VRE_profiles, all_cap, dem
     total_VRE_prod = np.array(total_VRE_prod)
     net_load = demand - total_VRE_prod
     print_green(f"Mean net-load: {round(net_load.mean(),3)} GW")
-    if year:
-        data_small = pickle.load(open(f"PickleJar/netload_components_small_{year}.pickle", "rb"))
-        net_load2 = data_small["total_hourly_load"] - data_small["VRE_gen"]
-        print_green(f"Mean net-load 2: {round(net_load2.mean(), 3)} GW")
     net_load_RA = fast_rolling_average(net_load, rolling_average_days * 24, min_periods=1, wraparound=False)
     try:
         print(
@@ -536,9 +511,9 @@ if remake_heat_dataframes:
     electrified_heat_demand = pd.DataFrame(index=mi, columns=heat_demand_regions.columns, data=0)
     for region in heat_demand_regions.columns:
         electrified_heat_demand.loc[:, region] = heat_demand_regions.loc[:, region] * heatshare_to_electrify.loc[region, 1]
-    pickle.dump(electrified_heat_demand, open("output\\electrified_heat_demand_dataframe.pickle", "wb"))
+    pickle.dump(electrified_heat_demand, open("PickleJar\\electrified_heat_demand_dataframe.pickle", "wb"))
 else:
-    electrified_heat_demand = pickle.load(open("output\\electrified_heat_demand_dataframe.pickle", "rb"))
+    electrified_heat_demand = pickle.load(open("PickleJar\\electrified_heat_demand_dataframe.pickle", "rb"))
 print_cyan("Done making heat demand dataframe!")
 
 WON = ["WONA" + str(i) for i in range(1, 6)]
@@ -566,11 +541,14 @@ capacity_keys = {"WON": 'capacity_onshoreA', "WOFF": 'capacity_offshore', 'solar
 capacity = {"WON": all_cap[all_cap.index.isin(WON, level=0)], "WOFF": all_cap[all_cap.index.isin(WOFF, level=0)],
             'solar': all_cap[all_cap.index.isin(PV, level=0)],
             'solar_rooftop': all_cap[all_cap.index.isin(PVR, level=0)]}
-fig_path = "figures\\profile_analysis\\"
-try:
-    mkdir(fig_path)
-except FileExistsError:
-    None
+fig_path = f"figures\\profile_analysis\\{sheet_name}\\"
+mat_path = f"output\\{sheet_name}\\"
+pickle_path = f"PickleJar\\{sheet_name}\\"
+for path in [fig_path, mat_path, pickle_path]:
+    try:
+        mkdir(path)
+    except FileExistsError:
+        None
 
 
 def remake_profile_seam(new_profile_seam=4344, profile_starts_in_winter=False, years=range(1980,2020), verbose=False):
@@ -578,12 +556,12 @@ def remake_profile_seam(new_profile_seam=4344, profile_starts_in_winter=False, y
     load_dict = {}
     net_load_dict = {}
     for i_y, year in enumerate(years):
-        if year == years[0]: continue  # make new VRE_profiles with seam in summer
         #print(f"Year {year}")
-        netload_components = pickle.load(open(f"PickleJar\\netload_components_large_{year}.pickle", "rb"))
+        netload_components = pickle.load(open(f"{pickle_path}netload_components_large_{year}.pickle", "rb"))
         VRE_profile_dict[year] = netload_components["VRE_profiles"]  # type: pd.DataFrame
         load_dict[year] = netload_components["traditional_load"]  # type: pd.DataFrame
         net_load_dict[year] = netload_components["net_load"]  # type: pd.DataFrame
+        if year == years[0]: continue  # make new VRE_profiles with seam in summer
         print_cyan(f" - Making profiles for years {years[i_y - 1]}-{year}")
         if verbose:
             print_cyan(f"Monthly mean demand for year {year}(GWh)")
@@ -636,7 +614,7 @@ def get_demand_as_df(year, reseamed=False):
         demand_df = pd.DataFrame(demand/1000, columns=regions, index=range(1, len(demand)+1))
     else:
         demand_filename = f'netload_components_large_{year}.pickle'
-        demand_df = pd.read_pickle("PickleJar\\"+demand_filename)["traditional_load"]
+        demand_df = pd.read_pickle(pickle_path+demand_filename)["traditional_load"]
     return demand_df
 
 
@@ -729,7 +707,7 @@ def plot_reseamed_years(years, threshold=False, window_size_days=3):
     for year_combination in year_combinations:
         print_cyan(f"Plotting {year_combination}")
         # Load the reseamed data from netload_components_YEAR1-YEAR2.pickle
-        netload_components = pickle.load(open(f"PickleJar\\netload_components_{year_combination}.pickle", "rb"))
+        netload_components = pickle.load(open(f"{pickle_path}netload_components_{year_combination}.pickle", "rb"))
         VRE_profiles = netload_components["VRE_profiles"]
         if len(VRE_profiles) > 8760: VRE_profiles = VRE_profiles.iloc[:8760]
         demand = netload_components["traditional_load"]
@@ -878,10 +856,10 @@ def combined_years(years, threshold=False, window_size_days=3):
 #make_heat_profiles()
 #make_hydro_profiles()
 #separate_years(years, make_output=True, make_figure=True)
-plot_reseamed_years(range(1980,2020))
+#plot_reseamed_years(range(1980,2020))
 #combined_years(years)
 #combined_years(range(1980,1982))
-#remake_profile_seam()
+remake_profile_seam()
 
 
 """net_load = separate_years(1980, add_nontraditional_load=False, make_figure=True, make_output=False, window_size_days=1)
