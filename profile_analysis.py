@@ -707,7 +707,7 @@ def plot_reseamed_years(years, threshold=False, window_size_days=3):
     for year_combination in year_combinations:
         print_cyan(f"Plotting {year_combination}")
         # Load the reseamed data from netload_components_YEAR1-YEAR2.pickle
-        netload_components = pickle.load(open(f"{pickle_path}netload_components_{year_combination}.pickle", "rb"))
+        netload_components = pickle.load(open(f"{pickle_path}netload_components_large_{year_combination}.pickle", "rb"))
         VRE_profiles = netload_components["VRE_profiles"]
         if len(VRE_profiles) > 8760: VRE_profiles = VRE_profiles.iloc[:8760]
         demand = netload_components["traditional_load"]
@@ -856,10 +856,10 @@ def combined_years(years, threshold=False, window_size_days=3):
 #make_heat_profiles()
 #make_hydro_profiles()
 #separate_years(years, make_output=True, make_figure=True)
-#plot_reseamed_years(range(1980,2020))
 #combined_years(years)
 #combined_years(range(1980,1982))
-remake_profile_seam()
+#remake_profile_seam()
+plot_reseamed_years(range(1980,2020))
 
 
 """net_load = separate_years(1980, add_nontraditional_load=False, make_figure=True, make_output=False, window_size_days=1)
