@@ -368,7 +368,11 @@ def print_red(to_print, *argv, replace_this_line=False, **kwargs):
     if len(argv) > 0:
         for arg in argv:
             to_print += "\n"+str(arg)
-    print(colored(to_print, "red"), end='\r' if replace_this_line else '\n', **kwargs)
+    if replace_this_line:
+        end = '\r'
+    else:
+        end = kwargs.pop('end', '\n')
+    print(colored(to_print, "red"), end=end, **kwargs)
 
 
 def print_green(to_print, *argv, replace_this_line=False, **kwargs):
@@ -378,17 +382,67 @@ def print_green(to_print, *argv, replace_this_line=False, **kwargs):
     if len(argv) > 0:
         for arg in argv:
             to_print += " "+str(arg)
-    print(colored(to_print, "green"), end='\r' if replace_this_line else '\n', **kwargs)
+    if replace_this_line:
+        end = '\r'
+    else:
+        end = kwargs.pop('end', '\n')
+    print(colored(to_print, "green"), end=end, **kwargs)
 
 
-def print_cyan(to_print, *argv, replace_this_line=False):
+def print_cyan(to_print, *argv, replace_this_line=False, **kwargs):
     from termcolor import colored
     if type(to_print) != str:
         to_print = str(to_print)
     if len(argv) > 0:
         for arg in argv:
             to_print += " "+str(arg)
-    print(colored(to_print, "cyan"), end='\r' if replace_this_line else '\n')
+    if replace_this_line:
+        end = '\r'
+    else:
+        end = kwargs.pop('end', '\n')
+    print(colored(to_print, "cyan"), end=end, **kwargs)
+
+
+def print_yellow(to_print, *argv, replace_this_line=False, **kwargs):
+    from termcolor import colored
+    if type(to_print) != str:
+        to_print = str(to_print)
+    if len(argv) > 0:
+        for arg in argv:
+            to_print += " "+str(arg)
+    if replace_this_line:
+        end = '\r'
+    else:
+        end = kwargs.pop('end', '\n')
+    print(colored(to_print, "yellow"), end=end, **kwargs)
+
+
+def print_blue(to_print, *argv, replace_this_line=False, **kwargs):
+    from termcolor import colored
+    if type(to_print) != str:
+        to_print = str(to_print)
+    if len(argv) > 0:
+        for arg in argv:
+            to_print += " "+str(arg)
+    if replace_this_line:
+        end = '\r'
+    else:
+        end = kwargs.pop('end', '\n')
+    print(colored(to_print, "blue"), end=end, **kwargs)
+
+
+def print_magenta(to_print, *argv, replace_this_line=False, **kwargs):
+    from termcolor import colored
+    if type(to_print) != str:
+        to_print = str(to_print)
+    if len(argv) > 0:
+        for arg in argv:
+            to_print += " "+str(arg)
+    if replace_this_line:
+        end = '\r'
+    else:
+        end = kwargs.pop('end', '\n')
+    print(colored(to_print, "magenta"), end=end, **kwargs)
 
 
 def fast_rolling_average(my_list, window_size, wraparound=True, **kwargs):
