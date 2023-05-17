@@ -347,7 +347,7 @@ def crawler(queue_years,thread_nr,amp_length,rolling_hours,area_mode_in_cfd,writ
     return None
 
 if __name__ == "__main__":
-    amp_length = 1
+    amp_length = 3
     rolling_hours = 12
     test_mode = False
     write_pickle = not test_mode
@@ -366,7 +366,7 @@ if __name__ == "__main__":
     queue_years = Queue(maxsize=0)
 
     if False: # Load results from most recent fingerprinting run
-        with open("results/most_recent_results.txt", "r") as f:
+        with open(f"results\\{ref_folder}/most_recent_results.txt", "r") as f:
             results_folder_name = f.read().strip()
         print_cyan(f"Loading results from {results_folder_name}...")
         import json

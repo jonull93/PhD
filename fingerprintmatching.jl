@@ -21,7 +21,7 @@ printstyled("\n ############# -- Starting fingerprintmatching.jl at $(timestamp)
 const print_lock = ReentrantLock()
 
 #set parameters
-amplitude_resolution = 3
+amplitude_resolution = 1
 window = 12
 years = 1980:2018 # cannot include 2019
 # from years, remove 1985, 1993,1994,1995,1996,1998,2001,2005,2017
@@ -30,7 +30,8 @@ if false
     years = [i for i in years if !(i in to_remove)]
     println("Removed years: $(to_remove)")
 end
-most_interesting_years = ["1989-1990","2005-2006"]#["1984-1985", "1995-1996"]#["2010-2011","2002-2003",]
+most_interesting_years = ["2005-2006","1989-1990"]#["1989-1990","2005-2006"]#["1984-1985", "1995-1996"]#["2010-2011","2002-2003",]
+
 maxtime = 60*0.5 # 60*30=30 minutes
 algs_size = "adaptive" # "small" or "large" or "single" or "adaptive"
 years_per_combination = 3
@@ -118,7 +119,7 @@ cores = Threads.nthreads()
 all_combinations = []
 if import_combinations
     # read folder_name from results/most_recent_results.txt
-    folder_name = readlines("results/most_recent_results.txt")[1]
+    folder_name = readlines("results/$ref_folder/most_recent_results.txt")[1]
     # read folder_name/best_100.json, or skip to the else-block if the file does not exist
     if !isfile("$(folder_name)/best_100.json")
         println("File $(folder_name)/best_100.json does not exist, skipping import of combinations")
@@ -500,7 +501,7 @@ catch e
 end
 
 # Save the results as a .json file
-folder_name = "results/FP $sum_func $timestamp"
+folder_name = "results\\$ref_folder/FP $sum_func $timestamp"
 mkpath(folder_name)
 
 results = Dict("combinations" => all_combinations, "best_weights" => best_weights,
@@ -617,7 +618,7 @@ end
 =#
 
 # Update the most recent results file
-open("results/most_recent_results.txt", "w") do f
+open("results\\$ref_folder/most_recent_results.txt", "w") do f
     write(f, folder_name)
 end
 
