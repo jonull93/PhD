@@ -40,36 +40,37 @@ all_interesting_years_at_once = false
 import_combinations = true
 optimize_all = false
 # ask the user whether to import the 100 best combinations from the previous run
-printstyled("
-Run is set up with the following parameters:
-maxtime = $(maxtime/60) minutes,
-algs_size = $(algs_size),
-years_per_combination = $(years_per_combination),
-most_interesting_years = $(most_interesting_years),
-import_combinations = $(import_combinations),
-    - Enter 'i' to attempt to import (100 best) combinations from previous run
-    - Enter 'a' to make only combinations that include all interesting_years at once
-    - Enter 'o' to optimize the weights also for the most interesting years
-    - Enter a number to set the max number of minutes for each optimization
-    - Enter anything else to skip..\n"; color=:yellow)
-input = readline()
-if input == "y"
-    import_combinations = true
-    printstyled("Importing combinations from previous run \n"; color=:green)
-elseif input == "a"
-    all_interesting_years_at_once = true # if true, use all years in most_interesting_years, if false, use only one at a time
-    years_to_add = years_per_combination - length(most_interesting_years)
-    printstyled("Using all interesting years at once \n"; color=:green)
-elseif tryparse(Float32,input) != nothing
-    maxtime = parse(Float32,input)*60
-    printstyled("Max time set to $(maxtime/60) minutes \n"; color=:green)
-elseif input == "o"
-    optimize_all = true
-    printstyled("Optimizing weights for all years \n"; color=:green)
-else
-    printstyled("Skipping\n"; color=:red)
+while true
+    printstyled("
+    Run is set up with the following parameters:
+    maxtime = $(maxtime/60) minutes,
+    algs_size = $(algs_size),
+    years_per_combination = $(years_per_combination),
+    most_interesting_years = $(most_interesting_years),
+    import_combinations = $(import_combinations),
+        - Enter 'i' to attempt to import (100 best) combinations from previous run
+        - Enter 'a' to make only combinations that include all interesting_years at once
+        - Enter 'o' to optimize the weights also for the most interesting years
+        - Enter a number to set the max number of minutes for each optimization
+        - Enter 'exit' or 'e' to skip\n"; color=:yellow)
+    input = readline()
+    if input == "exit" || input == "e" || input == ""
+        break
+    elseif input == "i"
+        import_combinations = true
+        printstyled("Importing combinations from previous run \n"; color=:green)
+    elseif input == "a"
+        all_interesting_years_at_once = true # if true, use all years in most_interesting_years, if false, use only one at a time
+        years_to_add = years_per_combination - length(most_interesting_years)
+        printstyled("Using all interesting years at once \n"; color=:green)
+    elseif tryparse(Float32,input) != nothing
+        maxtime = parse(Float32,input)*60
+        printstyled("Max time set to $(maxtime/60) minutes \n"; color=:green)
+    elseif input == "o"
+        optimize_all = true
+        printstyled("Optimizing weights for all years \n"; color=:green)
+    end
 end
-
 years_not_optimized = 0
 if !optimize_all
     years_not_optimized = years_per_combination - years_to_add
