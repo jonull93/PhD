@@ -32,12 +32,12 @@ if false
 end
 most_interesting_years = ["2005-2006","1989-1990"]#["1989-1990","2005-2006"]#["1984-1985", "1995-1996"]#["2010-2011","2002-2003",]
 
-maxtime = 60*0.5 # 60*30=30 minutes
-algs_size = "adaptive" # "small" or "large" or "single" or "adaptive"
-years_per_combination = 3
+maxtime = 60*60 # 60*30=30 minutes
+algs_size = "single" # "small" or "large" or "single" or "adaptive"
+years_per_combination = 4
 years_to_add = years_per_combination - 1 # number of years to add to the most interesting year for each combination
 all_interesting_years_at_once = false
-import_combinations = false
+import_combinations = true
 optimize_all = false
 # ask the user whether to import the 100 best combinations from the previous run
 printstyled("
@@ -45,7 +45,8 @@ Run is set up with the following parameters:
 maxtime = $(maxtime/60) minutes,
 algs_size = $(algs_size),
 years_per_combination = $(years_per_combination),
-most_interesting_years = $(most_interesting_years)
+most_interesting_years = $(most_interesting_years),
+import_combinations = $(import_combinations),
     - Enter 'i' to attempt to import (100 best) combinations from previous run
     - Enter 'a' to make only combinations that include all interesting_years at once
     - Enter 'o' to optimize the weights also for the most interesting years
@@ -291,6 +292,72 @@ longest_alg_name = maximum([length(string(alg)) for alg in BBO_algs])
 #print, in yellow and with ######-separation, the maxtime and algs that the loop is ran with
 global_best = 9e9
 printstyled("############# -- Starting optimization loop with maxtime=$(maxtime)s and algs_size '$(algs_size)' -- #############\n"; color=:yellow)
+global initial_guesses_3 = [
+    # considering the solution space as a triangle where each corner is 100% of one axis such as (1,0,0)
+    # let some initial guesses be the center of the triangle and on the center of the edges of the triangle
+    [1/3,1/3,1/3], [19/40, 19/40, 2/40], [2/40, 19/40, 19/40], [19/40, 2/40, 19/40],
+    # then divide the triangle into 4 new triangles (like a triforce) and do the same again
+    [2/3, 1/6, 1/6], [1/6, 2/3, 1/6], [1/6, 1/6, 2/3], # center of smaller triangles
+    [1/2, 1/4, 1/4], [1/4, 1/2, 1/4], [1/4, 1/4, 1/2], # center of inner edges of smaller triangles
+    [29, 9, 2]./40, [2, 29, 9]./40, [9, 2, 29]./40, # center of outer edges of smaller triangles
+    [29, 2, 9]./40, [9, 29, 2]./40, [2, 9, 29]./40, # center of outer edges of smaller triangles
+    ]
+global initial_guesses_4 = [
+    [1/4,1/4,1/4,1/4], [15/40,15/40,5/40,5/40], [15/40,5/40,15/40,5/40],
+    [15/40,5/40,5/40,15/40], [5/40,15/40,15/40,5/40], [5/40,15/40,5/40,15/40],
+    [5/40,5/40,15/40,15/40]
+    ]
+global initial_guesses_2 = [
+    [1/2, 1/2], [1/3, 2/3], [2/3, 1/3], [2/40, 38/40], [38/40, 2/40]
+    ]
+global initial_guesses_1 = [
+    [1.]
+    ]
+global initial_guesses = initial_guesses_3
+
+bounds = (1/40, 1-1/40)
+if !optimize_all
+    # if we are not optimizing all years, that means we are optimizing the last years_to_add years
+    # so initial_guesses should be the nr equal to years_to_add
+    if years_to_add == 1
+        initial_guesses = initial_guesses_1
+        printstyled("Initial guesses: initial_guesses_1\n"; color=:yellow)
+    elseif years_to_add == 2
+        initial_guesses = initial_guesses_2
+        printstyled("Initial guesses: initial_guesses_2\n"; color=:yellow)
+    elseif years_to_add == 3
+        initial_guesses = initial_guesses_3
+        printstyled("Initial guesses: initial_guesses_3\n"; color=:yellow)
+    end
+    if years_to_add == 1
+        #if we're optimizing only 1 year, then the bounds are just 1 value: 1-length(most_interesting_years)/40
+        bounds = (1-length(most_interesting_years)/40, 1-length(most_interesting_years)/40)
+    end
+    # decrease all values in the lists in initial_guesses by 1/40
+    for i in 1:length(initial_guesses)
+        initial_guesses[i] = initial_guesses[i] .- years_not_optimized/40/years_to_add
+    end
+    println("decreased each initial guess by $(years_not_optimized/40/years_to_add) so that the initial guesses sum to $(sum(initial_guesses[1])+years_not_optimized/40)")
+    #println(initial_guesses)
+else
+    if length(years_per_combination) == 4
+        initial_guesses = initial_guesses_4
+        printstyled("Initial guesses: initial_guesses_4\n"; color=:yellow)
+    end
+    if length(years_per_combination) == 3
+        initial_guesses = initial_guesses_3
+        printstyled("Initial guesses: initial_guesses_3\n"; color=:yellow)
+    end
+    if length(years_per_combination) == 2
+        initial_guesses = initial_guesses_2
+        printstyled("Initial guesses: initial_guesses_2\n"; color=:yellow)
+    end
+    if length(years_per_combination) == 1
+        initial_guesses = initial_guesses_1
+        printstyled("Initial guesses: initial_guesses_1\n"; color=:yellow)
+    end
+    printstyled("Sum of initial guesses [1]: $(sum(initial_guesses[1]))\n"; color=:yellow)
+end
 
 Threads.@threads for thread = 1:threads_to_start
     #sleep for 250 ms to stagger thread starts
@@ -352,58 +419,7 @@ Threads.@threads for thread = 1:threads_to_start
         ###----------------------------
         global opt_func_str = "sqrt_sum(x) + weights_penalty(x,fixed_weights=years_not_optimized,slack_distance=0.011,amplitude=10000)" #sigmoid((sum(x)-1.011)*1000) +
         opt_func(x) = sqrt_sum(x) + weights_penalty(x,fixed_weights=years_not_optimized,slack_distance=0.011,amplitude=10000) #sigmoid((sum(x)-1.011)*1000) +
-        local initial_guesses_3 = [
-            # considering the solution space as a triangle where each corner is 100% of one axis such as (1,0,0)
-            # let some initial guesses be the center of the triangle and on the center of the edges of the triangle
-            [1/3,1/3,1/3], [19/40, 19/40, 2/40], [2/40, 19/40, 19/40], [19/40, 2/40, 19/40],
-            # then divide the triangle into 4 new triangles (like a triforce) and do the same again
-            [2/3, 1/6, 1/6], [1/6, 2/3, 1/6], [1/6, 1/6, 2/3], # center of smaller triangles
-            [1/2, 1/4, 1/4], [1/4, 1/2, 1/4], [1/4, 1/4, 1/2], # center of inner edges of smaller triangles
-            [29, 9, 2]./40, [2, 29, 9]./40, [9, 2, 29]./40, # center of outer edges of smaller triangles
-            [29, 2, 9]./40, [9, 29, 2]./40, [2, 9, 29]./40, # center of outer edges of smaller triangles
-            ]
-        local initial_guesses_4 = [
-            [1/4,1/4,1/4,1/4], [15/40,15/40,5/40,5/40], [15/40,5/40,15/40,5/40],
-            [15/40,5/40,5/40,15/40], [5/40,15/40,15/40,5/40], [5/40,15/40,5/40,15/40],
-            [5/40,5/40,15/40,15/40]
-            ]
-        local initial_guesses_2 = [
-            [1/2, 1/2], [1/3, 2/3], [2/3, 1/3], [2/40, 38/40], [38/40, 2/40]
-            ]
-        local initial_guesses_1 = [
-            [1.]
-            ]
-        local initial_guesses = initial_guesses_3
 
-        bounds = (1/40, 1-1/40)
-        if !optimize_all
-            # if we are not optimizing all years, that means we are optimizing the last years_to_add years
-            # so initial_guesses should be the nr equal to years_to_add
-            if years_to_add == 1
-                initial_guesses = initial_guesses_1
-            elseif years_to_add == 2
-                initial_guesses = initial_guesses_2
-            elseif years_to_add == 3
-                initial_guesses = initial_guesses_3
-            end
-            if years_to_add == 1
-                #if we're optimizing only 1 year, then the bounds are just 1 value: 1-length(most_interesting_years)/40
-                bounds = (1-length(most_interesting_years)/40, 1-length(most_interesting_years)/40)
-            end
-            # decrease all values in the lists in initial_guesses by 1/40
-            for i in 1:length(initial_guesses)
-                initial_guesses[i] = initial_guesses[i] .- years_not_optimized/40/years_to_add
-            end
-            #println("decreased initial guesses by $(years_not_optimized/40/years_to_add) so that the initial guess should sum to $(sum(initial_guesses[1])+years_not_optimized/40)")
-            #println(initial_guesses)
-
-        else
-            length(years_per_combination) == 4 && (initial_guesses = initial_guesses_4)
-            length(years_per_combination) == 3 && (initial_guesses = initial_guesses_3)
-            length(years_per_combination) == 2 && (initial_guesses = initial_guesses_2)
-            length(years_per_combination) == 1 && (initial_guesses = initial_guesses_1)
-        end
-        local init
         local alg_solutions = Dict()
         for alg in BBO_algs
             #print the next line only tif thread==1
