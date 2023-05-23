@@ -211,7 +211,7 @@ def make_cfd_plot(ax, Xnetload, Ynetload, Znetload, xmin=False, xmax=False, ymin
     return cm
 
 def main(year, amp_length=1, rolling_hours=12, area_mode_in_cfd=True, write_files=True, read_pickle=True, xmin=0,
-         xmax=0, ymin=0, ymax=0, weights=False, thread_nr=False, debugging=False):
+         xmax=0, ymin=0, ymax=0, weights=False, thread_nr=False, debugging=False, sum_func="", errors=False):
     if not thread_nr:
         thread_nr = "MAIN"
     if type(year) != list and type(year) != tuple:
@@ -330,6 +330,8 @@ def main(year, amp_length=1, rolling_hours=12, area_mode_in_cfd=True, write_file
         fig.colorbar(cm, ax=axes[2])
         axes[2].set_title(f"{sum_func}.(diff_mat) = {errors[str(year)]:.0f}")
         fig.tight_layout()
+        with open(f"results\\{ref_folder}/most_recent_results.txt", "r") as f:
+            results_folder_name = f.read().strip()
         filename = f"{results_folder_name}/{errors[str(year)]:.0f}_{year}.png"
         fig.savefig(filename, dpi=500)
         plt.close(fig)
@@ -338,7 +340,7 @@ def main(year, amp_length=1, rolling_hours=12, area_mode_in_cfd=True, write_file
     return xmin, xmax, ymin, ymax
 
 
-def crawler(queue_years,thread_nr,amp_length,rolling_hours,area_mode_in_cfd,write_pickle,read_pickle,xmin,xmax,ymin,ymax):
+def crawler(queue_years,thread_nr,amp_length,rolling_hours,area_mode_in_cfd,write_pickle,read_pickle,xmin,xmax,ymin,ymax,sum_func,errors):
     while not queue_years.empty():
         year = queue_years.get()  # fetch new work from the Queue
         weights = False
@@ -347,7 +349,7 @@ def crawler(queue_years,thread_nr,amp_length,rolling_hours,area_mode_in_cfd,writ
         print_green(f"Starting Year {year} in thread {thread_nr}. Remaining years: {queue_years.qsize()}")
         start_time_thread = timer()
         main(year,amp_length=amp_length,rolling_hours=rolling_hours,area_mode_in_cfd=area_mode_in_cfd,write_files=write_pickle,
-             read_pickle=read_pickle,xmin=xmin,xmax=xmax,ymin=ymin,ymax=ymax,weights=weights,thread_nr=thread_nr)
+             read_pickle=read_pickle,xmin=xmin,xmax=xmax,ymin=ymin,ymax=ymax,weights=weights,thread_nr=thread_nr, sum_func=sum_func, errors=errors)
         print_green(f"   Finished Year {year} after {round(timer() - start_time_thread, 1)} seconds")
         #queue_years.task_done()
     return None
@@ -370,7 +372,7 @@ if __name__ == "__main__":
                                   write_files=True, read_pickle=True, debugging=debugging)
     print("Xmin =", xmin, "Xmax =", xmax, "Ymin =", ymin, "Ymax =", ymax)
     queue_years = Queue(maxsize=0)
-
+    sum_func = ""
     if False: # Load results from most recent fingerprinting run
         with open(f"results\\{ref_folder}/most_recent_results.txt", "r") as f:
             results_folder_name = f.read().strip()
@@ -447,7 +449,10 @@ if __name__ == "__main__":
     for i in range(num_threads):
         #print_cyan(f'Starting thread {i + 1}')
         #worker = threading.Thread(target=crawler, args=(), daemon=False)
-        worker = Process(target=crawler, args=(queue_years,i,amp_length,rolling_hours,area_mode_in_cfd,write_pickle,read_pickle,xmin,xmax,ymin,ymax))
+        #if errors is not defined, make it None
+        if "errors" not in locals():
+            errors = None
+        worker = Process(target=crawler, args=(queue_years,i,amp_length,rolling_hours,area_mode_in_cfd,write_pickle,read_pickle,xmin,xmax,ymin,ymax,sum_func,errors))
         # setting threads as "daemon" allows main program to exit eventually even if these dont finish correctly
         worker.start()
         tm.sleep(0.05)

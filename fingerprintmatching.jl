@@ -57,17 +57,17 @@ while true
     if input == "exit" || input == "e" || input == ""
         break
     elseif input == "i"
-        import_combinations = true
+        global import_combinations = true
         printstyled("Importing combinations from previous run \n"; color=:green)
     elseif input == "a"
-        all_interesting_years_at_once = true # if true, use all years in most_interesting_years, if false, use only one at a time
-        years_to_add = years_per_combination - length(most_interesting_years)
+        global all_interesting_years_at_once = true # if true, use all years in most_interesting_years, if false, use only one at a time
+        global years_to_add = years_per_combination - length(most_interesting_years)
         printstyled("Using all interesting years at once \n"; color=:green)
     elseif tryparse(Float32,input) != nothing
-        maxtime = parse(Float32,input)*60
+        global maxtime = parse(Float32,input)*60
         printstyled("Max time set to $(maxtime/60) minutes \n"; color=:green)
     elseif input == "o"
-        optimize_all = true
+        global optimize_all = true
         printstyled("Optimizing weights for all years \n"; color=:green)
     end
 end
