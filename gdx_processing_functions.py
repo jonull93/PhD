@@ -58,14 +58,22 @@ def print_cap(writer, num, sheet, row, col, ind):
 
 def run_case(scen_name, gdxpath, indicators, FC=False, print_FR_summary=False):
     def get_from_cap(tech_name, round=False):
-        try:
-            if round:
-                foo = tot_cap.loc[tech_name].sum().round(decimals=round)
-            else:
-                foo = tot_cap.loc[tech_name].sum()
-        except KeyError:
-            foo = 0
-        return foo
+        # if tech_name is not a list, do the following
+        if type(tech_name) != list:
+            try:
+                if round:
+                    foo = tot_cap.loc[tech_name].sum().round(decimals=round)
+                else:
+                    foo = tot_cap.loc[tech_name].sum()
+            except KeyError:
+                foo = 0
+            return foo
+        else:
+            foo = get_from_cap(tech_name[0])
+            for tech in tech_name[1:]:
+                foo += get_from_cap(tech)
+            return foo
+                
 
     def try_sum(df, level="FR_period", FR_cost=False):
         if type(FR_cost) != bool:
@@ -154,6 +162,7 @@ def run_case(scen_name, gdxpath, indicators, FC=False, print_FR_summary=False):
         tech_revenue_FR = gdx(f, "o_tech_revenue_FR")
         tech_revenue_FR_lowercap = gdx(f, "o_tech_revenue_FR_lowercap")
         tech_variable_expenses = gdx(f, "o_tech_variable_expenses")
+        bio_use = gdx(f, "o_biomass_use_total")
         if FC:
             try:
                 ESS_available = gdx(f, "o_PS_ESS_available")
@@ -280,6 +289,7 @@ def run_case(scen_name, gdxpath, indicators, FC=False, print_FR_summary=False):
                 print(format_exc())
     #flywheel = get_from_cap(TECH.FLYWHEEL)
     sync_cond = get_from_cap(TECH.SYNCHRONOUS_CONDENSER)
+    wind = get_from_cap(TECH.WIND_OFFSHORE_1) +
     FC = get_from_cap(TECH.FUEL_CELL)
     H2store = get_from_cap(TECH.H2_STORAGE)
     EB = get_from_cap(TECH.ELECTRIC_BOILER)

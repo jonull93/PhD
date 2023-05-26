@@ -33,15 +33,18 @@ name = f"results_{h}h{suffix}"  # this will be the name of the output excel and 
 # indicators are shown in a summary first page to give an overview of all scenarios in one place
 # the name of an indicator should preferably match the name of a variable from the gdx, requires extra code if not
 indicators = ["cost_tot",
-              "VRE_share_total",
+              "U_share"
+              "VRE_share",
+              "bio_use",
               'curtailment',
-              "cost_flexlim",
-              "G",
+              "wind",
+              "PV",
+              "WG",
+              "WG_peak",
 #              'sync_cond',
               'bat',
-              'FC',
               'H2store',
-              'EB', 'HP',
+#              'EB', 'HP',
               ]
 
 cases = []
