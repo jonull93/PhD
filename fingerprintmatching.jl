@@ -30,14 +30,14 @@ if false
     years = [i for i in years if !(i in to_remove)]
     println("Removed years: $(to_remove)")
 end
-most_interesting_years = ["2005-2006","1989-1990"]#["1989-1990","2005-2006"]#["1984-1985", "1995-1996"]#["2010-2011","2002-2003",]
+most_interesting_years = ["2002-2003","1996-1997"]#["1989-1990","2005-2006"]#["1984-1985", "1995-1996"]#["2010-2011","2002-2003",]
 
 maxtime = 60*60 # 60*30=30 minutes
 algs_size = "single" # "small" or "large" or "single" or "adaptive"
-years_per_combination = 4
+years_per_combination = 3
 years_to_add = years_per_combination - 1 # number of years to add to the most interesting year for each combination
 all_interesting_years_at_once = false
-import_combinations = true
+import_combinations = false
 optimize_all = false
 # ask the user whether to import the 100 best combinations from the previous run
 while true
@@ -48,7 +48,7 @@ while true
     years_per_combination = $(years_per_combination),
     most_interesting_years = $(most_interesting_years),
     import_combinations = $(import_combinations),
-        - Enter 'i' to attempt to import (100 best) combinations from previous run
+        - Enter 'i' to change the toggle on whether to attempt to import (100 best) combinations from previous run
         - Enter 'a' to make only combinations that include all interesting_years at once
         - Enter 'o' to optimize the weights also for the most interesting years
         - Enter a number to set the max number of minutes for each optimization
@@ -57,8 +57,12 @@ while true
     if input == "exit" || input == "e" || input == ""
         break
     elseif input == "i"
-        global import_combinations = true
-        printstyled("Importing combinations from previous run \n"; color=:green)
+        global import_combinations = !import_combinations
+        if import_combinations
+            printstyled("Will attempt to import combinations from previous run \n"; color=:green)
+        else
+            printstyled("Will not attempt to import combinations from previous run \n"; color=:red)
+        end
     elseif input == "a"
         global all_interesting_years_at_once = true # if true, use all years in most_interesting_years, if false, use only one at a time
         global years_to_add = years_per_combination - length(most_interesting_years)

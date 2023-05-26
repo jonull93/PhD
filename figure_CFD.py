@@ -10,7 +10,7 @@ import threading
 import time as tm
 import datetime as dt
 from timeit import default_timer as timer
-from my_utils import print_red, print_cyan, print_green, fast_rolling_average
+from my_utils import print_red, print_cyan, print_green, fast_rolling_average, print_magenta, print_blue, print_yellow
 import scipy.io
 import h5py
 import json
@@ -32,7 +32,7 @@ for folder in os.listdir("PickleJar"):
         ref_folders.append(folder)
 ref_folders.sort(key=lambda x: int(x[3:]))
 ref_folder = ref_folders[-1]
-print(f"ref_folder: {ref_folder}")
+print_magenta(f"ref_folder: {ref_folder}")
 #mkdir figures\\CFD plots\\{ref_folder}
 os.makedirs(f"figures\\CFD plots\\{ref_folder}", exist_ok=True)
 
@@ -229,7 +229,11 @@ def main(year, amp_length=1, rolling_hours=12, area_mode_in_cfd=True, write_file
             # 248s at 1 year then more changes and now 156-157s at 1 year
             end_time = timer()
             print(f"elapsed time to build CFD in thread {thread_nr} = {round(end_time - start_time, 1)}")
-            if write_files: pickle.dump(df_out_tot, open(pickle_dump_name, 'wb'))
+            if write_files: 
+                print_yellow(f"Writing {pickle_dump_name}")
+                pickle.dump(df_out_tot, open(pickle_dump_name, 'wb'))
+            else:
+                print_yellow(f"NOT writing {pickle_dump_name}")
         df_reset = df_out_tot.reset_index()
         df_reset.columns = ['Amplitude', 'Duration', 'Occurrence']
         xmax = max(xmax, int(math.ceil(df_reset["Amplitude"].max())))
@@ -354,7 +358,7 @@ def crawler(queue_years,thread_nr,amp_length,rolling_hours,area_mode_in_cfd,writ
         #queue_years.task_done()
     return None
 
-if __name__ == "__main__":
+def initiate():
     amp_length = 1
     rolling_hours = 12
     test_mode = False
@@ -446,14 +450,21 @@ if __name__ == "__main__":
     thread_nr = {}
     num_threads = min(max(cpu_count() - 2, 4), int(queue_years.qsize()))
 
+    workers = []
     for i in range(num_threads):
         #print_cyan(f'Starting thread {i + 1}')
         #worker = threading.Thread(target=crawler, args=(), daemon=False)
         #if errors is not defined, make it None
         if "errors" not in locals():
             errors = None
-        worker = Process(target=crawler, args=(queue_years,i,amp_length,rolling_hours,area_mode_in_cfd,write_pickle,read_pickle,xmin,xmax,ymin,ymax,sum_func,errors))
+        workers.append(Process(target=crawler, args=(queue_years,i,amp_length,rolling_hours,area_mode_in_cfd,write_pickle,read_pickle,xmin,xmax,ymin,ymax,sum_func,errors)))
         # setting threads as "daemon" allows main program to exit eventually even if these dont finish correctly
-        worker.start()
+        workers[-1].start()
         tm.sleep(0.05)
+    
+    for worker in workers:
+        worker.join()
+
+if __name__ == "__main__":
+    initiate()
 
