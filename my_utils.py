@@ -108,7 +108,7 @@ tech_names = {'RO': 'Hydro', 'RR': 'Run-of-river', 'U': 'Nuclear', "b": "Lignite
               "flywheel": "Flywheel", "bat": "Bat. storage", "sync_cond": "Sync. Cond.",
               'wind_onshore': 'Onshore wind', 'PV_cSiOPT': 'Solar PV', 'EB': 'EB', 'HP': 'HP', 'HOB_WG': 'Biogas HOB',
               'HOB_bio': 'Woodchip HOB', 'solarheat': 'Solar heating', "curtailment": "Curtailment",
-              'Load': 'Load', 'bat_PS': "Battery (PS)", 'bat_cap_PS': "Battery cap (PS)", 'bat_cap': "Battery power",
+              'Load': 'Load', 'bat_PS': "Battery (PS)", 'bat_cap_PS': "Battery cap (PS)", 'bat_cap': "Bat. power",
               "electrolyser": "Electrolyser", "H": "Coal ST", "W": "Biomass ST",
               "G": "N. Gas CCGT", "G_peak": "N. Gas GT", "PV": "Solar PV", "FC": "Fuel cell",
               "H2store": "H2 storage", "PtH":"Power-to-Heat", "thermals":"Thermal power", "Hydro":"Hydro power"
@@ -118,21 +118,38 @@ scen_names = {"_pre": "Base case", "_leanOR": "Lean OR", "_OR": "OR", "_OR_fixed
               "_inertia_noSyn": "Inertia (noSyn)", "_OR_inertia_3xCost": "OR + Inertia (3x)",
               "_inertia_3xCost": "Inertia (3x)", "_inertia_noSyn_3xCost": "Inertia (noSyn) (3x)", "noFC": "No FC",
               "fullFC": "Full FC", "OR": "FR", "inertia": "Inertia", "lowFlex":"LowFlex", "highFlex":"HighFlex"}
-color_dict = {'wind_onshore': '#B9B9B9', 'wind_offshore': '#DADADA', 'Wind': '#B9B9B9', 'RO': 'xkcd:ocean blue',
-              'U': 'xkcd:grape', 'Nuclear': 'xkcd:grape', 'GWGCCS': 'xkcd:dark peach', 'WA_CHP': 'xkcd:deep lavender',
-              'CHP_bio': 'xkcd:tree green', 'WG': '#a4be20', 'WG_peak': '#d00000', "WG_CHP": "#83981a",
-              'PV_cSiOPT': 'xkcd:mustard', 'CHP_WG_L': 'xkcd:mid green', 'RR': 'xkcd:ocean blue',
-              'HP': "#F48C06", 'EB': "#E85D04", "Fossil thermals": "#2b2d42", "Bio thermals": "#2a9d8f",
-              'CHP_WG': (0, 176 / 255, 80 / 255), "Solar PV": 'xkcd:mustard', 'Hydro': 'xkcd:ocean blue',
-              'HOB_WG': (128 / 255, 128 / 255, 0), 'solarheat': (204 / 255, 51 / 255, 0), 'HOB_bio': 'green',
-              'Load': 'Black', "bat_discharge": "xkcd:amber", 'bat': "#714b92", 'Battery': "#714b92",
-              'bat_cap': "#8d5eb7", 'Bat. In': "#8d5eb7", 'Bat. Out': "#8d5eb7", 'bat_PS': "xkcd:deep lavender",
-              'bat_cap_PS': "xkcd:deep lavender", "sync_cond": 'xkcd:aqua', "curtailment": "xkcd:slate",
-              'WOFF': '#DADADA', 'WON': '#B9B9B9', "H": "#172226", "H_CHP": "#172618", "b": "#172226", "B_CHP": "#23343A",
-              "W": "#014421", "W_CHP": "#016421", "G": "#5B90F6", "G_peak": "#7209b7", "G_CHP": "#5BB0F6",
-              "PV": "#FDC12A", "FC": "#c65082", "H2store": "#ad054d", "electrolyser": "#68032e", "BECCS": "#5b9aa0",
-              "Base":"#2b2d42", "Peak": "#5B90F6", "PtH": "#59A5B1", "CHP": "#5BB0F6", "Thermals": "#5BB0F6",
-              "offset": "white"}
+color_dict = {'B_CHP': "#23343A", 'Base': '#2b2d42', 'Bat. In': "#8d5eb7", 'Bat. Out': "#8d5eb7",
+              'bat': "#714b92", 'bat_PS': "xkcd:deep lavender", 'bat_cap': "#8d5eb7",
+              'bat_cap_PS': "xkcd:deep lavender", 'bat_discharge': "xkcd:amber", 'BECCS': "#5b9aa0",
+              'Bio thermals': "#2a9d8f", 'b': "#172226", 'CHP': "#5BB0F6",
+              'CHP_WG': (0, 176 / 255, 80 / 255), 'CHP_WG_L': 'xkcd:mid green', 'CHP_bio': 'xkcd:tree green',
+              'curtailment': "xkcd:slate", 'EB': "#E85D04", 'electrolyser': "#68032e", 'FC': "#c65082",
+              'Fossil thermals': "#2b2d42", 'G': "#5B90F6", 'G_CHP': "#5BB0F6", 'G_peak': "#7209b7",
+              'GWGCCS': 'xkcd:dark peach', 'H': "#172226", 'H2store': "#ad054d",
+              'HOB_WG': (128 / 255, 128 / 255, 0), 'HOB_bio': 'green', 'H_CHP': "#172618", 'HP': "#F48C06",
+              'Hydro': 'xkcd:ocean blue', 'Load': 'Black', 'Nuclear': 'xkcd:grape', 'offset': "white", "Other thermals": "#2b2d42",
+              'Peak': "crimson", 'PV': 'xkcd:mustard', 'PtH': "#59A5B1", 'RO': 'xkcd:ocean blue', 'RR': 'xkcd:ocean blue',
+              'solarheat': (204 / 255, 51 / 255, 0), 'sync_cond': 'xkcd:aqua', 'Thermals': "#5BB0F6", 'U': 'xkcd:grape',
+              'WA_CHP': 'xkcd:deep lavender', 'W': "#014421", 'WOFF': '#DADADA', 'WON': '#B9B9B9',
+              'Wind': '#B9B9B9', 'wind_offshore': '#DADADA', 'wind_onshore': '#B9B9B9', 'WG': '#a4be20',
+              'WG_CHP': "#83981a", 'WG_peak': '#d00000', 'W_CHP': "#016421"}
+
+# Additional entries for clarity and consistency
+color_dict["Battery"] = color_dict["bat"]
+color_dict["Bat. storage"] = color_dict["bat"]
+color_dict["Bat."] = color_dict["bat"]
+color_dict["Bat. power"] = color_dict["bat_cap"]
+
+color_dict["Solar PV"] = color_dict["PV"]
+color_dict["PV_cSiOPT"] = color_dict["PV"]
+
+color_dict["Hydro power"] = color_dict["Hydro"]
+color_dict["Baseload"] = color_dict["Base"]
+# If a value from tech_names is in color_dict, add the value from tech_names to color_dict with the same color
+for key, value in tech_names.items():
+    if key in color_dict:
+        color_dict[value] = color_dict[key]
+
 
 EPODreg_to_country = {  # dictionary for going between EPODreg to country
     'AT': 'Austria', 'BE': 'Belgium', 'BO': 'Bosnia', 'BG': 'Bulgaria', 'CR': 'Croatia', 'CY': 'Cyprus',
