@@ -9,6 +9,7 @@ using MAT
 using Plots
 using LinearAlgebra
 using LaTeXStrings
+using JSON
 
 function find_max_ref_folder(parent_directory)
     ref_folders = filter(x -> occursin(r"^ref\d+$", x), readdir(parent_directory))
@@ -72,9 +73,22 @@ printstyled("Imported total matrix $(size(ref_mat)) for $(total_year) \n"; color
 
 ref_mat[isnan.(ref_mat)].= 0
 scaled_ref_mat = ref_mat ./ 40
-combination = ["2005-2006", "1989-1990", "2014-2015"]
-#["2010-2011", "2000-2001", "2006-2007"]
-#["1983-1984", "2000-2001", "2007-2008"]#["2002-2003","2000-2001","2004-2005"]
+
+#combination = ["2005-2006", "1989-1990", "2014-2015"]
+# in the folder results\$ref_folder there is a file called most_recent_results.txt which holds the path to the folder with the file results.json
+# in this results.json file there is a key called "combinations" which holds all combination of years, sorted from best to worst
+# take the first set of years and make it into a list called combination
+# step 1, read the file most_recent_results.txt
+file = open("results\\$ref_folder\\most_recent_results.txt")
+path = readline(file)
+close(file)
+# step 2, read the file results.json
+file = open("$path\\results.json")
+json = JSON.parse(read(file, String))
+close(file)
+combination = json["combinations"][1]
+printstyled("Combination of years: $(combination) \n"; color=:green)
+
 cfd_data = Dict()
 for year in combination
     filename = "output\\$ref_folder\\heatmap_values_$(year)_amp1_window12_area_padded.mat"
@@ -84,7 +98,7 @@ end
 matrices = [cfd_data[year] for year in combination]
 printstyled("M1[1:2,1:2] = $(matrices[1][1:2,1:2]) \n"; color=:cyan)
 
-res = 17  # make sure res+1 is divisible by 3
+res = 32  # make sure res+1 is divisible by 3
 center = (res-1)÷3+1
 
 function create_filled_triangle_matrix2(n::Int)
@@ -168,11 +182,11 @@ p = plot(
 # Add the labels for the min and max to each subplot
 for (i, heatmap) in enumerate([square_error, abs_errors, sqrt_errors, log_errors])
     best_index = indexmins2(heatmap, 1)[1]
-    annotate!(p[i], [(1,0,text("$(Int.(m[1,1]))",8,:center))])
+    annotate!(p[i], [(1,-0.5,text("$(Int.(m[1,1]))",8,:center))])
     #annotate!(p[i], [(1,1,text("$(Int.(m[1,1]))",8,:center))])
-    annotate!(p[i], [(res,0,text("$(Int.(m[res,1]))",8,:center))])
+    annotate!(p[i], [(res,-0.5,text("$(Int.(m[res,1]))",8,:center))])
     annotate!(p[i], [(1,res,text("$(Int.(m[1,res]))",8,:center))])
-    annotate!(p[i], [(center,center,text("<--(⅓,⅓,⅓)",8,:left))])
+    annotate!(p[i], [(center,center,text("x",8,:left))])
     annotate!(p[i], [(best_index[2],best_index[1],text("+",18,:center))])
 end
 
@@ -180,7 +194,7 @@ end
 combination_string = join(combination,", ")
 path = "figures/$ref_folder/$combination_string"
 mkpath(path)
-savefig(joinpath(path,"res$(res)_error_triangles.png"), dpi=300)
+savefig(joinpath(path,"res$(res)_error_triangles.png"))
 
 #=
 printstyled("Making wmat plot where min = $(minimum(wmat_errors[.!isnan.(wmat_errors)])) and max = $(maximum(wmat_errors[.!isnan.(wmat_errors)])) \n"; color=:green)
