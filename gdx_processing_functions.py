@@ -10,22 +10,22 @@ import numpy as np
 
 from get_from_gams_db import gdx
 from copy import copy
-from my_utils import TECH, order_map_cap, order_map_gen, print_green, print_cyan, print_red
-
+from my_utils import TECH, order_map_cap, order_map_gen, print_green, print_cyan, print_red, print_blue, print_magenta, print_yellow
+from order_cap import VRE
 
 def print_gen(writer, sheet, df, gamsTimestep):
     global scen_row
     df["sort_by"] = df.index.get_level_values(0).map(order_map_gen)
     df.sort_values("sort_by", inplace=True)
     df.drop(columns="sort_by", inplace= True)
-    df = df.reorder_levels(["I_reg", "tech"]).sort_index(level=0, sort_remaining=False)
+    df = df.reorder_levels(["I_reg", "tech", "stochastic_scenarios"]).sort_index(level=0, sort_remaining=False)
     df.to_excel(writer, sheet_name=sheet, freeze_panes=(0, 2), startrow=scen_row, startcol=1)
     scen_row += len(df.index)+1
 
 
 def print_df(writer, df, name, sheet, col=3, header=True, row_inc=1):
     global scen_row
-    merge = True
+    merge = False
     length = 0
     if type(df.index) == pd.core.indexes.base.Index:
         length = 1
@@ -104,12 +104,12 @@ def run_case(scen_name, gdxpath, indicators, FC=False, print_FR_summary=False):
     with gdxr.GdxFile(gdxpath + k + ".gdx") as f:
         before = [i for i in locals().keys()]  # variables defined before this line do not get pickled
         gamsTimestep = gdx(f, "timestep")
-        I_reg = gdx(f, "i_reg")
+        I_reg = gdx(f, "I_reg")
         curtailment_profiles = gdx(f, "o_curtailment_hourly")
         curtailment_profiles.fillna(0, inplace=True)
         curtailment_profiles[curtailment_profiles < 0] = 0
         curtailment_profile_total = gdx(f, "o_curtailment_hourly_total")
-        curtailment = gdx(f, "o_curtailment_total")
+        curtailment = gdx(f, "o_curtailment_share_total")
         curtailment_regional = gdx(f, "o_curtailment_regional")
         #curtailment_wind = gdx(f, "o_curtailment_wind")
         #curtailment_PV = gdx(f, "o_curtailment_PV")
@@ -118,14 +118,15 @@ def run_case(scen_name, gdxpath, indicators, FC=False, print_FR_summary=False):
         #VRE_share_total = gdx(f, "o_VRE_share_total")
         #wind_share = gdx(f, "o_VRE_share")
         PV_share = gdx(f, "o_VRE_share")
+        U_share = gen_share["U"]
         tot_cap = gdx(f, "o_capacity")
         new_cap = gdx(f, "v_newcap")
         for reg in new_cap.index.unique(1):
             if reg not in I_reg:
                 new_cap.drop(reg, level="I_reg", inplace=True)
         for index, vals in new_cap.iterrows():
-            if 0 < vals.upper == vals.level:
-                print(" ! ! Found capped investment at",index)
+            if (0 < vals.upper == vals.level) and index[0] not in VRE:
+                print_magenta(f" !! Found capped investment ({vals.level}) at {index} for {scen_name}")
         gen = gdx(f, "o_generation")
         gen_per_eltech = gdx(f, "o_generation_el")
         el_price = gdx(f, "o_el_price")
@@ -287,9 +288,16 @@ def run_case(scen_name, gdxpath, indicators, FC=False, print_FR_summary=False):
                 FR_value_share_VRE = False
                 print("%ancillary_services% was not activated for", k, "because:")
                 print(format_exc())
+        else:
+            PS = False
+            FR_value_share_thermal = False
+            FR_value_share_VRE = False
     #flywheel = get_from_cap(TECH.FLYWHEEL)
     sync_cond = get_from_cap(TECH.SYNCHRONOUS_CONDENSER)
-    wind = get_from_cap(TECH.WIND_OFFSHORE_1) +
+    wind = get_from_cap([TECH.WIND_OFFSHORE_1,TECH.WIND_OFFSHORE_2,TECH.WIND_OFFSHORE_3,TECH.WIND_OFFSHORE_4,TECH.WIND_OFFSHORE_5,
+                         TECH.WIND_ONSHORE_1, TECH.WIND_ONSHORE_2, TECH.WIND_ONSHORE_3, TECH.WIND_ONSHORE_4, TECH.WIND_ONSHORE_5])
+    PV = get_from_cap([TECH.PV_A1, TECH.PV_A2, TECH.PV_A3, TECH.PV_A4, TECH.PV_A5, 
+                       TECH.PV_R1, TECH.PV_R2, TECH.PV_R3, TECH.PV_R4, TECH.PV_R5])
     FC = get_from_cap(TECH.FUEL_CELL)
     H2store = get_from_cap(TECH.H2_STORAGE)
     EB = get_from_cap(TECH.ELECTRIC_BOILER)
@@ -326,10 +334,14 @@ def short_scen(scen):
     shortened_scen = shortened_scen.replace("fullFC", "FC")
     shortened_scen = shortened_scen.replace("noTransport", "noTrsp")
     shortened_scen = shortened_scen.replace("Flex", "Flx")
+    shortened_scen = shortened_scen.replace("ref_cap", "refCap")
     return shortened_scen
 
 def excel(scen:str, data, row, writer, indicators):
     global scen_row
+    global indicators_column
+    try: type(indicators_column) == int
+    except NameError: indicators_column = 5
     stripped_scen = "_".join(scen.split("_")[:5])  # stripping unnecessary name components, like "6h"
     shortened_scen = short_scen(stripped_scen)
     if len(shortened_scen)>30: print_red("scen name is too long!", shortened_scen)
@@ -350,7 +362,8 @@ def excel(scen:str, data, row, writer, indicators):
         return
     for i, scen_part in enumerate(stripped_scen.split('_')):  # split up the scenario name on _
         print_num(writer, [scen_part], "Indicators", row + 1, i, 0)  # print the (split) scenario name in Indicators
-    c = i+1
+        if i>indicators_column: indicators_column = i
+    c = indicators_column+1
 
     for indicator in indicators:
         # print(data[k][i])
@@ -360,12 +373,16 @@ def excel(scen:str, data, row, writer, indicators):
         ind_type = type(thing)
         if isinstance([], ind_type):
             print_num(writer, thing, "Indicators", row + 1, c, 0)
-        elif ind_type in [type(1.), type(3), type(''), type(True), np.float64]:
+        elif ind_type in [type(1.), type(3), np.float64]:
+            print_num(writer, [round(thing,ndigits=2)], "Indicators", row + 1, c, 0)
+        elif ind_type in [type(''), type(True)]:
             print_num(writer, [thing], "Indicators", row + 1, c, 0)
         elif isinstance(None, ind_type):
             print_num(writer, ["-"], "Indicators", row + 1, c, 0)
         elif ind_type == pd.core.series.Series:
-            try: print_num(writer, [thing.sum()], "Indicators", row + 1, c, 0)
+            try: 
+                print_num(writer, ["/".join(map(str, (thing*100).round(1)))], "Indicators", row + 1, c, 0)
+                #if "share" in 
             except: print(f"Failed to print {indicator} to excel!")
         else:
             print(f"some weird variable type ({str(indicator)}: {ind_type}) entered the excel-printing loop")
@@ -381,17 +398,26 @@ def excel(scen:str, data, row, writer, indicators):
     cappy.sort_values("sort_by", inplace=True)
     cappy.drop(columns="sort_by", inplace=True)
     print(cappy)
-    cappy = cappy.reorder_levels(["I_reg", "tech"]).sort_index(level=0, sort_remaining=False)
-    cappy[["New cap","Cap"]].groupby(level=[1]).sum().to_excel(writer, sheet_name=shortened_scen, startcol=1, startrow=1)
+    cappy = cappy.reorder_levels(["I_reg", "tech", "stochastic_scenarios"]).sort_index(level=0, sort_remaining=False)
+    mask = cappy.duplicated(subset=["New cap","Cap"], keep='first')
+    cappy2 = cappy[~mask]
+    cappy2[["New cap","Cap"]].groupby(level=["tech"]).sum().to_excel(writer, sheet_name=shortened_scen, startcol=1, startrow=1)
+    cappy_len = len(cappy2[["New cap","Cap"]].groupby(level=["tech"]).sum())
     for i, reg in enumerate(cappy.index.get_level_values(0).unique()):
-        cappy.filter(like=reg,axis=0).to_excel(writer, sheet_name=shortened_scen, startcol=5+6*i, startrow=1)
-    scen_row += cap_len+1
-    print_df(writer, data["curtailment_profile_total"].round(decimals=3), "Curtailment", shortened_scen)
+        cappy.filter(like=reg,axis=0).to_excel(writer, sheet_name=shortened_scen, startcol=5+8*i, startrow=1)
+        if len(cappy.filter(like=reg,axis=0)) > cappy_len: cappy_len = len(cappy.filter(like=reg,axis=0))
+    # get the nr of rows in cappy.filter(like=reg,axis=0)
+    print_yellow(scen_row)
+    scen_row += cappy_len+6
+    print_yellow(scen_row)
+    try: print_df(writer, data["curtailment_profile_total"].round(decimals=3), "Curtailment", shortened_scen)
+    except AttributeError: print_red(f"could not print curtailment for {shortened_scen}")
     try: print_df(writer, data["el_price"].round(decimals=3), "Elec. price", shortened_scen, row_inc=2)
-    except AttributeError: print(f"could not print elec price for {shortened_scen}")
+    except AttributeError: print_red(f"could not print elec price for {shortened_scen}")
 
     if data["PS"]: print_df(writer, data["FR_period_cost"].round(decimals=3), "FR period cost", shortened_scen, row_inc=2)
-    print_gen(writer, shortened_scen, gen, data["gamsTimestep"])
+    try: print_gen(writer, shortened_scen, gen, data["gamsTimestep"])
+    except AttributeError: print_red(f"could not print gen for {shortened_scen}")
 
     if data["PS"]:
         try: print_df(writer, data["FR_cost"].round(decimals=3), "FR: Cost", shortened_scen, row_inc=2)

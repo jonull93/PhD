@@ -20,25 +20,22 @@ start_time_script = tm.time()
 print("Excel-writing script started at", datetime.now().strftime('%H:%M:%S'))
 
 excel = True  # will only make a .pickle if excel == False
-run_output = "w"  # 'w' to (over)write or 'rw' to only add missing scenarios
+run_output = "rw"  # 'w' to (over)write or 'rw' to only add missing scenarios
 overwrite = []  # names of scenarios to overwrite regardless of existence in pickled data
 #overwrite = [reg+"_inertia_0.1x" for reg in ["ES3", "HU", "IE", "SE2"]]+\
 #            [reg+"_inertia" for reg in ["ES3", "HU", "IE", "SE2"]]+\
 #            [reg+"_inertia_noSyn" for reg in ["ES3", "HU", "IE", "SE2"]]
-h = 6  # time resolution
-suffix = "noTransportnoFlex"  # Optional suffix for the run, e.g. "test" or "highBioCost"
-suffix = '_'+suffix if len(suffix) > 0 else ''
-name = f"results_{h}h{suffix}"  # this will be the name of the output excel and pickle files
 
 # indicators are shown in a summary first page to give an overview of all scenarios in one place
 # the name of an indicator should preferably match the name of a variable from the gdx, requires extra code if not
 indicators = ["cost_tot",
-              "U_share"
+              "U_share",
               "VRE_share",
               "bio_use",
               'curtailment',
               "wind",
               "PV",
+              "U",
               "WG",
               "WG_peak",
 #              'sync_cond',
@@ -47,20 +44,28 @@ indicators = ["cost_tot",
 #              'EB', 'HP',
               ]
 
+scenario_prefix = "ref_cap" # prefix of scenario names in gdx files
 cases = []
 systemFlex = ["highFlex"]
-modes = ["noFC"]   # , "fullFC", "inertia", "OR"]# "noFC",
-hedging_scenarios = ['']#,'base1'
-years = [2040] #[2020,2025,2030,2040]
+modes = [""]   # , "fullFC", "inertia", "OR"]# "noFC",
+regions = ["nordic_L"]
+hedging_scenarios = ['iter1_2', 'iter2_2', 'iter3_2', '2base2extreme']
+years = [2050] #[2020,2025,2030,2040]
+timesteps = [1,3]  # time resolution
 replace_with_alternative_solver_if_missing = True
-alternative_solutions = ["NCO"]  # to replace with if replace_with_alternative_solver_if_missing
-for reg in ["brit"]:#, "iberia","nordic"]:
+alternative_solutions = [""]  # to replace with if replace_with_alternative_solver_if_missing
+suffix = ""  # Optional suffix for the run, e.g. "test" or "highBioCost"
+suffix = '_'+suffix if len(suffix) > 0 else ''
+timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+name = f"results_{timestamp}{suffix}"  # this will be the name of the output excel and pickle files
+for reg in regions:
     for flex in systemFlex:
         for mode in modes:
             for year in years:
-                for hedging_scenario in hedging_scenarios:
-                    #if f"{reg}_{flex}_{mode}_{year}{suffix}{'_'+str(h)+'h' if h>1 else ''}" != "iberia_lowFlex_fullFC_2030_noGpeak_6h": continue
-                    cases.append(f"{reg}_{flex}_{mode}_{year}{'_'+hedging_scenario if hedging_scenario else ''}{suffix}{'_'+str(h)+'h' if h>1 else ''}")
+                for timestep in timesteps:
+                    for hedging_scenario in hedging_scenarios:
+                        #if f"{reg}_{flex}_{mode}_{year}{suffix}{'_'+str(h)+'h' if h>1 else ''}" != "iberia_lowFlex_fullFC_2030_noGpeak_6h": continue
+                        cases.append(f"{scenario_prefix}{'_'+str(timestep)+'h'}{'_'+hedging_scenario if hedging_scenario else ''}{suffix}")
 
 
 comp_name = os.environ['COMPUTERNAME']
@@ -74,8 +79,8 @@ elif "DESKTOP-ATM4RVA" in comp_name: #.22
     path = "C:\\Users\\Jonathan\\git\\python\\output\\"
     gdxpath = "C:\\Users\\Jonathan\\git\\multinode\\results\\"  # where to find gdx files
 else:
-    path = "D:\\Jonathan\\QoL scripts\\output\\"
-    gdxpath = "D:\\Jonathan\\multinode\\results\\"
+    path = "C:\\Users\\jonathan\\git\\python\\output\\"
+    gdxpath = "C:\\Users\\jonathan\\git\\multinode\\results\\"
 
 
 if run_output.lower() == "w" or run_output.lower() == "write":
@@ -106,6 +111,7 @@ errors = 0
 isgdxdone = False
 row = 0
 scen_row = 1
+indicators_column = 0
 q_gdx = Queue(maxsize=0)
 q_excel = Queue(maxsize=0)
 for i, scen in enumerate(todo_gdx):
