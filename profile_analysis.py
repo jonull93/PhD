@@ -196,7 +196,7 @@ def make_gams_profiles(year, VRE_profiles, load, pot_cap=False, ):
     year, str
     VRE_profiles, dataframe with tech and reg in the header, and time as the index
     load, list or array/series that list() can be used on
-    pot_cap, series with (cap,reg) multiindex
+    pot_cap, dictionary of dictionaries of values: {tech:{reg:cap}}
 
     Returns
     -------
@@ -238,7 +238,8 @@ def make_gams_profiles(year, VRE_profiles, load, pot_cap=False, ):
     load_df = load_df.reorder_levels(["I_reg", "profileyear", "timestep"])  # I_reg,profile_years,allhours
     # print_cyan(load_df)
     write_inc_from_df_columns(path, load_filename, load_df, comment=comment)
-    if pot_cap: write_inc(path, cap_filename, pot_cap, comment=comment, flip=False)
+    if pot_cap: 
+        write_inc(path, cap_filename, pot_cap, comment=comment, flip=False)
 
 
 def get_FLH(profile, weights=False):
@@ -603,7 +604,7 @@ def remake_profile_seam(new_profile_seam=4344, profile_starts_in_winter=False, y
         # print_cyan(load)
         if make_profiles: make_gams_profiles(f"{years[i_y - 1]}-{year}", VRE_df, load_df)
         make_pickles(f"{years[i_y - 1]}-{year}", VRE_df, all_cap, load_df, non_traditional_load, heat_demand_to_add, net_load_df)
-    return None
+    pass
 
 
 def get_demand_as_df(year, reseamed=False):
@@ -768,6 +769,7 @@ def plot_reseamed_years(years, threshold=False, window_size_days=3):
         filename = f"{fig_path}over{threshold_string}_netload_events_{year_combination}.png"
         plt.savefig(filename, dpi=400)
         plt.close()
+    pass
 
 
 
@@ -853,15 +855,38 @@ def combined_years(years, threshold=False, window_size_days=3):
     # the second level of the multiindex is now "h0001" but should just be 1
     net_load.index = pd.MultiIndex.from_tuples([(i[0], int(i[1][1:])) for i in net_load.index])
     make_pickles(f"{years[0]}-{years[-1]}", VRE_profiles, all_cap, demands, non_traditional_load, electrified_heat_demand, net_load)
+    if True:
+        pot_cap = {reg: {} for reg in regions}
+        for VRE in VREs:
+            filename = filenames[VRE].replace("YEAR", str(year))
+            VRE_mat = mat73.loadmat(mat_folder + filename)
+            for site in sites:
+                tech_name = VRE_tech_name_dict[VRE] + str(site)
+                capacities = VRE_mat[capacity_keys[VRE]]
+                for i_r, region in enumerate(regions):
+                    pot_cap[region][tech_name] = capacities[i_r, site - 1]
+        # make a dataframe with tech and reg as the index, 
+        # the first column, "pot_cap" holds the potential capacity from the pot_cap dictionary
+        # there should also be one column for each profileyear that hold the sum of the VRE profiles for each tech and reg
+        df = pd.DataFrame(index=pd.MultiIndex.from_tuples([(tech, reg) for tech in VRE_tech_name_dict.values() for reg in regions]),
+                            columns=["pot_cap"] + [str(year) for year in years])
+        for tech in VRE_tech_name_dict.values():
+            for reg in regions:
+                df.loc[(tech, reg), "pot_cap"] = pot_cap[reg][tech]
+                for year in years:
+                    df.loc[(tech, reg), str(year)] = VRE_profiles[year].loc[(reg, tech)].sum()
+        df.to_excel(f"{years[0]}-{years[-1]}_summary.xlsx")
+        
+
 
 #separate_years(2012, make_figure=True, make_output=True)
 #make_heat_profiles()
 #make_hydro_profiles()
-separate_years(years, make_profiles=False, make_figure=True)
+#separate_years(years, make_profiles=False, make_figure=True)
 combined_years(years)
 #combined_years(range(1980,1982))
-remake_profile_seam(make_profiles=False)
-plot_reseamed_years(range(1980,2020))
+#remake_profile_seam(make_profiles=False)
+#plot_reseamed_years(range(1980,2020))
 
 
 """net_load = separate_years(1980, add_nontraditional_load=False, make_figure=True, make_output=False, window_size_days=1)
