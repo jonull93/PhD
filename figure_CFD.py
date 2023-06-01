@@ -298,22 +298,41 @@ def main(year, amp_length=1, rolling_hours=12, area_mode_in_cfd=True, write_file
         # construct Z using m and the weights
         Z = sum([Zs[y] * w for y, w in zip(year, weights)])
         # make both Z and Z ref have 0s instead of nans
-        Z = np.where(np.isnan(Z), 0, Z)
+        Z = np.where(np.isnan(Z), 0, Z) #redundant
         Z_ref = np.where(np.isnan(Z_ref), 0, Z_ref)
         # get the difference matrix
-        Z_diff = Z_ref.T/40 - Z
-        Z_error = np.sqrt(np.abs(Z_diff)) #Z_error is the diff matrix with sqrt of each element
+        Z_diff = Z - Z_ref.T/40
+        print_yellow(f"{year}\n" + 
+                     f"Min and max of Z_diff: {Z_diff.min():.01f}, {Z_diff.max():.01f}\n" + 
+                     f"Actual max of Z: {Z.max():.01f}")
+        
+        if sum_func == "sqrt_sum":
+            sum_func_latex = r"$\sum_{i,j} \sqrt{|M^{diff}_{i,j}|}$"
+            Z_error = np.sqrt(np.abs(Z_diff)) #Z_error is the diff matrix with sqrt of each element
+        elif sum_func == "abs_sum":
+            sum_func_latex = r"$\sum_{i,j} |M^{diff}_{i,j}|$"
+            Z_error = np.abs(Z_diff) #Z_error is the diff matrix with abs of each element
+        elif sum_func == "sse":
+            sum_func_latex = r"$\sum_{i,j} (M^{diff}_{i,j})^2$"
+            Z_error = Z_diff**2 #Z_error is the diff matrix with square of each element
+        elif sum_func == "log_sum":
+            sum_func_latex = r"$\sum_{i,j} \log(|M^{diff}_{i,j}|+1)$"
+            Z_error = np.log(np.abs(Z_diff)+1) #Z_error is the diff matrix with log of each element
+        else:
+            raise NotImplementedError(f"sum_func {sum_func} not recognized")
         Z_contour = {y: get_contour(Zs[y]) for y in year}
+        if round(Z_error.sum()) != round(errors[str(year)]):
+            print_red(f"Error in {year}: {Z_error.sum():.01f} != {errors[str(year)]:.01f}")
         # restore nans so that plot is white instead of black
         Z = np.where(Z == 0., np.nan, Z)
         Z_ref = np.where(Z_ref == 0., np.nan, Z_ref)
         Z_diff = np.where(Z_diff == 0., np.nan, Z_diff)
         Z_error = np.where(Z_error == 0., np.nan, Z_error)
-        Z = np.where(Z > 50, 50, Z)
-        Z_diff = np.where(Z_diff > 50, 50, Z_diff)
+        #Z = np.where(Z > 30, 30, Z)
+        #Z_diff = np.where(Z_diff > 50, 50, Z_diff)
         Z = np.where(Z == 0., np.nan, Z)
         fig, axes = plt.subplots(1, 3, figsize=(10, 5))
-        try: cm = make_cfd_plot(axes[0], Xnetload, Ynetload, Z, xmin=xmin, xmax=xmax, ymin=ymin, ymax=ymax, vmax=50)
+        try: cm = make_cfd_plot(axes[0], Xnetload, Ynetload, Z, xmin=xmin, xmax=xmax, ymin=ymin, ymax=ymax, vmax=20)
         except Exception as e:
             print_red(f"Error in {year} when plotting Z: {e}")
             raise e
@@ -328,11 +347,14 @@ def main(year, amp_length=1, rolling_hours=12, area_mode_in_cfd=True, write_file
         cm = make_cfd_plot(axes[1], Xnetload, Ynetload, Z_diff, xmin=xmin, xmax=xmax, ymin=ymin, ymax=ymax,
                            color="seismic", vmin=-5, vmax=5)
         fig.colorbar(cm, ax=axes[1])
-        axes[0].set_title(f"{year}\n{weights}", fontsize=7)
-        axes[1].set_title(f"Zref-Z = diff_mat")
-        cm = make_cfd_plot(axes[2], Xnetload, Ynetload, Z_error, xmin=xmin, xmax=xmax, ymin=ymin, ymax=ymax)
+        axes[0].set_title(r"$\sum_{i} M_{i} w_{i}$")
+        axes[1].set_title(r"$M_{diff} = \sum_{i} M_{i} w_{i} - M_{ref}$")
+        #axes[1].set_title(f"Zref-Z = diff_mat")
+        # set vmax to the 99th percentile of the absolute values of Z_error
+        vmax = np.nanpercentile(Z_error, 99)
+        cm = make_cfd_plot(axes[2], Xnetload, Ynetload, Z_error, xmin=xmin, xmax=xmax, ymin=ymin, ymax=ymax,vmax=vmax)
         fig.colorbar(cm, ax=axes[2])
-        axes[2].set_title(f"{sum_func}.(diff_mat) = {errors[str(year)]:.0f}")
+        axes[2].set_title(f"{sum_func_latex} = "+f"{errors[str(year)]:,.0f}".replace(",", " "))
         fig.tight_layout()
         with open(f"results\\{ref_folder}/most_recent_results.txt", "r") as f:
             results_folder_name = f.read().strip()
@@ -377,7 +399,8 @@ def initiate():
     print("Xmin =", xmin, "Xmax =", xmax, "Ymin =", ymin, "Ymax =", ymax)
     queue_years = Queue(maxsize=0)
     sum_func = ""
-    if False: # Load results from most recent fingerprinting run
+    make_fingerprinted_figures = os.path.exists(f"results\\{ref_folder}/most_recent_results.txt")
+    if make_fingerprinted_figures: # Load results from most recent fingerprinting run
         with open(f"results\\{ref_folder}/most_recent_results.txt", "r") as f:
             results_folder_name = f.read().strip()
         print_cyan(f"Loading results from {results_folder_name}...")
@@ -443,7 +466,7 @@ def initiate():
             queue_years.put(i)
             continue
     for year in years_iter2:
-        queue_years.put(year)
+        if not make_fingerprinted_figures: queue_years.put(year)
         continue
     print("Queue contains", queue_years.qsize(), "years")
     threads = {}
