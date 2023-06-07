@@ -413,6 +413,9 @@ def initiate():
         combinations_strings = [str(comb).replace("'",'"') for comb in combinations]
         weights = results["best_weights"]
         errors = results["best_errors"]
+        # In weights and errors, remove 'Any' from the keys
+        weights = {key.replace('Any',''): weights[key] for key in weights}
+        errors = {key.replace('Any',''): errors[key] for key in errors}
         sum_func = results["sum_func"]
         maxtime = parameters["maxtime"]
         #find all non-float values in errors and remove the corresponding key from weights, errors, combinations and combinations_strings
