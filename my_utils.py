@@ -127,9 +127,9 @@ color_dict = {'B_CHP': "#23343A", 'Base': '#2b2d42', 'Bat. In': "#8d5eb7", 'Bat.
               'Fossil thermals': "#2b2d42", 'G': "#5B90F6", 'G_CHP': "#5BB0F6", 'G_peak': "#7209b7",
               'GWGCCS': 'xkcd:dark peach', 'H': "#172226", 'H2store': "#ad054d",
               'HOB_WG': (128 / 255, 128 / 255, 0), 'HOB_bio': 'green', 'H_CHP': "#172618", 'HP': "#F48C06",
-              'Hydro': 'xkcd:ocean blue', 'Load': 'Black', 'Nuclear': 'xkcd:grape', 'offset': "white", "Other thermals": "#2b2d42",
+              'Hydro': 'xkcd:ocean blue', 'Load': 'Black', 'offset': "white", "Other thermals": "Peru",
               'Peak': "crimson", 'PV': 'xkcd:mustard', 'PtH': "#59A5B1", 'RO': 'xkcd:ocean blue', 'RR': 'xkcd:ocean blue',
-              'solarheat': (204 / 255, 51 / 255, 0), 'sync_cond': 'xkcd:aqua', 'Thermals': "#5BB0F6", 'U': 'xkcd:grape',
+              'solarheat': (204 / 255, 51 / 255, 0), 'sync_cond': 'xkcd:aqua', 'Thermals': "#5BB0F6", 'U': 'mediumturquoise',
               'WA_CHP': 'xkcd:deep lavender', 'W': "#014421", 'WOFF': '#DADADA', 'WON': '#B9B9B9',
               'Wind': '#B9B9B9', 'wind_offshore': '#DADADA', 'wind_onshore': '#B9B9B9', 'WG': '#a4be20',
               'WG_CHP': "#83981a", 'WG_peak': '#d00000', 'W_CHP': "#016421"}
@@ -145,6 +145,7 @@ color_dict["PV_cSiOPT"] = color_dict["PV"]
 
 color_dict["Hydro power"] = color_dict["Hydro"]
 color_dict["Baseload"] = color_dict["Base"]
+color_dict["Nulear"] = color_dict["U"]
 # If a value from tech_names is in color_dict, add the value from tech_names to color_dict with the same color
 for key, value in tech_names.items():
     if key in color_dict:
