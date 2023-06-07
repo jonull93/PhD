@@ -40,6 +40,7 @@ indicators = ["cost_tot",
               "WG_peak",
 #              'sync_cond',
               'bat',
+              'bat_cap',
               'H2store',
 #              'EB', 'HP',
               ]
@@ -53,7 +54,7 @@ hedging_scenarios = ['iter1_2', 'iter2_2', 'iter3_2', '2base2extreme']
 years = [2050] #[2020,2025,2030,2040]
 timesteps = [1,3]  # time resolution
 replace_with_alternative_solver_if_missing = True
-alternative_solutions = [""]  # to replace with if replace_with_alternative_solver_if_missing
+alternative_solutions = ["tight"]  # to replace with if replace_with_alternative_solver_if_missing
 suffix = ""  # Optional suffix for the run, e.g. "test" or "highBioCost"
 suffix = '_'+suffix if len(suffix) > 0 else ''
 timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
@@ -67,6 +68,10 @@ for reg in regions:
                         #if f"{reg}_{flex}_{mode}_{year}{suffix}{'_'+str(h)+'h' if h>1 else ''}" != "iberia_lowFlex_fullFC_2030_noGpeak_6h": continue
                         cases.append(f"{scenario_prefix}{'_'+str(timestep)+'h'}{'_'+hedging_scenario if hedging_scenario else ''}{suffix}")
 
+# Or overwrite the cases list manually
+# iter2_3 = "2002-2003", "1996-1997", "2014-2015"
+cases = ["singleyear_1h_2002to2003", "singleyear_1h_1996to1997", "singleyear_1h_2014to2015", "iter2_3_1h"]
+cases = ["singleyear_"+str(year)+"to"+str(year+1)+"_1h" for year in range(1980, 2018)]
 
 comp_name = os.environ['COMPUTERNAME']
 if "PLIA" in comp_name:
@@ -170,6 +175,10 @@ def crawl_gdx(q_gdx, old_data, gdxpath, thread_nr, overwrite, todo_gdx_len, file
                     if alternative in files:
                         print_cyan("Found and added to the queue an alternative file:",alternative)
                         q_gdx.put((scen_i, alternative))
+                if "1h" in scen_name:
+                    if scen_name.replace("1h", "3h") in files:
+                        print_cyan("Found and added to the queue an alternative file:", scen_name.replace("1h", "3h"))
+                        q_gdx.put((scen_i, scen_name.replace("1h", "3h")))
         except:
             identifier = thread_nr[threading.get_ident()]
             global errors

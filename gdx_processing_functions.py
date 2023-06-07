@@ -99,8 +99,8 @@ def run_case(scen_name, gdxpath, indicators, FC=False, print_FR_summary=False):
     # FC',
     # H2store
     # el_tot,
-    region = k.split("_")[0]
-    year = k.split("_")[3]
+    # region = k.split("_")[0]
+    # year = k.split("_")[3]
     with gdxr.GdxFile(gdxpath + k + ".gdx") as f:
         before = [i for i in locals().keys()]  # variables defined before this line do not get pickled
         gamsTimestep = gdx(f, "timestep")
@@ -307,9 +307,11 @@ def run_case(scen_name, gdxpath, indicators, FC=False, print_FR_summary=False):
     WG = get_from_cap(TECH.BIOGAS)
     WG_peak = get_from_cap(TECH.BIOGAS_PEAK)
     U = get_from_cap(TECH.NUCLEAR)
-    try: bat = tot_cap.loc[TECH.BATTERY].sum().round(decimals=2).astype(str) + " / " \
+    bat = get_from_cap(TECH.BATTERY)
+    bat_cap = get_from_cap(TECH.BATTERY_CAP)
+    try: battery = tot_cap.loc[TECH.BATTERY].sum().round(decimals=2).astype(str) + " / " \
           + tot_cap.loc[TECH.BATTERY_CAP].sum().round(decimals=2).astype(str)
-    except KeyError: bat = 0
+    except KeyError: battery = 0
 
     after = locals().keys()
     to_save = [i for i in after if i not in before and "_" != i[0]]  # skip variables that start with _
@@ -408,7 +410,7 @@ def excel(scen:str, data, row, writer, indicators):
         if len(cappy.filter(like=reg,axis=0)) > cappy_len: cappy_len = len(cappy.filter(like=reg,axis=0))
     # get the nr of rows in cappy.filter(like=reg,axis=0)
     print_yellow(scen_row)
-    scen_row += cappy_len+6
+    scen_row += cappy_len+4
     print_yellow(scen_row)
     try: print_df(writer, data["curtailment_profile_total"].round(decimals=3), "Curtailment", shortened_scen)
     except AttributeError: print_red(f"could not print curtailment for {shortened_scen}")
