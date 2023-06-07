@@ -20,11 +20,10 @@ tech_groups = {
     'PtH': PtH,
     'Wind': wind,
     'PV': PV,
-    'Baseload': baseload,
     'Peak': peak,
-    'Other thermals': CCS + CHP + midload
+    'Other thermals': CCS + CHP + midload + ["W"]
 }
-techs_to_exclude = PtH + ["Electrolyser", "electrolyser"]
+techs_to_exclude = PtH + ["Electrolyser", "electrolyser", "H", "b", "H_CHP", "B_CHP"]
 storage_techs = ["bat", "H2store"]
 storage_techs = storage_techs + [tech_names[t] for t in storage_techs if t in tech_names]
 
@@ -187,9 +186,31 @@ def create_figure(grouped_data, pickle_timestamp, use_defaults):
     width = 0.35
 
     # Plot normal tech and storage tech side by side
-    normal_tech.T.plot(kind='bar', stacked=True, ax=ax1, width=width, color=[color_dict.get(tech, 'gray') for tech in normal_tech.index], position=1.05, rot=11)
-    storage_tech.T.plot(kind='bar', stacked=True, ax=ax2, width=width, color=[color_dict.get(tech, 'gray') for tech in storage_tech.index], position=-0.05)
+    bars1 = normal_tech.T.plot(kind='bar', stacked=True, ax=ax1, width=width, color=[color_dict.get(tech, 'gray') for tech in normal_tech.index], position=1.05, rot=11)
+    bars2 = storage_tech.T.plot(kind='bar', stacked=True, ax=ax2, width=width, color=[color_dict.get(tech, 'gray') for tech in storage_tech.index], position=-0.05)
 
+    # After plotting, iterate over the bars and add labels
+    def conditional_label(bar, cutoff):
+        # Get the height of the bar
+        height = bar.get_height()
+        # If height is greater than or equal to cutoff, return label
+        if abs(height) >= 100:
+            return f'{height:.0f}'
+        # Otherwise, return an empty string
+        elif abs(height) >= cutoff:
+            return f'{height:.1f}'
+        else:
+            return ''
+
+    # Apply this function to each bar
+    for container in bars1.containers:
+        labels1 = [conditional_label(bar, 40) for bar in container]
+        ax1.bar_label(container, labels=labels1, label_type='center', fontsize=9)
+
+    for container in bars2.containers:
+        labels2 = [conditional_label(bar, 40) for bar in container]
+        ax2.bar_label(container, labels=labels2, label_type='center', fontsize=9)
+    
     # Adjust the xlim
     ax1.set_xlim(-0.5, len(combined_data.columns) - 0.5)
 
@@ -235,14 +256,14 @@ def create_figure(grouped_data, pickle_timestamp, use_defaults):
     ax1.set_xlabel('Scenario')
     ax1.set_ylabel('Installed power capacity [GW]')
     ax2.set_ylabel('Installed storage capacity [GWh]')
-    plt.tight_layout()
+    plt.tight_layout(pad=0.5)
     
     # Save the figure as PNG and SVG (or EPS)
     fig_name_base = f"figures/capacity/{pickle_timestamp}"
     fig_num = 1
     while os.path.exists(f"{fig_name_base}_{fig_num}.png"):
         fig_num += 1
-    fig.savefig(f"{fig_name_base}_{fig_num}.png")
+    fig.savefig(f"{fig_name_base}_{fig_num}.png", dpi=300)
     fig.savefig(f"{fig_name_base}_{fig_num}.svg")  # or .eps for EPS format
 
     # Close the figure to free memory
