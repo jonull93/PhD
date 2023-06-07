@@ -32,13 +32,14 @@ if false
 end
 most_interesting_years = ["2002-2003","1996-1997"]#["1989-1990","2005-2006"]#["1984-1985", "1995-1996"]#["2010-2011","2002-2003",]
 
-maxtime = 60*60 # 60*30=30 minutes
+maxtime = 60*5 # 60*30=30 minutes
 algs_size = "single" # "small" or "large" or "single" or "adaptive"
-years_per_combination = 3
+years_per_combination = 5
 years_to_add = years_per_combination - 1 # number of years to add to the most interesting year for each combination
 all_interesting_years_at_once = false
 import_combinations = false
 optimize_all = false
+requested_sum_func = "abs_sum" # "abs_sum" or "sqrt_sum" or "log_sum" or "sse"
 # ask the user whether to import the 100 best combinations from the previous run
 while true
     printstyled("
@@ -48,10 +49,15 @@ while true
     years_per_combination = $(years_per_combination),
     most_interesting_years = $(most_interesting_years),
     import_combinations = $(import_combinations),
+    optimize_all = $(optimize_all),
+    all_interesting_years_at_once = $(all_interesting_years_at_once),
+    requested_sum_func = $(requested_sum_func),
         - Enter 'i' to change the toggle on whether to attempt to import (100 best) combinations from previous run
         - Enter 'a' to make only combinations that include all interesting_years at once
         - Enter 'o' to optimize the weights also for the most interesting years
         - Enter a number to set the max number of minutes for each optimization
+        - Enter 'single', 'small', 'adaptive' or 'large' to change the size of the algorithm
+        - Enter 'abs', 'sqrt', 'log' or 'sse' to change the sum function
         - Enter 'exit' or 'e' to skip\n"; color=:yellow)
     input = readline()
     if input == "exit" || input == "e" || input == ""
@@ -64,15 +70,26 @@ while true
             printstyled("Will not attempt to import combinations from previous run \n"; color=:red)
         end
     elseif input == "a"
-        global all_interesting_years_at_once = true # if true, use all years in most_interesting_years, if false, use only one at a time
-        global years_to_add = years_per_combination - length(most_interesting_years)
+        global all_interesting_years_at_once = !all_interesting_years_at_once  # if true, use all years in most_interesting_years, if false, use only one at a time
+        global years_to_add = years_per_combination - length(most_interesting_years)*all_interesting_years_at_once-1*!all_interesting_years_at_once
         printstyled("Using all interesting years at once \n"; color=:green)
     elseif tryparse(Float32,input) != nothing
         global maxtime = parse(Float32,input)*60
         printstyled("Max time set to $(maxtime/60) minutes \n"; color=:green)
     elseif input == "o"
-        global optimize_all = true
+        global optimize_all = !optimize_all
         printstyled("Optimizing weights for all years \n"; color=:green)
+    elseif input == "single" || input == "small" || input == "adaptive" || input == "large"
+        global algs_size = input
+        printstyled("Algorithm size set to $algs_size \n"; color=:green)
+    elseif input == "abs" || input == "sqrt" || input == "log"
+        global requested_sum_func = input * "_sum"
+        printstyled("Sum function set to $requested_sum_func \n"; color=:green)
+    elseif input == "sse"
+        global requested_sum_func = input
+        printstyled("Sum function set to $requested_sum_func \n"; color=:green)
+    else
+        printstyled("Invalid input \n"; color=:red)
     end
 end
 years_not_optimized = 0
@@ -369,6 +386,7 @@ Threads.@threads for thread = 1:threads_to_start
     time_to_sleep = 0.2*thread
     sleep(time_to_sleep)
     global global_best
+    global requested_sum_func
     while true
         if length(queue) == 0
             #println("Nothing to do")
@@ -422,8 +440,23 @@ Threads.@threads for thread = 1:threads_to_start
         ###----------------------------
         ### SET THE ERROR FUNCTION TO OPTIMIZE WITH HERE
         ###----------------------------
-        global opt_func_str = "sqrt_sum(x) + weights_penalty(x,fixed_weights=years_not_optimized,slack_distance=0.011,amplitude=10000)" #sigmoid((sum(x)-1.011)*1000) +
-        opt_func(x) = sqrt_sum(x) + weights_penalty(x,fixed_weights=years_not_optimized,slack_distance=0.011,amplitude=10000) #sigmoid((sum(x)-1.011)*1000) +
+        
+        global opt_func_str = "$requested_sum_func(x) + weights_penalty(x,fixed_weights=years_not_optimized,slack_distance=0.011,amplitude=10000)" #sigmoid((sum(x)-1.011)*1000) +
+        function opt_func(x)
+            if requested_sum_func == "sse"
+                return sse(x) + weights_penalty(x, fixed_weights=years_not_optimized, slack_distance=0.011, amplitude=10000)
+            elseif requested_sum_func == "abs_sum"
+                return abs_sum(x) + weights_penalty(x, fixed_weights=years_not_optimized, slack_distance=0.011, amplitude=10000)
+            elseif requested_sum_func == "sqrt_sum"
+                return sqrt_sum(x) + weights_penalty(x, fixed_weights=years_not_optimized, slack_distance=0.011, amplitude=10000)
+            elseif requested_sum_func == "log_sum"
+                return log_sum(x) + weights_penalty(x, fixed_weights=years_not_optimized, slack_distance=0.011, amplitude=10000)
+            else
+                error("Invalid requested_sum_func")
+            end
+        end
+        
+
 
         local alg_solutions = Dict()
         for alg in BBO_algs
