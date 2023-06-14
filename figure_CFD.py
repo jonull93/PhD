@@ -32,6 +32,7 @@ for folder in os.listdir("PickleJar"):
         ref_folders.append(folder)
 ref_folders.sort(key=lambda x: int(x[3:]))
 ref_folder = ref_folders[-1]
+#ref_folder = "ref14"
 print_magenta(f"ref_folder: {ref_folder}")
 #mkdir figures\\CFD plots\\{ref_folder}
 os.makedirs(f"figures\\CFD plots\\{ref_folder}", exist_ok=True)
@@ -403,6 +404,7 @@ def initiate():
     if make_fingerprinted_figures: # Load results from most recent fingerprinting run
         with open(f"results\\{ref_folder}/most_recent_results.txt", "r") as f:
             results_folder_name = f.read().strip()
+#            results_folder_name = r"results\ref14\FP sse Jun_06_16.52.18".strip()
         print_cyan(f"Loading results from {results_folder_name}...")
         import json
         with open(f"{results_folder_name}/results.json", "r") as f:

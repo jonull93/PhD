@@ -118,6 +118,8 @@ def load_data(pickle_file, use_defaults):
     selected_data = {s.replace("ref_cap_", ""): selected_data[s] for s in selected_data.keys()}
     selected_data = {s.replace("singleyear_", ""): selected_data[s] for s in selected_data.keys()}
     selected_data = {s.replace("to", "-"): selected_data[s] for s in selected_data.keys()}
+    selected_data = {s.replace("_1h", ""): selected_data[s] for s in selected_data.keys()}
+    selected_data = {s.replace("_tight", ""): selected_data[s] for s in selected_data.keys()}
     return selected_data
 
 
@@ -154,6 +156,14 @@ def group_technologies(data):
     return grouped_data
 
 
+def prettify_scenario_name(name):
+    if "iter" in name:
+        return "Set (1 opt.)"
+    # remove 'base' and 'extreme' and split into a list
+    parts = name.replace('base', '').replace('extreme', ' ').split()
+    # join the parts with appropriate labels
+    return f'Set ({parts[0]} opt.)'
+
 
 def create_figure(grouped_data, pickle_timestamp, use_defaults):
     # Create a directory for the figures if it doesn't already exist
@@ -161,7 +171,7 @@ def create_figure(grouped_data, pickle_timestamp, use_defaults):
         os.makedirs('figures/capacity')
 
     # Create a figure and axis
-    fig, ax1 = plt.subplots()
+    fig, ax1 = plt.subplots(figsize=(8,5))
 
     # Combine all scenarios into a single DataFrame
     combined_data = pd.DataFrame({scenario: data for scenario, data in grouped_data.items()})
@@ -183,7 +193,7 @@ def create_figure(grouped_data, pickle_timestamp, use_defaults):
     ax2 = ax1.twinx()
 
     # Width of the bars
-    width = 0.35
+    width = 0.39
 
     # Plot normal tech and storage tech side by side
     bars1 = normal_tech.T.plot(kind='bar', stacked=True, ax=ax1, width=width, color=[color_dict.get(tech, 'gray') for tech in normal_tech.index], position=1.05, rot=11)
@@ -198,18 +208,18 @@ def create_figure(grouped_data, pickle_timestamp, use_defaults):
             return f'{height:.0f}'
         # Otherwise, return an empty string
         elif abs(height) >= cutoff:
-            return f'{height:.1f}'
+            return f'{height:.0f}'
         else:
             return ''
 
     # Apply this function to each bar
     for container in bars1.containers:
         labels1 = [conditional_label(bar, 40) for bar in container]
-        ax1.bar_label(container, labels=labels1, label_type='center', fontsize=9)
+        ax1.bar_label(container, labels=labels1, label_type='center', fontsize=8)
 
     for container in bars2.containers:
         labels2 = [conditional_label(bar, 40) for bar in container]
-        ax2.bar_label(container, labels=labels2, label_type='center', fontsize=9)
+        ax2.bar_label(container, labels=labels2, label_type='center', fontsize=7)
     
     # Adjust the xlim
     ax1.set_xlim(-0.5, len(combined_data.columns) - 0.5)
@@ -250,6 +260,19 @@ def create_figure(grouped_data, pickle_timestamp, use_defaults):
     # Create a combined legend above the figure title
     ax1.legend(handles1 + handles2, labels1 + labels2, loc=legend_loc, ncol=legend_ncol, bbox_to_anchor=legend_bbox_to_anchor)
 
+    # Change the x-labels to be right-aligned
+    x_ticks = ax1.get_xticklabels()
+    new_labels = []#[f"{f'{scenario}, '*(len(scenario.replace(year,''))>3)}" + f"{year}" for scenario, year in zip(all_scenarios, all_years)]
+    for scenario in x_ticks:
+        scenario = scenario.get_text()
+        if len(scenario) > 10 or "iter" in scenario:
+            # change labels from "base#extreme#" (where # is a number) to "#b #e"
+            temp_label = f"{scenario.replace('_tight','').replace('_1h','')}"
+            temp_label = prettify_scenario_name(temp_label)
+            new_labels.append(temp_label)
+        else:
+            new_labels.append(scenario)
+    ax1.set_xticklabels(new_labels, rotation=20, ha='right', fontsize=10)
 
     # Add title and labels
     ax1.set_title('Technology capacity in each scenario')
