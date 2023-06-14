@@ -24,7 +24,15 @@ if __name__ == "__main__":
         exit()
 
     #Step 1
-    if choice==1: import profile_analysis
+    if choice==1: 
+        import profile_analysis
+        years = profile_analysis.years
+        profile_analysis.separate_years(years, make_profiles=False, make_figure=True)
+        profile_analysis.combined_years(years)
+        #combined_years(range(1980,1982))
+        profile_analysis.remake_profile_seam(make_profiles=False)
+        #plot_reseamed_years(range(1980,2020))
+
 
     #Step 2
     if choice<=2:
@@ -36,6 +44,8 @@ if __name__ == "__main__":
     # run the julia script by using the following powershell command: julia --threads 60 fingerprintmatching.jl
     #Step 3
     if choice<=3:
+        print("Better to run confirm the CFD plots and then run julia from the terminal..")
+        exit()
         import subprocess
         script_path = "fingerprintmatching.jl"
         command = ["julia", "--threads", "60", script_path]

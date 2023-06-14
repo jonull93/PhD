@@ -412,6 +412,7 @@ def find_year_and_hour(index, start_year=1980):
 sheets = pd.ExcelFile("input\\cap_ref.xlsx").sheet_names
 # make sheet_name the name of the sheet that starts with "ref" and has the highest number after it
 sheet_name = "ref" + str(max([int(i[3:]) for i in sheets if i.startswith("ref")]))
+#sheet_name = "ref17"
 print_red(f"Reading capacities from sheet {sheet_name}")
 cap_df = pd.read_excel("input\\cap_ref.xlsx", sheet_name=sheet_name, header=0, index_col=[0, 1], engine="openpyxl")
 # print(cap_df)
@@ -525,12 +526,13 @@ VRE_tech = WON + WOFF + PV + PVR
 all_cap = all_cap[all_cap.index.isin(VRE_tech, level=0)]
 # print(all_cap)
 years = range(1980, 2020)
+reseamed_years = [f"{years[i_y]}-{year}" for i_y, year in enumerate(range(1981,2020))]
 sites = range(1, 6)
 # instead of switching to a new year at Jan 1st, a seam in summer gives a whole winter period
 # 4344 = hours until 1st of July
 
 region_name = "nordic_L"
-VREs = ["WON", "WOFF", "solar", "solar_rooftop"]
+VRE_groups = ["WON", "WOFF", "solar", "solar_rooftop"]
 VRE_tech_dict = {"WON": WON, "WOFF": WOFF, "solar": PV, "solar_rooftop": PVR}
 VRE_tech_name_dict = {"WON": "WONA", "WOFF": "WOFF", "solar": "PVPA", "solar_rooftop": "PVR"}
 filenames = {"WON": f"GISdata_windYEAR_{region_name}.mat", "WOFF": f"GISdata_windYEAR_{region_name}.mat",
@@ -630,7 +632,7 @@ def separate_years(years, add_nontraditional_load=True, make_profiles=False, mak
                                     columns=pd.MultiIndex.from_product([VRE_tech, regions], names=["tech", "I_reg"]))
         FLHs = {}
         pot_cap = {reg: {} for reg in regions}
-        for VRE in VREs:
+        for VRE in VRE_groups:
             filename = filenames[VRE].replace("YEAR", str(year))
             VRE_mat = mat73.loadmat(mat_folder + filename)
             # [site,region]
@@ -784,7 +786,7 @@ def combined_years(years, threshold=False, window_size_days=3):
                                    columns=pd.MultiIndex.from_product([VRE_tech, regions], names=["tech", "I_reg"]))
         # regions = ["SE_NO_N", "SE_S", "NO_S", "FI", "DE_N", "DE_S"]
         FLHs = {}
-        for VRE in VREs:  # ["WON", "WOFF", "solar", "solar_rooftop"]
+        for VRE in VRE_groups:  # ["WON", "WOFF", "solar", "solar_rooftop"]
             # print(f"- {VRE} -")
             filename = filenames[VRE].replace("YEAR", str(year))
             # [site,region]
@@ -855,38 +857,39 @@ def combined_years(years, threshold=False, window_size_days=3):
     # the second level of the multiindex is now "h0001" but should just be 1
     net_load.index = pd.MultiIndex.from_tuples([(i[0], int(i[1][1:])) for i in net_load.index])
     make_pickles(f"{years[0]}-{years[-1]}", VRE_profiles, all_cap, demands, non_traditional_load, electrified_heat_demand, net_load)
-    if True:
-        pot_cap = {reg: {} for reg in regions}
-        for VRE in VREs:
-            filename = filenames[VRE].replace("YEAR", str(year))
-            VRE_mat = mat73.loadmat(mat_folder + filename)
-            for site in sites:
-                tech_name = VRE_tech_name_dict[VRE] + str(site)
-                capacities = VRE_mat[capacity_keys[VRE]]
-                for i_r, region in enumerate(regions):
-                    pot_cap[region][tech_name] = capacities[i_r, site - 1]
-        # make a dataframe with tech and reg as the index, 
-        # the first column, "pot_cap" holds the potential capacity from the pot_cap dictionary
-        # there should also be one column for each profileyear that hold the sum of the VRE profiles for each tech and reg
-        df = pd.DataFrame(index=pd.MultiIndex.from_tuples([(tech, reg) for tech in VRE_tech_name_dict.values() for reg in regions]),
-                            columns=["pot_cap"] + [str(year) for year in years])
-        for tech in VRE_tech_name_dict.values():
-            for reg in regions:
-                df.loc[(tech, reg), "pot_cap"] = pot_cap[reg][tech]
-                for year in years:
-                    df.loc[(tech, reg), str(year)] = VRE_profiles[year].loc[(reg, tech)].sum()
-        df.to_excel(f"{years[0]}-{years[-1]}_summary.xlsx")
+
+
+if __name__ == "__main__":
+    #separate_years(2012, make_figure=True, make_output=True)
+    #make_heat_profiles()
+    #make_hydro_profiles()
+    separate_years(years, make_profiles=False, make_figure=True)
+    combined_years(years)
+    #combined_years(range(1980,1982))
+    remake_profile_seam(make_profiles=False)
+    plot_reseamed_years(range(1980,2020))
+    if False:
+        for nr, years_to_summarize in enumerate([reseamed_years, years]):
+            df = pd.DataFrame(index=pd.MultiIndex.from_tuples([(tech, reg) for tech in VRE_tech for reg in regions]),
+                                    columns=["pot_cap"] + [str(year) for year in years_to_summarize])
+            for year in years_to_summarize:
+                data = pickle.load(open(rf"PickleJar\ref14\netload_components_large_{year}.pickle", "rb"))
+                pot_cap = data["cap"]  # pd.Series with tech and reg as the index
+                VRE_profiles = data["VRE_profiles"]  # pd.DataFrame with hour as index and (tech, reg) as columns
+                # make a dataframe with tech and reg as the index, 
+                # the first column, "pot_cap" holds the potential capacity from the pot_cap dictionary
+                # there should also be one column for each profileyear that hold the sum of the VRE profiles for each tech and reg
+                
+                # add the potential capacity to the dataframe
+                df["pot_cap"] = pot_cap
+                for tech in VRE_tech:
+                    for reg in regions:
+                        df.loc[(tech, reg), str(year)] = VRE_profiles[(tech,reg)].sum()
+                #remove all rows where the pot_cap is 0
+                df = df[df["pot_cap"] > 0]
+            df.to_excel(f"results/VRE_resource_summary{'_reseamed_years'*(1-nr)}.xlsx")
+            print_green(f"Saved results/VRE_resource_summary{'_reseamed_years'*(1-nr)}.xlsx")
         
-
-
-#separate_years(2012, make_figure=True, make_output=True)
-#make_heat_profiles()
-#make_hydro_profiles()
-#separate_years(years, make_profiles=False, make_figure=True)
-combined_years(years)
-#combined_years(range(1980,1982))
-#remake_profile_seam(make_profiles=False)
-#plot_reseamed_years(range(1980,2020))
 
 
 """net_load = separate_years(1980, add_nontraditional_load=False, make_figure=True, make_output=False, window_size_days=1)
