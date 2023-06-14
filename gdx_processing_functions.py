@@ -337,6 +337,9 @@ def short_scen(scen):
     shortened_scen = shortened_scen.replace("noTransport", "noTrsp")
     shortened_scen = shortened_scen.replace("Flex", "Flx")
     shortened_scen = shortened_scen.replace("ref_cap", "refCap")
+    shortened_scen = shortened_scen.replace("tight", "t")
+    shortened_scen = shortened_scen.replace("base", "b")
+    shortened_scen = shortened_scen.replace("extreme", "e")
     return shortened_scen
 
 def excel(scen:str, data, row, writer, indicators):
@@ -399,7 +402,7 @@ def excel(scen:str, data, row, writer, indicators):
     cappy["sort_by"] = cappy.index.get_level_values(0).map(order_map_cap)
     cappy.sort_values("sort_by", inplace=True)
     cappy.drop(columns="sort_by", inplace=True)
-    print(cappy)
+    #print(cappy)
     cappy = cappy.reorder_levels(["I_reg", "tech", "stochastic_scenarios"]).sort_index(level=0, sort_remaining=False)
     mask = cappy.duplicated(subset=["New cap","Cap"], keep='first')
     cappy2 = cappy[~mask]
@@ -409,9 +412,9 @@ def excel(scen:str, data, row, writer, indicators):
         cappy.filter(like=reg,axis=0).to_excel(writer, sheet_name=shortened_scen, startcol=5+8*i, startrow=1)
         if len(cappy.filter(like=reg,axis=0)) > cappy_len: cappy_len = len(cappy.filter(like=reg,axis=0))
     # get the nr of rows in cappy.filter(like=reg,axis=0)
-    print_yellow(scen_row)
+    #print_yellow(scen_row)
     scen_row += cappy_len+4
-    print_yellow(scen_row)
+    #print_yellow(scen_row)
     try: print_df(writer, data["curtailment_profile_total"].round(decimals=3), "Curtailment", shortened_scen)
     except AttributeError: print_red(f"could not print curtailment for {shortened_scen}")
     try: print_df(writer, data["el_price"].round(decimals=3), "Elec. price", shortened_scen, row_inc=2)
@@ -435,4 +438,5 @@ def excel(scen:str, data, row, writer, indicators):
         print_df(writer, data["inertia_available"].round(decimals=3), "Inertia: Available", shortened_scen, header=True)
         print_df(writer, data["inertia_available_thermals"].round(decimals=3), "Inertia: Thermals", shortened_scen, header=True, row_inc=2)
     else:
-        print("PS variables were not available for", scen)
+        #print("PS variables were not available for", scen)
+        pass
