@@ -20,7 +20,7 @@ start_time_script = tm.time()
 print("Excel-writing script started at", datetime.now().strftime('%H:%M:%S'))
 
 excel = True  # will only make a .pickle if excel == False
-run_output = "rw"  # 'w' to (over)write or 'rw' to only add missing scenarios
+run_output = "w"  # 'w' to (over)write or 'rw' to only add missing scenarios
 overwrite = []  # names of scenarios to overwrite regardless of existence in pickled data
 #overwrite = [reg+"_inertia_0.1x" for reg in ["ES3", "HU", "IE", "SE2"]]+\
 #            [reg+"_inertia" for reg in ["ES3", "HU", "IE", "SE2"]]+\
@@ -70,8 +70,10 @@ for reg in regions:
 
 # Or overwrite the cases list manually
 # iter2_3 = "2002-2003", "1996-1997", "2014-2015"
-cases = ["singleyear_1h_2002to2003", "singleyear_1h_1996to1997", "singleyear_1h_2014to2015", "iter2_3_1h"]
-cases = ["singleyear_"+str(year)+"to"+str(year+1)+"_1h" for year in range(1980, 2018)]
+cases = ["singleyear_2002to2003_1h", "singleyear_1996to1997_1h", "singleyear_2014to2015_1h", "singleyear_1989to1990_1h", "singleyear_2010to2011_1h", "singleyear_2003to2004_1h",
+         "singleyear_1990to1991_1h", 
+         "iter2_3_1h", "base2extreme2_3_2002to2003_1h", "base3extreme2_3_2002to2003_1h", "base4extreme2_4_2002to2003_1h","base4extreme2_5_2002to2003_1h"]
+#cases = ["singleyear_"+str(year)+"to"+str(year+1)+"_1h" for year in range(1980, 2018)]
 
 comp_name = os.environ['COMPUTERNAME']
 if "PLIA" in comp_name:
@@ -166,19 +168,23 @@ def crawl_gdx(q_gdx, old_data, gdxpath, thread_nr, overwrite, todo_gdx_len, file
                 print(f' (q_excel appended and is now : {q_excel.qsize()} items long)')
         except FileNotFoundError:
             print_cyan("! Could not find file for", scen_name)
+            found_alternative = False
             if replace_with_alternative_solver_if_missing:
-                for replacer in alternative_solutions:
+                for replacer in alternative_solutions: # list of alternative suffixes
                     alternative = scen_name.split("_")
-                    alternative.insert(-1, replacer)
+                    alternative.append(replacer)
                     alternative = "_".join(alternative)
                     print_cyan("Looking for", alternative)
                     if alternative in files:
                         print_cyan("Found and added to the queue an alternative file:",alternative)
                         q_gdx.put((scen_i, alternative))
-                if "1h" in scen_name:
+                        todo_gdx.append(alternative)
+                        found_alternative = True
+                if "1h" in scen_name and not found_alternative:
                     if scen_name.replace("1h", "3h") in files:
                         print_cyan("Found and added to the queue an alternative file:", scen_name.replace("1h", "3h"))
                         q_gdx.put((scen_i, scen_name.replace("1h", "3h")))
+                        todo_gdx.append(scen_name.replace("1h", "3h"))
         except:
             identifier = thread_nr[threading.get_ident()]
             global errors
