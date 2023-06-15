@@ -30,11 +30,11 @@ if false
     years = [i for i in years if !(i in to_remove)]
     println("Removed years: $(to_remove)")
 end
-most_interesting_years = ["2002-2003","1996-1997"]#["1989-1990","2005-2006"]#["1984-1985", "1995-1996"]#["2010-2011","2002-2003",]
+most_interesting_years = ["2002-2003","1996-1997"]#["1986-1987","1989-1990"]["1989-1990","2005-2006"]#["1984-1985", "1995-1996"]#["2010-2011","2002-2003",]
 
 maxtime = 60*5 # 60*30=30 minutes
 algs_size = "single" # "small" or "large" or "single" or "adaptive"
-years_per_combination = 5
+years_per_combination = 4
 years_to_add = years_per_combination - 1 # number of years to add to the most interesting year for each combination
 all_interesting_years_at_once = false
 import_combinations = false
@@ -117,6 +117,7 @@ function find_max_ref_folder(parent_directory)
 end
 
 ref_folder = find_max_ref_folder("./output")
+#ref_folder = "ref14"
 println("Reading data from $ref_folder")
 total_year = "1980-2019"
 ref_full = matread("output\\$ref_folder\\heatmap_values_$(total_year)_amp$(amplitude_resolution)_window$(window)_area.mat")
@@ -256,7 +257,7 @@ function sigmoid(x)
     return 1 / (1 + exp(-x))
 end
 
-function weights_penalty(weights;fixed_weights=0,slack_distance=0.011,amplitude=1e6)
+function weights_penalty(weights;fixed_weights=0,slack_distance=0.009,amplitude=2e6)
     weight_sum = sum(weights)+fixed_weights*1/40
     penalty = (sigmoid((weight_sum-(1+slack_distance))*1000) + sigmoid(((1-slack_distance)-weight_sum)*1000))*amplitude
     return penalty
@@ -350,6 +351,9 @@ if !optimize_all
     elseif years_to_add == 3
         initial_guesses = initial_guesses_3
         printstyled("Initial guesses: initial_guesses_3\n"; color=:yellow)
+    elseif years_to_add == 4
+        initial_guesses = initial_guesses_4
+        printstyled("Initial guesses: initial_guesses_4\n"; color=:yellow)
     end
     if years_to_add == 1
         #if we're optimizing only 1 year, then the bounds are just 1 value: 1-length(most_interesting_years)/40
@@ -361,7 +365,7 @@ if !optimize_all
     end
     println("decreased each initial guess by $(years_not_optimized/40/years_to_add) so that the initial guesses sum to $(sum(initial_guesses[1])+years_not_optimized/40)")
     #println(initial_guesses)
-else
+else 
     if length(years_per_combination) == 4
         initial_guesses = initial_guesses_4
         printstyled("Initial guesses: initial_guesses_4\n"; color=:yellow)
@@ -441,16 +445,16 @@ Threads.@threads for thread = 1:threads_to_start
         ### SET THE ERROR FUNCTION TO OPTIMIZE WITH HERE
         ###----------------------------
         
-        global opt_func_str = "$requested_sum_func(x) + weights_penalty(x,fixed_weights=years_not_optimized,slack_distance=0.011,amplitude=10000)" #sigmoid((sum(x)-1.011)*1000) +
+        global opt_func_str = "$requested_sum_func(x) + weights_penalty(x,fixed_weights=years_not_optimized,slack_distance=0.009,amplitude=2e5)" #sigmoid((sum(x)-1.011)*1000) +
         function opt_func(x)
             if requested_sum_func == "sse"
-                return sse(x) + weights_penalty(x, fixed_weights=years_not_optimized, slack_distance=0.011, amplitude=10000)
+                return sse(x) + weights_penalty(x, fixed_weights=years_not_optimized, slack_distance=0.009, amplitude=2e5)
             elseif requested_sum_func == "abs_sum"
-                return abs_sum(x) + weights_penalty(x, fixed_weights=years_not_optimized, slack_distance=0.011, amplitude=10000)
+                return abs_sum(x) + weights_penalty(x, fixed_weights=years_not_optimized, slack_distance=0.009, amplitude=2e5)
             elseif requested_sum_func == "sqrt_sum"
-                return sqrt_sum(x) + weights_penalty(x, fixed_weights=years_not_optimized, slack_distance=0.011, amplitude=10000)
+                return sqrt_sum(x) + weights_penalty(x, fixed_weights=years_not_optimized, slack_distance=0.009, amplitude=2e5)
             elseif requested_sum_func == "log_sum"
-                return log_sum(x) + weights_penalty(x, fixed_weights=years_not_optimized, slack_distance=0.011, amplitude=10000)
+                return log_sum(x) + weights_penalty(x, fixed_weights=years_not_optimized, slack_distance=0.009, amplitude=2e5)
             else
                 error("Invalid requested_sum_func")
             end

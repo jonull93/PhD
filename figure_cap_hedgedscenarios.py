@@ -120,6 +120,25 @@ def load_data(pickle_file, use_defaults):
     selected_data = {s.replace("to", "-"): selected_data[s] for s in selected_data.keys()}
     selected_data = {s.replace("_1h", ""): selected_data[s] for s in selected_data.keys()}
     selected_data = {s.replace("_tight", ""): selected_data[s] for s in selected_data.keys()}
+
+    # has_altscenarios should be True if there are any scenarios with "v2" in the name
+    has_altscenarios = any("v2" in s or "_5_" in s for s in selected_data.keys())
+    if has_altscenarios and not use_defaults:
+        print_yellow("There are alternative scenarios in the data. What should be done with these?")
+        print_yellow("1. Keep all scenarios (default)")
+        print_yellow("2. Remove alternative scenarios")
+        user_input = input("Please enter your choice ( or 2): \n")
+        if user_input == "1":
+            print_yellow("Keeping all scenarios")
+            pass
+        elif user_input == "2":
+            print_yellow("Removing all alternative scenarios")
+            selected_data = {s: selected_data[s] for s in selected_data.keys() if "v2" not in s and "_5_" not in s}
+        else:
+            print_yellow("Invalid input. Keeping all scenarios")
+    if has_altscenarios and use_defaults:
+        print_yellow("There are alternative scenarios in the data.")
+    print_blue(selected_data)
     return selected_data
 
 
@@ -161,6 +180,8 @@ def prettify_scenario_name(name):
         return "Set (1 opt.)"
     # remove 'base' and 'extreme' and split into a list
     parts = name.replace('base', '').replace('extreme', ' ').split()
+    if "v2" in name or "_5_" in name:
+        return f'Alt. set ({parts[0]} opt.)'
     # join the parts with appropriate labels
     return f'Set ({parts[0]} opt.)'
 
@@ -310,7 +331,7 @@ def main():
     print_yellow(f"Data loaded from pickle file")
     grouped_data = group_technologies(data)
     print_green(f"Technologies grouped successfully")
-    print_yellow(f"Grouped data: \n{grouped_data}")
+    #print_yellow(f"Grouped data: \n{grouped_data}")
     create_figure(grouped_data, pickle_timestamp, use_defaults)
     print_magenta(f"Figures created and saved in {figures_folder}")
     
