@@ -21,7 +21,14 @@ tech_groups = {
     'Wind': wind,
     'PV': PV,
     'Peak': peak,
-    'Other thermals': CCS + CHP + midload + ["W"]
+    'Other thermals': CCS + CHP + ["W"]
+}
+tech_groups2 = {
+    "Battery": ["bat_cap", "bat"],
+    "VRE": PV + wind,
+    "Slow thermals": CCS + CHP + midload + ["W", "U", "Other thermals"],
+    "Peak": peak,
+    "H2": ["H2store", "electrolyser","FC"],
 }
 techs_to_exclude = PtH + ["Electrolyser", "electrolyser", "H", "b", "H_CHP", "B_CHP"]
 storage_techs = ["bat", "H2store"]
@@ -138,7 +145,6 @@ def load_data(pickle_file, use_defaults):
             print_yellow("Invalid input. Keeping all scenarios")
     if has_altscenarios and use_defaults:
         print_yellow("There are alternative scenarios in the data.")
-    print_blue(selected_data)
     return selected_data
 
 
@@ -315,6 +321,78 @@ def create_figure(grouped_data, pickle_timestamp, use_defaults):
 
     print_green(f"Figure saved as '{fig_name_base}_{fig_num}.png'.")
 
+def create_figure_separated_techs(grouped_data, pickle_timestamp, use_defaults):
+    # Create a directory for the figures if it doesn't already exist
+    if not os.path.exists('figures/capacity'):
+        os.makedirs('figures/capacity')
+
+    # Create a figure and axes
+    fig, axs = plt.subplots(len(tech_groups2)//2, 2, figsize=(7,3*len(tech_groups2)//2)) 
+    axes = axs.flatten()
+
+    # Combine all scenarios into a single DataFrame
+    combined_data = pd.DataFrame({scenario: data for scenario, data in grouped_data.items()})
+    print_magenta(combined_data)
+    
+    # Loop over each group and create a subplot
+    for ax, (group_name, tech_list) in zip(axes, tech_groups2.items()):
+        # Filter data for the current technology group
+        group_data = combined_data.loc[combined_data.index.intersection(tech_list)].dropna(how='all')
+        
+        # Plot the data for this group
+        group_data.T.plot(kind='bar', stacked=True, ax=ax, color=[color_dict.get(tech, 'gray') for tech in group_data.index], width=0.8)
+        
+        # Set the title for this subplot
+        ax.set_title(group_name)
+
+    # Add overall title, labels, legend etc. to your liking
+    # Change the x-labels to be right-aligned
+    for i_a, ax in enumerate(axes):
+        x_ticks = ax.get_xticklabels()
+        new_labels = []#[f"{f'{scenario}, '*(len(scenario.replace(year,''))>3)}" + f"{year}" for scenario, year in zip(all_scenarios, all_years)]
+        for scenario in x_ticks:
+            scenario = scenario.get_text()
+            if len(scenario) > 10 or "iter" in scenario:
+                # change labels from "base#extreme#" (where # is a number) to "#b #e"
+                temp_label = f"{scenario.replace('_tight','').replace('_1h','')}"
+                temp_label = prettify_scenario_name(temp_label)
+                new_labels.append(temp_label)
+            else:
+                # change all years from 19## or 20## to '## (e.g. 1990 to '90)
+                scenario = scenario.replace('19','\'').replace('20','\'')
+                new_labels.append(scenario)
+
+        ax.set_xticklabels(new_labels, rotation=35, ha='right', fontsize=10, rotation_mode='anchor')
+        # for each label in the legend see if there is a better name in tech_names and replace it
+        handles, labels = ax.get_legend_handles_labels()
+        new_labels = []
+        for label in labels:
+            if label in tech_names:
+                new_labels.append(tech_names[label])
+            else:
+                new_labels.append(label)
+        ax.legend(handles[::-1], new_labels[::-1], loc='lower right') # [::-1] to reverse the order of the legend entries
+
+        if i_a==0:
+            ax.set_ylabel('Installed capacity [GW(h)]')
+        else:
+            ax.set_ylabel('Installed power capacity [GW]')
+    fig.tight_layout(pad=0.5)
+    plt.subplots_adjust(wspace=0.25)
+    # Save and close the figure as in your original function
+    # Save the figure as PNG and SVG (or EPS)
+    fig_name_base = f"figures/capacity/{pickle_timestamp}"
+    fig_num = 1
+    while os.path.exists(f"{fig_name_base}_{fig_num}.png"):
+        fig_num += 1
+    fig.savefig(f"{fig_name_base}_{fig_num}.png", dpi=300)
+    fig.savefig(f"{fig_name_base}_{fig_num}.svg")  # or .eps for EPS format
+    print_green(f"Figure saved as '{fig_name_base}_{fig_num}.png'.")
+
+    # Close the figure to free memory
+    plt.close(fig)
+
+
 
 def main():
     print_blue(f"Script started at: {datetime.now()}")
@@ -332,7 +410,7 @@ def main():
     grouped_data = group_technologies(data)
     print_green(f"Technologies grouped successfully")
     #print_yellow(f"Grouped data: \n{grouped_data}")
-    create_figure(grouped_data, pickle_timestamp, use_defaults)
+    create_figure_separated_techs(grouped_data, pickle_timestamp, use_defaults)
     print_magenta(f"Figures created and saved in {figures_folder}")
     
     print_red(f"Script finished at: {datetime.now()}")

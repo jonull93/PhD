@@ -31,10 +31,16 @@ if false
     println("Removed years: $(to_remove)")
 end
 most_interesting_years = ["2002-2003","1996-1997"]#["1986-1987","1989-1990"]["1989-1990","2005-2006"]#["1984-1985", "1995-1996"]#["2010-2011","2002-2003",]
+function find_max_ref_folder(parent_directory)
+    ref_folders = filter(x -> occursin(r"^ref\d+$", x), readdir(parent_directory))
+    isempty(ref_folders) ? nothing : "ref" * string(maximum(parse(Int, replace(x, "ref" => "")) for x in ref_folders))
+end
+ref_folder = find_max_ref_folder("./output")
+#ref_folder = "ref14"
 
 maxtime = 60*5 # 60*30=30 minutes
 algs_size = "single" # "small" or "large" or "single" or "adaptive"
-years_per_combination = 4
+years_per_combination = 6
 years_to_add = years_per_combination - 1 # number of years to add to the most interesting year for each combination
 all_interesting_years_at_once = false
 import_combinations = false
@@ -52,12 +58,15 @@ while true
     optimize_all = $(optimize_all),
     all_interesting_years_at_once = $(all_interesting_years_at_once),
     requested_sum_func = $(requested_sum_func),
+    ref_folder = $(ref_folder)
         - Enter 'i' to change the toggle on whether to attempt to import (100 best) combinations from previous run
         - Enter 'a' to make only combinations that include all interesting_years at once
         - Enter 'o' to optimize the weights also for the most interesting years
         - Enter a number to set the max number of minutes for each optimization
         - Enter 'single', 'small', 'adaptive' or 'large' to change the size of the algorithm
         - Enter 'abs', 'sqrt', 'log' or 'sse' to change the sum function
+        - Enter 'ref' followed by a number (e.g. 'ref1') to change the ref_folder
+        - Enter '#years' (e.g 4years) to change the number of years in each combination
         - Enter 'exit' or 'e' to skip\n"; color=:yellow)
     input = readline()
     if input == "exit" || input == "e" || input == ""
@@ -88,6 +97,13 @@ while true
     elseif input == "sse"
         global requested_sum_func = input
         printstyled("Sum function set to $requested_sum_func \n"; color=:green)
+    elseif occursin(r"^ref\d+$", input)
+        global ref_folder = input
+        printstyled("Ref folder set to $ref_folder \n"; color=:green)
+    elseif occursin(r"^\d+years$", input)
+        global years_per_combination = parse(Int, replace(input, "years" => ""))
+        global years_to_add = years_per_combination - length(most_interesting_years)*all_interesting_years_at_once-1*!all_interesting_years_at_once
+        printstyled("Years per combination set to $years_per_combination \n"; color=:green)
     else
         printstyled("Invalid input \n"; color=:red)
     end
@@ -104,21 +120,13 @@ if !optimize_all && years_to_add == 1
     algs_size = "single"
 end
 
-
+#sleep(60*60*5)
 # years_to_add scales insanely with the number of years, so it is not recommended to use more than 2
 
 years_list = map(x -> string(x, "-", x+1), years)
 years_list = vcat(years_list,[i for i in most_interesting_years if !(i in years_list)])
 
 # Load mat data
-function find_max_ref_folder(parent_directory)
-    ref_folders = filter(x -> occursin(r"^ref\d+$", x), readdir(parent_directory))
-    isempty(ref_folders) ? nothing : "ref" * string(maximum(parse(Int, replace(x, "ref" => "")) for x in ref_folders))
-end
-
-ref_folder = find_max_ref_folder("./output")
-#ref_folder = "ref14"
-println("Reading data from $ref_folder")
 total_year = "1980-2019"
 ref_full = matread("output\\$ref_folder\\heatmap_values_$(total_year)_amp$(amplitude_resolution)_window$(window)_area.mat")
 ref_mat = ref_full["recurrance"]
@@ -310,7 +318,9 @@ if typeof(algs_size) == String
 else
     BBO_algs = [algs_size]
 end
-printstyled("At $maxtime s per solve, $(length(BBO_algs)) algs and $(threads_to_start) threads, this will take $(round(length(queue)*maxtime/60/threads_to_start*length(BBO_algs),digits=1)) minutes with multi-threading\n"; color=:green)
+hours_to_solve = Int(div(length(queue)*maxtime/60/threads_to_start*length(BBO_algs),60))
+minutes_to_solve = round((length(queue)*maxtime/60/threads_to_start*length(BBO_algs))%60)
+printstyled("At $maxtime s per solve, $(length(BBO_algs)) algs and $(threads_to_start) threads, this will take $(hours_to_solve)h$(minutes_to_solve)m with multi-threading\n"; color=:green)
 longest_alg_name = maximum([length(string(alg)) for alg in BBO_algs])
 #print, in yellow and with ######-separation, the maxtime and algs that the loop is ran with
 global_best = 9e9

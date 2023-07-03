@@ -70,9 +70,15 @@ for reg in regions:
 
 # Or overwrite the cases list manually
 # iter2_3 = "2002-2003", "1996-1997", "2014-2015"
-cases = ["singleyear_2002to2003_1h", "singleyear_1996to1997_1h", "singleyear_2014to2015_1h", "singleyear_1989to1990_1h", "singleyear_2010to2011_1h", "singleyear_2003to2004_1h",
-         "singleyear_1990to1991_1h", 
-         "iter2_3_1h", "base2extreme2_3_2002to2003_1h", "base3extreme2_3_2002to2003_1h", "base4extreme2_4_2002to2003_1h","base4extreme2_5_2002to2003_1h"]
+cases = [#"singleyear_2002to2003_1h", "singleyear_1996to1997_1h", "singleyear_2014to2015_1h", "singleyear_1989to1990_1h", "singleyear_2010to2011_1h", "singleyear_2003to2004_1h",
+         #"singleyear_1990to1991_1h", 
+        # years to include: ['89', '95', '96', '97', '02', '03', '04', '09', '10', '18']
+        "singleyear_1989to1990_1h", "singleyear_1995to1996_1h", "singleyear_1996to1997_1h", 
+        "singleyear_1997to1998_1h", "singleyear_2002to2003_1h", "singleyear_2003to2004_1h", 
+        "singleyear_2004to2005_1h", "singleyear_2009to2010_1h", "singleyear_2010to2011_1h", 
+        "singleyear_2018to2019_1h",
+
+         "iter2_3_1h", "iter3_16start_2002to2003_1h", "base3extreme2_3_2002to2003_1h", "base4extreme2_12s_i1_2002to2003_1h","base4extreme2_5_2002to2003_1h"]
 #cases = ["singleyear_"+str(year)+"to"+str(year+1)+"_1h" for year in range(1980, 2018)]
 
 comp_name = os.environ['COMPUTERNAME']

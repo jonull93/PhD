@@ -412,7 +412,7 @@ def find_year_and_hour(index, start_year=1980):
 sheets = pd.ExcelFile("input\\cap_ref.xlsx").sheet_names
 # make sheet_name the name of the sheet that starts with "ref" and has the highest number after it
 sheet_name = "ref" + str(max([int(i[3:]) for i in sheets if i.startswith("ref")]))
-#sheet_name = "ref17"
+#sheet_name = "ref16"
 print_red(f"Reading capacities from sheet {sheet_name}")
 cap_df = pd.read_excel("input\\cap_ref.xlsx", sheet_name=sheet_name, header=0, index_col=[0, 1], engine="openpyxl")
 # print(cap_df)

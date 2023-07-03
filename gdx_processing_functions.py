@@ -141,6 +141,28 @@ def run_case(scen_name, gdxpath, indicators, FC=False, print_FR_summary=False):
         cost_tot_onlynew = gdx(f, "v_totcost").level
         cost_partload = gdx(f, "o_cost_partload")
         cost_flexlim = gdx(f, "o_cost_flexlim")
+        cost_OMvar = gdx(f, "o_cost_OMvar")
+        cost_OMfix = gdx(f, "o_cost_OMfix")
+        cost_fuel = gdx(f, "o_cost_fuel")
+        cost_CO2 = gdx(f, "o_cost_CO2")
+        cost_CCS = gdx(f, "o_cost_CCS")
+        cost_newinv = gdx(f, "o_cost_newinv")
+        #if cost_fuel has "stochastic_scenarios" as index, then sum over it, otherwise just take cost_fuel
+        if "stochastic_scenarios" in cost_fuel.index.names:
+            cost_variable = cost_fuel.groupby(level="stochastic_scenarios").sum()
+            #cost_variable = pd.DataFrame(cost_fuel).groupby(level="stochastic_scenarios").sum()
+        else:
+            cost_variable = cost_fuel
+            #cost_variable = pd.DataFrame(cost_fuel)
+
+        for _df in [cost_flexlim, cost_OMvar, cost_CO2, cost_CCS]:
+            if type(_df) not in [pd.Series]:
+                print_red(f"! {type(_df)} in the cost_variable loop")
+            if not _df.empty:
+                if "stochastic_scenarios" in _df.index.names:
+                    _df = _df.groupby(level="stochastic_scenarios").sum()
+                # this will throw an error about fill_value not being implemented if series and dfs get mixed 
+                cost_variable = cost_variable.add(_df, fill_value=0) 
         allthermal = gdx(f, "allthermal")
         thermal_share_total = gen_per_eltech[gen_per_eltech.index.isin(allthermal, level="tech")].sum()/gen_per_eltech.sum()
         print(f"thermal_share_total = {round(thermal_share_total,2)}   ({scen_name})")

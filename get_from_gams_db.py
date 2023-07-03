@@ -69,7 +69,7 @@ def get_from_db(db, symbol_name):
 
 def which_set(iterable):
     import string
-    for i, set in enumerate([['ES_N','ES_S','SE_S','DE_N',]+[i for i in EPODs if i not in tech_names],
+    for i, set in enumerate([['ES_N','ES_S','SE_S','DE_N','DE_S']+[i for i in EPODs if i not in tech_names],
                              list(tech_names.keys()),
                              [f"d{d:03}{h}" for d in range(1,366) for h in string.ascii_lowercase[:24]],  # d001a etc
                              [str(i) for i in range(1, 9)],
@@ -83,7 +83,8 @@ def which_set(iterable):
             # print("checking item", item)
             if item in iterable:
                 return ["I_reg", "tech", "timestep", "FR_period", "model_year", "stochastic_scenarios", "tech_con", "tech_prop"][i]
-    if len(iterable) > 0: print("found no match for", iterable)
+    if len(iterable) > 0 and "marginal" not in iterable: 
+        print("found no match for", iterable)
     return ''
 
 
@@ -116,6 +117,7 @@ def gdx(f, symbol_name, silent=False, error_return=None, keep_na=False, dud_df_r
             symbol = betterIndex(symbol)
         else:
             symbol.index = symbol.index.astype(str)
+            symbol.index.name = which_set(symbol.index.astype(str))
         if not keep_na: symbol.fillna(0, inplace=True)
         if expected_a_df:
             symbol = symbol.reindex(index=dud_df_return.index, columns=dud_df_return.columns, fill_value=0)
@@ -125,6 +127,7 @@ def gdx(f, symbol_name, silent=False, error_return=None, keep_na=False, dud_df_r
             symbol = betterIndex(symbol)
         else:
             symbol.index = symbol.index.astype(str)
+            symbol.index.name = which_set(symbol.index.astype(str))
         if not keep_na: symbol.fillna(0, inplace=True)
         try:
             if expected_a_df: symbol = symbol.reindex(index=dud_df_return.index, columns=dud_df_return.columns, fill_value=0)
