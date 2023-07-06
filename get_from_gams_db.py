@@ -74,7 +74,7 @@ def which_set(iterable):
                              [f"d{d:03}{h}" for d in range(1,366) for h in string.ascii_lowercase[:24]],  # d001a etc
                              [str(i) for i in range(1, 9)],
                              ['2020', '2025', '2030', '2035', '2040', '2045', '2050'],
-                             ['sy1_'+str(year) for year in range(2010,2020)]+[f"{y}-{y+1}" for y in range(1980,2020)],
+                             ['sy1_'+str(year) for year in range(2010,2020)]+[f"{y}-{y+1}" for y in range(1980,2020)]+[str(year) for year in range(1980, 2020)],
                              ['OHAC', 'SCDC'],
                              ['life', 'heat_type', 'd-cost', 'OM_var', 'OM_fix', 'LF', 'd', 'fuel']
                              ]):

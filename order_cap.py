@@ -5,6 +5,9 @@ CHP = ['WA_CHP', 'B_CHP', 'W_CHP', 'H_CHP', 'G_CHP', 'WG_CHP', "CHP"]
 midload = ['G', 'WG', 'WG_PS',]
 peak = ['G_peak', 'WG_peak', "Peak"]
 thermals = baseload + CCS + CHP + midload + ["Other thermals"] + peak + ["Fossil thermals", "Bio thermals", "Thermals"]
+nonPeak_thermals = thermals
+nonPeak_thermals.remove("WG_peak")
+nonPeak_thermals.remove("Peak")
 wind = ["Wind", 'WOFF', 'WON', 'wind_onshore', 'wind_offshore', ] + ["WON" + ab + str(dig) for ab in ["A", "B"] for dig
                                                                      in range(5, 0, -1)] + ["WOFF" + str(dig) for dig in range(5, 0, -1)]
 PV = ["PVPA1", "PVPA2", "PVPA3", "PVPA4", "PVPA5", "PVR1", "PVR2", "PVR3", "PVR4", "PVR5", "PV", "Solar PV"]
@@ -19,3 +22,6 @@ order_cap = hydro + thermals + VRE + H2 + bat + PS + PtH
 order_cap2 = hydro + thermals + ["bat_cap", "Bat. power", "FC"] + VRE + H2 + bat + PS + PtH
 # now remove duplicates from order_cap2 while keeping the order
 order_cap2 = list(dict.fromkeys(order_cap2))
+
+order_cap3 = hydro + nonPeak_thermals + VRE + ["WG_peak", "Peak"] + H2 + bat + PS + PtH
+order_cap3 = list(dict.fromkeys(order_cap3))

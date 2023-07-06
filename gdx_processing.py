@@ -76,7 +76,9 @@ cases = [#"singleyear_2002to2003_1h", "singleyear_1996to1997_1h", "singleyear_20
         "singleyear_1989to1990_1h", "singleyear_1995to1996_1h", "singleyear_1996to1997_1h", 
         "singleyear_1997to1998_1h", "singleyear_2002to2003_1h", "singleyear_2003to2004_1h", 
         "singleyear_2004to2005_1h", "singleyear_2009to2010_1h", "singleyear_2010to2011_1h", 
-        "singleyear_2018to2019_1h",
+        "singleyear_2018to2019_1h", "singleyear_2014to2015_1h",
+        # also 2012 and 2016-2017
+        "singleyear_1h_2012", "singleyear_2016to2017_1h",
 
          "iter2_3_1h", "iter3_16start_2002to2003_1h", "base3extreme2_3_2002to2003_1h", "base4extreme2_12s_i1_2002to2003_1h","base4extreme2_5_2002to2003_1h"]
 #cases = ["singleyear_"+str(year)+"to"+str(year+1)+"_1h" for year in range(1980, 2018)]
@@ -182,13 +184,13 @@ def crawl_gdx(q_gdx, old_data, gdxpath, thread_nr, overwrite, todo_gdx_len, file
                     alternative = "_".join(alternative)
                     print_cyan("Looking for", alternative)
                     if alternative in files:
-                        print_cyan("Found and added to the queue an alternative file:",alternative)
+                        print_green("Found and added to the queue an alternative file:",alternative)
                         q_gdx.put((scen_i, alternative))
                         todo_gdx.append(alternative)
                         found_alternative = True
                 if "1h" in scen_name and not found_alternative:
                     if scen_name.replace("1h", "3h") in files:
-                        print_cyan("Found and added to the queue an alternative file:", scen_name.replace("1h", "3h"))
+                        print_green("Found and added to the queue an alternative file:", scen_name.replace("1h", "3h"))
                         q_gdx.put((scen_i, scen_name.replace("1h", "3h")))
                         todo_gdx.append(scen_name.replace("1h", "3h"))
         except:

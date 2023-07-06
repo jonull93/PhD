@@ -136,6 +136,7 @@ def run_case(scen_name, gdxpath, indicators, FC=False, print_FR_summary=False):
         iter_t = range(len(gams_timestep))
         timestep = [i + 1 for i in iter_t]  # 1
         TT = 8760 / len(gams_timestep)
+        stochastic_probability = gdx(f, "stochastic_year_probability")
         allwind = gdx(f, "timestep")
         cost_tot = gdx(f, "o_cost_total_oldinv", silent=False)
         cost_tot_onlynew = gdx(f, "v_totcost").level

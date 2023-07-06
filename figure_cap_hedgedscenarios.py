@@ -2,6 +2,7 @@ import os
 import pandas as pd
 import matplotlib.pyplot as plt
 import glob
+import re
 from my_utils import color_dict, tech_names, print_red, print_cyan, print_green, print_magenta, print_blue, print_yellow
 from order_cap import wind, PV, baseload, peak, CCS, CHP, midload, hydro, PtH, order_cap, order_cap2
 from datetime import datetime
@@ -25,14 +26,22 @@ tech_groups = {
 }
 tech_groups2 = {
     "Battery": ["bat_cap", "bat"],
+    "Hydrogen": ["H2store", "electrolyser","FC"],
     "VRE": PV + wind,
-    "Slow thermals": CCS + CHP + midload + ["W", "U", "Other thermals"],
-    "Peak": peak,
-    "H2": ["H2store", "electrolyser","FC"],
+    "Thermals": CCS + CHP + midload + ["W", "U", "Other thermals"] + peak,
+    #"Peak": peak,
 }
 techs_to_exclude = PtH + ["Electrolyser", "electrolyser", "H", "b", "H_CHP", "B_CHP"]
 storage_techs = ["bat", "H2store"]
 storage_techs = storage_techs + [tech_names[t] for t in storage_techs if t in tech_names]
+
+def shorten_year(scenario):
+    # define a function to be used in re.sub
+    def replacer(match):
+        return "'" + match.group()[-2:]
+
+    # use re.sub to replace all occurrences of 4-digit years
+    return re.sub(r'(19|20)\d{2}', replacer, scenario)
 
 def select_pickle(use_defaults):
     pickle_files = glob.glob(os.path.join(pickle_folder, "data_results_*.pickle"))
@@ -53,6 +62,8 @@ def select_pickle(use_defaults):
     print_yellow("1. Most recent file")
     print_yellow("2. Largest file")
     print_yellow("3. Hardcoded filename")
+    print_yellow("4. Pick among the 10 most recent files")
+    print_yellow("5. Enter the filename manually")
 
     user_input = input("Please enter the option number: ")
     if user_input == '1':
@@ -70,6 +81,29 @@ def select_pickle(use_defaults):
         else:
             print_red("The hardcoded file was not found in the directory. Falling back to the most recent file.")
             return pickle_files[0] # The list is already sorted by modification time
+    elif user_input == '4':
+        # Pick among the 10 most recent files
+        print_yellow("Pick among the 10 most recent files:")
+        for i, f in enumerate(pickle_files[:10]):
+            print_yellow(f"{i+1}. {f}")
+        user_input = input("Please enter the option number: ")
+        try:
+            return pickle_files[int(user_input)-1]
+        except:
+            print_red("Invalid input. Falling back to the most recent file.")
+            return pickle_files[0]
+    elif user_input == '5':
+        # Enter the filename manually
+        user_input = input("Please enter the filename: ")
+        if user_input in pickle_files or "PickleJar\\" + user_input in pickle_files or "PickleJar\\"+user_input+".pickle" in pickle_files:
+            if ".pickle" not in user_input:
+                user_input = user_input + ".pickle"
+            if "PickleJar\\" not in user_input:
+                user_input = "PickleJar\\" + user_input
+            return user_input
+        else:
+            print_red("The file was not found in the directory. Falling back to the most recent file.")
+            return pickle_files[0]
 
 
 def load_data(pickle_file, use_defaults):
@@ -83,14 +117,19 @@ def load_data(pickle_file, use_defaults):
     selected_scenarios = []
     if use_defaults:
         # Use all scenarios, but if there's a scenarioname with "1h", skip the one with "3h" if there is one
-        selected_scenarios = all_scenarios 
-        for s in all_scenarios:
+        selected_scenarios = [i for i in all_scenarios if "singleyear" not in i]
+        print_magenta(f"Included sets: {selected_scenarios}")
+        # add the singleyear scenarios corresponding to 2012, 2016-2017, 1996-1997, 2002-2003, 2003-2004, 2009-2010
+        years_to_add = [i for i in all_scenarios if "singleyear" in i and ("singleyear_1h_2012" in i or "singleyear_2016to2017_" in i or "singleyear_1996to1997_" in i or "singleyear_2002to2003_" in i or "singleyear_2003to2004_" in i or "singleyear_2009to2010_" in i)]
+        selected_scenarios = selected_scenarios + years_to_add
+
+        for s in selected_scenarios:
             if "1h" in s:
-                selected_scenarios = [s for s in all_scenarios if s != s.replace("1h", "3h")]
+                selected_scenarios = [s for s in selected_scenarios if s != s.replace("1h", "3h")]
                 break
             # then do the same to skip the "tight" scenarios
             if "tight" not in s:
-                selected_scenarios = [s for s in all_scenarios if s != s + "tight"]
+                selected_scenarios = [s for s in selected_scenarios if s != s + "tight"]
                 break
     else:
         # Let the user exclude some scenarios
@@ -145,6 +184,9 @@ def load_data(pickle_file, use_defaults):
             print_yellow("Invalid input. Keeping all scenarios")
     if has_altscenarios and use_defaults:
         print_yellow("There are alternative scenarios in the data.")
+
+    selected_scenarios_to_print = "\n".join(selected_data.keys())
+    print_blue(f"Selected scenarios: \n{selected_scenarios_to_print}")
     return selected_data
 
 
@@ -182,8 +224,10 @@ def group_technologies(data):
 
 
 def prettify_scenario_name(name):
-    if "iter" in name:
+    if "iter2_3" in name:
         return "Set (1 opt.)"
+    elif "iter3_16start" in name:
+        return "Set (2 opt.)"
     # remove 'base' and 'extreme' and split into a list
     parts = name.replace('base', '').replace('extreme', ' ').split()
     if "v2" in name or "_5_" in name:
@@ -327,7 +371,7 @@ def create_figure_separated_techs(grouped_data, pickle_timestamp, use_defaults):
         os.makedirs('figures/capacity')
 
     # Create a figure and axes
-    fig, axs = plt.subplots(len(tech_groups2)//2, 2, figsize=(7,3*len(tech_groups2)//2)) 
+    fig, axs = plt.subplots((len(tech_groups2)-1)//2+1, 2, figsize=(7,3*len(tech_groups2)//2)) 
     axes = axs.flatten()
 
     # Combine all scenarios into a single DataFrame
@@ -345,6 +389,27 @@ def create_figure_separated_techs(grouped_data, pickle_timestamp, use_defaults):
         # Set the title for this subplot
         ax.set_title(group_name)
 
+        # After plotting, iterate over the bars and add labels
+        def conditional_label(bar, cutoff):
+            # Get the height of the bar
+            height = bar.get_height()
+            # If height is greater than or equal to cutoff, return label
+            if abs(height) >= 100:
+                return f'{height:.0f}'
+            # Otherwise, return an empty string
+            elif abs(height) >= cutoff:
+                return f'{height:.0f}'
+            else:
+                return ''
+        
+        # get the max y-value for this subplot
+        max_y = ax.get_ylim()[1]
+        for bars in ax.containers:
+            # Apply this function to each bar
+            for bar in bars:
+                label = conditional_label(bar, 10)
+                ax.text(bar.get_x() + bar.get_width() / 2, bar.get_y() + bar.get_height()-max_y*0.04, label, ha='center', va='center', fontsize=6)
+
     # Add overall title, labels, legend etc. to your liking
     # Change the x-labels to be right-aligned
     for i_a, ax in enumerate(axes):
@@ -359,7 +424,7 @@ def create_figure_separated_techs(grouped_data, pickle_timestamp, use_defaults):
                 new_labels.append(temp_label)
             else:
                 # change all years from 19## or 20## to '## (e.g. 1990 to '90)
-                scenario = scenario.replace('19','\'').replace('20','\'')
+                scenario = shorten_year(scenario).replace('_tight','').replace('1h_','')
                 new_labels.append(scenario)
 
         ax.set_xticklabels(new_labels, rotation=35, ha='right', fontsize=10, rotation_mode='anchor')
@@ -371,14 +436,14 @@ def create_figure_separated_techs(grouped_data, pickle_timestamp, use_defaults):
                 new_labels.append(tech_names[label])
             else:
                 new_labels.append(label)
-        ax.legend(handles[::-1], new_labels[::-1], loc='lower right') # [::-1] to reverse the order of the legend entries
-
+        ncols = 1+(len(new_labels)>2)
+        ax.legend(handles[::-1], new_labels[::-1], loc='lower center', framealpha=0.65, ncols=2, fontsize="small") # [::-1] to reverse the order of the legend entries
         if i_a==0:
             ax.set_ylabel('Installed capacity [GW(h)]')
         else:
             ax.set_ylabel('Installed power capacity [GW]')
     fig.tight_layout(pad=0.5)
-    plt.subplots_adjust(wspace=0.25)
+    plt.subplots_adjust(wspace=0.29)
     # Save and close the figure as in your original function
     # Save the figure as PNG and SVG (or EPS)
     fig_name_base = f"figures/capacity/{pickle_timestamp}"

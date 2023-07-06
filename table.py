@@ -55,7 +55,7 @@ def load_pickle_file(pickle_file, default_options=True):
 
 def select_indicators(data, default_options=True):
     # list the indicators in Data and ask the user whether some should be removed
-    default_indicators = ["cost_tot", "cost_variable", "cost_newinv", "cost_OMfix", "bio_use"]
+    default_indicators = ["stochastic_probability","cost_tot", "cost_variable", "cost_newinv", "cost_OMfix", "bio_use"]
     if not default_options:
         print_yellow("Which indicators should be included in the table? ('all' / 'item1, item2..' /'none')")
         print_yellow("[Default option (''): Total cost as well as each year's variable cost and bio use]")
@@ -161,9 +161,10 @@ def make_df(data, indicators, default_options=True):
     new_scenario_names = [prettify_scenario_name(name,year) for year,name in df.index]
     map_dict = {old:new for old,new in zip(df.index.get_level_values("scenario"), new_scenario_names)}
     df = df.rename(index=map_dict, level="scenario")
+
     # Reorder the index: alphabetically for the first year, and according to the scenario_order list for the scenario level
     scenario_order = ["Single year", "Set (1 opt.)", "Set (2 opt.)", "Set (3 opt.)", "Set (4 opt.)", "Alt. set (4 opt.)"]
-    print_magenta(df.round(3))
+
     # Sort the 'profile_year' level
     df.sort_index(level='profile_year', inplace=True)
 
@@ -182,6 +183,8 @@ def make_df(data, indicators, default_options=True):
 
     # Set the index back to ['profile_year', 'scenario']
     df = df_reset.set_index(['profile_year', 'scenario'])
+
+    print_magenta(df.round(3))
     return df
 
 
