@@ -3,6 +3,7 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import glob
+import re
 from my_utils import color_dict, tech_names, print_red, print_cyan, print_green, print_magenta, print_blue, print_yellow
 from order_cap import wind, PV, baseload, peak, CCS, CHP, midload, hydro, PtH, order_cap, order_cap2, order_cap3
 from datetime import datetime
@@ -27,6 +28,14 @@ tech_groups = {
 techs_to_exclude = PtH + ["Electrolyser", "electrolyser", "H", "b", "H_CHP", "B_CHP"]
 storage_techs = ["bat", "H2store"]
 storage_techs = storage_techs + [tech_names[t] for t in storage_techs if t in tech_names]
+
+def shorten_year(scenario):
+    # define a function to be used in re.sub
+    def replacer(match):
+        return "'" + match.group()[-2:]
+
+    # use re.sub to replace all occurrences of 4-digit years
+    return re.sub(r'(19|20)\d{2}', replacer, scenario)
 
 def select_pickle(use_defaults):
     pickle_files = glob.glob(os.path.join(pickle_folder, "data_results_*.pickle"))
@@ -297,7 +306,11 @@ def create_figure(grouped_data, pickle_timestamp, use_defaults):
 
     # Find all unique years
     unique_years = combined_data.columns.get_level_values(0).unique()
-    years_to_add = [i for i in unique_years if ("1996-1997" in i or "2002-2003" in i or "2003-2004" in i or "2009-2010" in i or "1995-1996" in i or "1997-1998" in i or "2004-2005" in i or "2018-2019" in i or "2014-2015" in i)]
+    years_to_add = ["1996-1997","2002-2003","2014-2015","2009-2010","2003-2004","1995-1996","1997-1998","2004-2005","2018-2019"]
+    years_to_add = [i for i in years_to_add if i in unique_years]
+                    #("1996-1997" in i or "2002-2003" in i or "2003-2004" in i or "2009-2010" in i or 
+                    # "1995-1996" in i or "1997-1998" in i or "2004-2005" in i or "2018-2019" in i or 
+                    # "2014-2015" in i)]
 
     # Variables to collect all scenarios and their positions
     all_positions = []
@@ -307,6 +320,7 @@ def create_figure(grouped_data, pickle_timestamp, use_defaults):
     # For each unique year, create a cluster of stacked bars
     next_cluster_pos = 0
     for i, year in enumerate(years_to_add):
+        print_yellow(f'Plotting {year}...')
         year_data = combined_data[year]  # Get the data for this year
         bars_cluster, positions, scenarios, next_cluster_pos = plot_cluster(year_data, next_cluster_pos, ax1)  # Create the cluster at position i
 
@@ -363,8 +377,8 @@ def create_figure(grouped_data, pickle_timestamp, use_defaults):
     cluster_positions = [(np.array(all_positions)[change_indices[i-1]:change_indices[i]]).mean() for i in range(1, len(change_indices))]
 
     # Add a text label for each year
-    for pos, year in zip(cluster_positions, unique_years):
-        ax1.text(pos, max_height + 0.06*max_height, str(year).replace("20","'").replace("19","'"), ha='center', fontsize=7)  # change 0.1 to desired proportion
+    for pos, year in zip(cluster_positions, years_to_add):
+        ax1.text(pos, max_height + 0.06*max_height, shorten_year(year), ha='center', fontsize=7)  # change 0.1 to desired proportion
 
     # Get legend location from user
     if not use_defaults:
