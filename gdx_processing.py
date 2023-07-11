@@ -80,7 +80,9 @@ cases = [#"singleyear_2002to2003_1h", "singleyear_1996to1997_1h", "singleyear_20
         # also 2012 and 2016-2017
         "singleyear_1h_2012", "singleyear_2016to2017_1h",
 
-         "iter2_3_1h", "iter3_16start_2002to2003_1h", "base3extreme2_3_2002to2003_1h", "base4extreme2_12s_i1_2002to2003_1h","base4extreme2_5_2002to2003_1h"]
+         "iter2_3_1h", "iter3_16start_2002to2003_1h",
+         "base3extreme2_3_2002to2003_1h", "base4extreme2_12s_i1_2002to2003_1h",
+         "base4extreme2_5_2002to2003_1h", "base4extreme2_even_2002to2003_1h",]
 #cases = ["singleyear_"+str(year)+"to"+str(year+1)+"_1h" for year in range(1980, 2018)]
 
 comp_name = os.environ['COMPUTERNAME']
