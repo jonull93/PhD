@@ -188,6 +188,8 @@ def prettify_scenario_name(name,year):
             # join the parts with appropriate labels
             if "v2" in name:
                 return f'Alt. set ({parts[0]} opt.)'
+            elif "even" in name:
+                return f'6 yr, eq. weights'
             return f'Set ({parts[0]} opt.)'
     else:
         return "Single year"

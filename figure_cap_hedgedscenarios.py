@@ -232,6 +232,8 @@ def prettify_scenario_name(name):
     parts = name.replace('base', '').replace('extreme', ' ').split()
     if "v2" in name or "_5_" in name:
         return f'Alt. set ({parts[0]} opt.)'
+    elif "even" in name:
+        return f'6 yr, eq. weights'
     # join the parts with appropriate labels
     return f'Set ({parts[0]} opt.)'
 
