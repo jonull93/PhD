@@ -23,6 +23,7 @@ Outputs:
 CFD plot and VRE event df for fingerprint matching
 """
 
+print_cyan(f"Starting figure_CFD.py at {dt.datetime.now().strftime('%d-%m-%Y, %H:%M:%S')}")
 os.system('color')
 
 # in \output\ there are subfolders called "ref#", save the name of the ref folder with the highest number
@@ -32,7 +33,7 @@ for folder in os.listdir("PickleJar"):
         ref_folders.append(folder)
 ref_folders.sort(key=lambda x: int(x[3:]))
 ref_folder = ref_folders[-1]
-ref_folder = "ref16"
+#ref_folder = "ref23"
 print_magenta(f"ref_folder: {ref_folder}")
 #mkdir figures\\CFD plots\\{ref_folder}
 os.makedirs(f"figures\\CFD plots\\{ref_folder}", exist_ok=True)
