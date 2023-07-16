@@ -4,6 +4,7 @@ fingerprintmatching:
 - Author: Jonathan Ullmark
 - Date: 2023-01-18
 =#
+
 import Combinatorics: combinations
 using MAT
 using Optim
@@ -30,7 +31,7 @@ if false
     years = [i for i in years if !(i in to_remove)]
     println("Removed years: $(to_remove)")
 end
-most_interesting_years = ["2002-2003","1996-1997"]#["1986-1987","1989-1990"]["1989-1990","2005-2006"]#["1984-1985", "1995-1996"]#["2010-2011","2002-2003",]
+extreme_years = ["2002-2003", "1996-1997"]#["1986-1987","1989-1990"]["1989-1990","2005-2006"]#["1984-1985", "1995-1996"]#["2010-2011","2002-2003",]
 function find_max_ref_folder(parent_directory)
     ref_folders = filter(x -> occursin(r"^ref\d+$", x), readdir(parent_directory))
     isempty(ref_folders) ? nothing : "ref" * string(maximum(parse(Int, replace(x, "ref" => "")) for x in ref_folders))
@@ -41,11 +42,12 @@ ref_folder = find_max_ref_folder("./output")
 maxtime = 60*5 # 60*30=30 minutes
 algs_size = "single" # "small" or "large" or "single" or "adaptive"
 years_per_combination = 6
-years_to_add = years_per_combination - 1 # number of years to add to the most interesting year for each combination
-all_interesting_years_at_once = false
 import_combinations = false
 optimize_all = false
-requested_sum_func = "abs_sum" # "abs_sum" or "sqrt_sum" or "log_sum" or "sse"
+requested_sum_func = "sse" # "abs_sum" or "sqrt_sum" or "log_sum" or "sse"
+simultaneous_extreme_years = 2
+years_to_add = years_per_combination - simultaneous_extreme_years # number of years to add to the extreme years for each combination
+years_to_optimize = years_to_add + simultaneous_extreme_years*optimize_all
 # ask the user whether to import the 100 best combinations from the previous run
 while true
     printstyled("
@@ -53,20 +55,20 @@ while true
     maxtime = $(maxtime/60) minutes,
     algs_size = $(algs_size),
     years_per_combination = $(years_per_combination),
-    most_interesting_years = $(most_interesting_years),
     import_combinations = $(import_combinations),
+    extreme_years = $(extreme_years),
+    simultaneous_extreme_years = $(simultaneous_extreme_years),
     optimize_all = $(optimize_all),
-    all_interesting_years_at_once = $(all_interesting_years_at_once),
     requested_sum_func = $(requested_sum_func),
     ref_folder = $(ref_folder)
-        - Enter 'i' to change the toggle on whether to attempt to import (100 best) combinations from previous run
-        - Enter 'a' to make only combinations that include all interesting_years at once
-        - Enter 'o' to optimize the weights also for the most interesting years
         - Enter a number to set the max number of minutes for each optimization
         - Enter 'single', 'small', 'adaptive' or 'large' to change the size of the algorithm
+        - Enter '#years' (e.g 4years) to change the number of years in each combination
+        - Enter 'i' to change the toggle on whether to attempt to import (100 best) combinations from previous run
+        - Enter 'o' to optimize the weights also for the extreme years
+        - Enter '#ey' (e.g 2ey) to change the number of extreme years in each combination
         - Enter 'abs', 'sqrt', 'log' or 'sse' to change the sum function
         - Enter 'ref' followed by a number (e.g. 'ref1') to change the ref_folder
-        - Enter '#years' (e.g 4years) to change the number of years in each combination
         - Enter 'exit' or 'e' to skip\n"; color=:yellow)
     input = readline()
     if input == "exit" || input == "e" || input == ""
@@ -79,14 +81,17 @@ while true
             printstyled("Will not attempt to import combinations from previous run \n"; color=:red)
         end
     elseif input == "a"
-        global all_interesting_years_at_once = !all_interesting_years_at_once  # if true, use all years in most_interesting_years, if false, use only one at a time
-        global years_to_add = years_per_combination - length(most_interesting_years)*all_interesting_years_at_once-1*!all_interesting_years_at_once
-        printstyled("Using all interesting years at once \n"; color=:green)
+        global simultaneous_extreme_years = length(extreme_years)  # if true, use all years in extreme_years, if false, use only one at a time
+        global years_to_add = years_per_combination - simultaneous_extreme_years
+        global years_to_optimize = years_to_add + simultaneous_extreme_years*optimize_all
+        global optimize_all = years_to_optimize == years_per_combination
+        printstyled("Using all extreme years at once \n"; color=:green)
     elseif tryparse(Float32,input) != nothing
         global maxtime = parse(Float32,input)*60
         printstyled("Max time set to $(maxtime/60) minutes \n"; color=:green)
     elseif input == "o"
         global optimize_all = !optimize_all
+        global years_to_optimize = years_to_add + simultaneous_extreme_years*optimize_all
         printstyled("Optimizing weights for all years \n"; color=:green)
     elseif input == "single" || input == "small" || input == "adaptive" || input == "large"
         global algs_size = input
@@ -100,31 +105,41 @@ while true
     elseif occursin(r"^ref\d+$", input)
         global ref_folder = input
         printstyled("Ref folder set to $ref_folder \n"; color=:green)
-    elseif occursin(r"^\d+years$", input)
-        global years_per_combination = parse(Int, replace(input, "years" => ""))
-        global years_to_add = years_per_combination - length(most_interesting_years)*all_interesting_years_at_once-1*!all_interesting_years_at_once
-        printstyled("Years per combination set to $years_per_combination \n"; color=:green)
+    elseif occursin(r"^\d+years$", input) || occursin(r"^\d+y$", input)
+        global years_per_combination = parse(Int, replace(replace(input, "years" => ""), "y" => ""))
+        global years_to_add = years_per_combination - simultaneous_extreme_years
+        global years_to_optimize = years_to_add + simultaneous_extreme_years*optimize_all
+        global optimize_all = years_to_optimize == years_per_combination
+        printstyled("Years per combination set to $years_per_combination, $years_to_add years to add from list\n"; color=:green)
+    elseif occursin(r"^\d+ey$", input)
+        global simultaneous_extreme_years = parse(Int, replace(input, "ey" => ""))
+        global years_to_add = years_per_combination - simultaneous_extreme_years
+        global years_to_optimize = years_to_add + simultaneous_extreme_years*optimize_all
+        global optimize_all = years_to_optimize == years_per_combination
+        printstyled("Simultaneous extreme years set to $simultaneous_extreme_years, $years_to_add years to add from list\n"; color=:green)
     else
         printstyled("Invalid input \n"; color=:red)
     end
 end
-years_not_optimized = 0
-if !optimize_all
-    years_not_optimized = years_per_combination - years_to_add
-    printstyled("-- Only optimizing for $years_to_add year(s) -- \n"; color=:red, bold=true)
-end
+years_not_optimized = years_per_combination - years_to_optimize
+printstyled("-- Optimizing for $years_to_optimize year(s) out of $years_per_combination -- \n"; color=:red, bold=true)
 
-if !optimize_all && years_to_add == 1
+if years_to_optimize == 1
     printstyled("There is only one year to optimize, so maxtime will be reduced to 5s and alg set to 'single'\n"; color=:red)
     maxtime = 5
     algs_size = "single"
 end
 
-#sleep(60*60*5)
+if optimize_all && years_to_optimize == years_per_combination
+    optimize_all = true
+    printstyled("All years will be optimized, so optimize_all will be set to true\n"; color=:green)
+end
+
+# sleep(60*60*2)
 # years_to_add scales insanely with the number of years, so it is not recommended to use more than 2
 
 years_list = map(x -> string(x, "-", x+1), years)
-years_list = vcat(years_list,[i for i in most_interesting_years if !(i in years_list)])
+years_list = vcat(years_list,[i for i in extreme_years if !(i in years_list)]) # if some years has been excluded, make sure to add back the extreme years
 
 # Load mat data
 total_year = "1980-2019"
@@ -137,7 +152,7 @@ printstyled("\nImported total matrix $(size(ref_mat)) for $(total_year) \n"; col
 #printstyled("Sum of extreme rows: $(sum(ref_mat[1,:])) and $(sum(ref_mat[end,:])) \n"; color=:cyan)
 #printstyled("Sum of extreme columns: $(sum(ref_mat[:,1])) and $(sum(ref_mat[:,end])) \n"; color=:cyan)
 # load weight matrices to be used with the error func sum_weight_mat, see git\python\figures\weight_matrix#.png for visuals
-weight_matrices = matread("output/weight_matrices.mat")
+weight_matrices = matread("output/weight_matrices.mat", )
 weight_matrix_lin19diff = weight_matrices["Z_lin19diff"]
 weight_matrix_lin190diff = weight_matrices["Z_lin190diff"]
 weight_matrix_sqrt = weight_matrices["Z_sqrt"]  # min = 1, max = 14
@@ -154,7 +169,8 @@ if import_combinations
     folder_name = readlines("results/$ref_folder/most_recent_results.txt")[1]
     # read folder_name/best_100.json, or skip to the else-block if the file does not exist
     if !isfile("$(folder_name)/best_100.json")
-        println("File $(folder_name)/best_100.json does not exist, skipping import of combinations")
+        printstyled("File $(folder_name)/best_100.json does not exist, skipping import of combinations\n", color=:red)
+        sleep(3)
         @goto skip_import
     end
     best_100 = JSON.parsefile("$(folder_name)/best_100.json")
@@ -170,22 +186,14 @@ else
     println("Years: $(years_list)")
     println("Number of years: $(length(years_list))")
 
-    if all_interesting_years_at_once
-        years_to_use = [i for i in years_list if !(i in most_interesting_years)]
-        year_combinations = combinations(years_to_use, years_to_add)
-        for combination in year_combinations
-            case = copy(most_interesting_years)
-            append!(case,combination)
-            enqueue!(queue,case)
-            push!(all_combinations,case)
-        end
-    else
-        for interesting_year in most_interesting_years
-            #printstyled("Starting optimization that include year $(interesting_year)\n"; color=:cyan)
-            year_combinations[interesting_year] = combinations(filter(!=(interesting_year),years_list), years_to_add)  # a generator instead of a list until collect() is used
-            for combination in year_combinations[interesting_year]
-                case = [interesting_year]
-                append!(case,combination)
+    extreme_year_combinations = combinations(extreme_years, simultaneous_extreme_years)
+    for extreme_year_set in extreme_year_combinations
+        years_to_use = [i for i in years_list if !(i in extreme_year_set)]
+        if length(years_to_use) >= years_to_add
+            global year_combinations = combinations(years_to_use, years_to_add)
+            for combination in year_combinations
+                case = copy(extreme_year_set)
+                append!(case, combination)
                 enqueue!(queue,case)
                 push!(all_combinations,case)
             end
@@ -341,41 +349,36 @@ global initial_guesses_4 = [
     [5/40,5/40,15/40,15/40]
     ]
 global initial_guesses_2 = [
-    [1/2, 1/2], [1/3, 2/3], [2/3, 1/3], [2/40, 38/40], [38/40, 2/40]
+    [1/2, 1/2], [1/3, 2/3], [2/3, 1/3], [2/40, 38/40], [38/40, 2/40], [6/40, 34/40], [34/40, 6/40]
     ]
 global initial_guesses_1 = [
     [1.]
     ]
 global initial_guesses = initial_guesses_3
 
-bounds = (1/40, 1-1/40)
-if !optimize_all
-    # if we are not optimizing all years, that means we are optimizing the last years_to_add years
-    # so initial_guesses should be the nr equal to years_to_add
-    if years_to_add == 1
-        initial_guesses = initial_guesses_1
-        printstyled("Initial guesses: initial_guesses_1\n"; color=:yellow)
-    elseif years_to_add == 2
-        initial_guesses = initial_guesses_2
-        printstyled("Initial guesses: initial_guesses_2\n"; color=:yellow)
-    elseif years_to_add == 3
-        initial_guesses = initial_guesses_3
-        printstyled("Initial guesses: initial_guesses_3\n"; color=:yellow)
-    elseif years_to_add == 4
-        initial_guesses = initial_guesses_4
-        printstyled("Initial guesses: initial_guesses_4\n"; color=:yellow)
-    end
-    if years_to_add == 1
-        #if we're optimizing only 1 year, then the bounds are just 1 value: 1-length(most_interesting_years)/40
-        bounds = (1-length(most_interesting_years)/40, 1-length(most_interesting_years)/40)
-    end
-    # decrease all values in the lists in initial_guesses by 1/40
-    for i in 1:length(initial_guesses)
-        initial_guesses[i] = initial_guesses[i] .- years_not_optimized/40/years_to_add
-    end
-    println("decreased each initial guess by $(years_not_optimized/40/years_to_add) so that the initial guesses sum to $(sum(initial_guesses[1])+years_not_optimized/40)")
-    #println(initial_guesses)
-else 
+bounds = (0+years_not_optimized/40, 1-years_not_optimized/40)
+# if we are not optimizing all years, that means we are optimizing the last years_to_add years
+# so initial_guesses should be the nr equal to years_to_add
+if years_to_optimize == 1
+    initial_guesses = initial_guesses_1
+    printstyled("Initial guesses: initial_guesses_1\n"; color=:yellow)
+elseif years_to_optimize == 2
+    initial_guesses = initial_guesses_2
+    printstyled("Initial guesses: initial_guesses_2\n"; color=:yellow)
+elseif years_to_optimize == 3
+    initial_guesses = initial_guesses_3
+    printstyled("Initial guesses: initial_guesses_3\n"; color=:yellow)
+elseif years_to_optimize == 4
+    initial_guesses = initial_guesses_4
+    printstyled("Initial guesses: initial_guesses_4\n"; color=:yellow)
+end
+# decrease all values in the lists in initial_guesses by 1/40
+for i in 1:length(initial_guesses)
+    initial_guesses[i] = initial_guesses[i] .- years_not_optimized/40/years_to_add
+end
+!optimize_all && println("decreased each initial guess by $(years_not_optimized/40/years_to_add) so that the initial guesses sum to $(sum(initial_guesses[1])+years_not_optimized/40)")
+#println(initial_guesses)
+#=else
     if length(years_per_combination) == 4
         initial_guesses = initial_guesses_4
         printstyled("Initial guesses: initial_guesses_4\n"; color=:yellow)
@@ -393,7 +396,7 @@ else
         printstyled("Initial guesses: initial_guesses_1\n"; color=:yellow)
     end
     printstyled("Sum of initial guesses [1]: $(sum(initial_guesses[1]))\n"; color=:yellow)
-end
+end=#
 
 Threads.@threads for thread = 1:threads_to_start
     #sleep for 250 ms to stagger thread starts
@@ -413,7 +416,7 @@ Threads.@threads for thread = 1:threads_to_start
             printstyled("Thread $(thread) started working on $(case) at $(Dates.format(now(), "HH:MM:SS")), $(length(queue)) left in queue\n"; color=:cyan)
         end
         convert(Vector{String},case)
-        matrices = [cfd_data[year] for year in case if !(year in most_interesting_years)]
+        matrices = [cfd_data[year] for year in case if !(year in extreme_years && !optimize_all)]
         # Use an optimization algorithm to find the best weights
         function sse(x)
            diff = diff_sum_weighted_mats(matrices,x)
@@ -471,22 +474,24 @@ Threads.@threads for thread = 1:threads_to_start
         end
         
 
-
         local alg_solutions = Dict()
         for alg in BBO_algs
             #print the next line only tif thread==1
             if thread == 1
-                printstyled("Trying $(alg) with bounds = $bounds and $(length(initial_guesses[1])) dims..\n"; color=:cyan)
+                printstyled("Trying $(alg) with bounds = $bounds and $(length(initial_guesses[1])) dims\n"; color=:yellow)
+                hours_to_solve = Int(div(length(queue)*maxtime/60/threads_to_start*length(BBO_algs),60))
+                minutes_to_solve = round((length(queue)*maxtime/60/threads_to_start*length(BBO_algs))%60)
+                printstyled("Estimated time left: $(hours_to_solve)h$(minutes_to_solve)m\n"; color=:yellow)
             end
             local res
             try
-                res = bboptimize(opt_func, initial_guesses; method=alg, NumDimensions=length(initial_guesses[1]),
+                res = bboptimize(opt_func, initial_guesses; method=alg, NumDimensions=years_to_optimize,
                                     SearchRange=bounds, MaxTime=maxtime, TraceInterval=2, TraceMode=:silent) #TargetFitness=88355.583298,FitnessTolerance=0.0001
             catch e
                 println("$case, $alg failed with error: \n$e")
                 println("retrying..")
                 try
-                    res = bboptimize(opt_func, initial_guesses; method=alg, NumDimensions=length(initial_guesses[1]),
+                    res = bboptimize(opt_func, initial_guesses; method=alg, NumDimensions=years_to_optimize,
                                     SearchRange=bounds, MaxTime=maxtime, TraceInterval=2, TraceMode=:silent) #TargetFitness=88355.583298,FitnessTolerance=0.0001
                 catch e
                     printstyled("$case, $alg failed AGAIN with error: \n$e"; color=:red)
@@ -569,7 +574,7 @@ catch e
 end
 
 # Save the results as a .json file
-folder_name = "results\\$ref_folder/FP $sum_func $timestamp"
+folder_name = "results\\$ref_folder/FP $sum_func $timestamp $(years_per_combination)yr"
 mkpath(folder_name)
 
 results = Dict("combinations" => all_combinations, "best_weights" => best_weights,
