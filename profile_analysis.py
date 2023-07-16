@@ -7,7 +7,7 @@ import pandas as pd
 import numpy as np
 from os import mkdir
 from statistics import mean
-from my_utils import print_red, print_green, print_cyan, fast_rolling_average, write_inc_from_df_columns, write_inc
+from my_utils import fast_rolling_average, write_inc_from_df_columns, write_inc, print_red, print_green, print_cyan, print_yellow, print_magenta, print_blue
 from datetime import datetime
 
 print_cyan(f"Starting profile_analysis.py at {datetime.now().strftime('%d-%m-%Y, %H:%M:%S')}")
@@ -415,7 +415,9 @@ sheet_name = "ref" + str(max([int(i[3:]) for i in sheets if i.startswith("ref")]
 #sheet_name = "ref16"
 print_red(f"Reading capacities from sheet {sheet_name}")
 cap_df = pd.read_excel("input\\cap_ref.xlsx", sheet_name=sheet_name, header=0, index_col=[0, 1], engine="openpyxl")
-# print(cap_df)
+# from cap_df, filter out all rows where the first index level does not start with "WO" or "PV"
+cap_df = cap_df[cap_df.index.get_level_values(level=0).str.startswith("WO") | cap_df.index.get_level_values(level=0).str.startswith("PV")]
+print_magenta(f"Capacities filtered to only include wind and solar:\n{cap_df}")
 all_cap = cap_df.squeeze()
 regions = ["SE_NO_N", "SE_S", "NO_S", "FI", "DE_N", "DE_S"]
 remake_heat_dataframes = False
