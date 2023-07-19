@@ -51,7 +51,7 @@ ref_folder = find_max_ref_folder("./output")
 #ref_folder = "ref14"
 
 maxtime = 60*5 # 60*30=30 minutes
-algs_size = "single" # "small" or "large" or "single" or "adaptive"
+algs_size = "adaptive" # "small" or "large" or "single" or "adaptive"
 years_per_combination = 3
 import_combinations = false
 optimize_all = false
@@ -88,7 +88,7 @@ while true
     elseif input == "ifalse" || input == "i50" || input == "i100"
         if input == "ifalse"
             global import_combinations = false
-        else:
+        else
             #parse the input to an integer
             global import_combinations = parse(Int, input[2:end])
         end
@@ -138,7 +138,7 @@ years_not_optimized = years_per_combination - years_to_optimize
 printstyled("-- Optimizing for $years_to_optimize year(s) out of $years_per_combination -- \n"; color=:red, bold=true)
 
 if years_to_optimize == 1
-    printstyled("There is only one year to optimize, so maxtime will be reduced to 5s and alg set to 'single'\n"; color=:red)
+    printstyled("There is only one year to 'optimize', so maxtime will be reduced to 5s and alg set to 'single'\n"; color=:red)
     maxtime = 5
     algs_size = "single"
 end
@@ -326,13 +326,15 @@ BBO_algs_large = [:generating_set_search,
 :dxnes,
 ]
 BBO_algs_small = [:pso,
-:adaptive_de_rand_1_bin,
-:probabilistic_descent,]
+:probabilistic_descent,
+:adaptive_de_rand_1_bin,]
 BBO_algs_single = [:probabilistic_descent]
-if maxtime>120
+if maxtime >= 29*60 # 29 minutes
+    BBO_algs_adaptive = BBO_algs_single
+elseif maxtime > 60 # 1 minute
     BBO_algs_adaptive = [:probabilistic_descent, :adaptive_de_rand_1_bin]
 else
-    BBO_algs_adaptive = [:pso]
+    BBO_algs_adaptive = BBO_algs_small
 end
 if typeof(algs_size) == String
     BBO_algs = eval(Meta.parse("BBO_algs_$(algs_size)"))
@@ -349,12 +351,12 @@ printstyled("############# -- Starting optimization loop with maxtime=$(maxtime)
 global initial_guesses_3 = [
     # considering the solution space as a triangle where each corner is 100% of one axis such as (1,0,0)
     # let some initial guesses be the center of the triangle and on the center of the edges of the triangle
-    [1/3,1/3,1/3], [19/40, 19/40, 2/40], [2/40, 19/40, 19/40], [19/40, 2/40, 19/40],
+    [1/3, 1/3, 1/3], [18/40, 18/40, 4/40], [4/40, 18/40, 18/40], [18/40, 4/40, 18/40],
     # then divide the triangle into 4 new triangles (like a triforce) and do the same again
     [2/3, 1/6, 1/6], [1/6, 2/3, 1/6], [1/6, 1/6, 2/3], # center of smaller triangles
-    [1/2, 1/4, 1/4], [1/4, 1/2, 1/4], [1/4, 1/4, 1/2], # center of inner edges of smaller triangles
-    [29, 9, 2]./40, [2, 29, 9]./40, [9, 2, 29]./40, # center of outer edges of smaller triangles
-    [29, 2, 9]./40, [9, 29, 2]./40, [2, 9, 29]./40, # center of outer edges of smaller triangles
+    #[1/2, 1/4, 1/4], [1/4, 1/2, 1/4], [1/4, 1/4, 1/2], # center of inner edges of smaller triangles
+    #[29, 9, 2]./40, [2, 29, 9]./40, [9, 2, 29]./40, # center of outer edges of smaller triangles
+    #[29, 2, 9]./40, [9, 29, 2]./40, [2, 9, 29]./40, # center of outer edges of smaller triangles
     ]
 global initial_guesses_4 = [
     [1/4,1/4,1/4,1/4], [15/40,15/40,5/40,5/40], [15/40,5/40,15/40,5/40],
@@ -362,7 +364,7 @@ global initial_guesses_4 = [
     [5/40,5/40,15/40,15/40]
     ]
 global initial_guesses_2 = [
-    [1/2, 1/2], [1/3, 2/3], [2/3, 1/3], [2/40, 38/40], [38/40, 2/40], [6/40, 34/40], [34/40, 6/40]
+    [1/2, 1/2], [1/3, 2/3], [2/3, 1/3], [6/40, 34/40], [34/40, 6/40] #, [2/40, 38/40], [38/40, 2/40]
     ]
 global initial_guesses_1 = [
     [1.]
@@ -488,74 +490,106 @@ Threads.@threads for thread = 1:threads_to_start
         
 
         local alg_solutions = Dict()
-        for alg in BBO_algs
-            #print the next line only tif thread==1
+        if maxtime < 61
             if thread == 1
-                printstyled("Trying $(alg) with bounds = $bounds and $(length(initial_guesses[1])) dims\n"; color=:yellow)
-                hours_to_solve = Int(div(length(queue)*maxtime/60/threads_to_start*length(BBO_algs),60))
-                minutes_to_solve = round((length(queue)*maxtime/60/threads_to_start*length(BBO_algs))%60)
-                printstyled("Estimated time left: $(hours_to_solve)h$(minutes_to_solve)m\n"; color=:yellow)
+                lock(print_lock) do
+                    printstyled("maxtime is less than 61 seconds, testing starting points manually\n"; color=:magenta)
+                end
             end
-            local res
-            try
-                res = bboptimize(opt_func, initial_guesses; method=alg, NumDimensions=years_to_optimize,
-                                    SearchRange=bounds, MaxTime=maxtime, TraceInterval=2, TraceMode=:silent) #TargetFitness=88355.583298,FitnessTolerance=0.0001
-            catch e
-                println("$case, $alg failed with error: \n$e")
-                println("retrying..")
+            #manually test the initial guesses one by one using opt_func() instead of the BBOptim.jl package
+            best_guess = (0,Inf)
+            for i in 1:length(initial_guesses)
+                # if the thread is the first one, print which starting point is being tested
+                if thread == 1
+                    lock(print_lock) do
+                        printstyled("Trying initial guess $(i) of $(length(initial_guesses))\n"; color=:magenta)
+                    end
+                end
+                local x = initial_guesses[i]
+                local e = opt_func(x)
+                if e < best_guess[2]
+                    best_guess = (x,e)
+                end
+            end
+            best_weights[case] = best_guess[1]
+            best_errors[case] = best_guess[2]
+            best_alg[case] = "manual"
+
+            lock(print_lock) do
+                printstyled("Thread $(thread) finished working on $(case) at $(Dates.format(now(), "HH:MM:SS")), after $(round(Dates.now()-start_time,Dates.Second))\n"; color=:green)
+                printstyled("Best error is $(round(best_guess[2],digits=1)) for $(round.(best_weights[case],digits=3))\n"; color=:white)
+            end
+
+        else
+            for alg in BBO_algs
+                #print the next line only if thread==1
+                if thread == 1
+                    printstyled("Trying $(alg) with bounds = $bounds and $(length(initial_guesses[1])) dims\n"; color=:yellow)
+                    hours_to_solve = Int(div(length(queue)*maxtime/60/threads_to_start*length(BBO_algs),60))
+                    minutes_to_solve = round((length(queue)*maxtime/60/threads_to_start*length(BBO_algs))%60)
+                    printstyled("Estimated time left: $(hours_to_solve)h$(minutes_to_solve)m\n"; color=:yellow)
+                end
+                local res
                 try
                     res = bboptimize(opt_func, initial_guesses; method=alg, NumDimensions=years_to_optimize,
-                                    SearchRange=bounds, MaxTime=maxtime, TraceInterval=2, TraceMode=:silent) #TargetFitness=88355.583298,FitnessTolerance=0.0001
+                                        SearchRange=bounds, MaxTime=maxtime, TraceInterval=2, TraceMode=:silent) #TargetFitness=88355.583298,FitnessTolerance=0.0001
                 catch e
-                    printstyled("$case, $alg failed AGAIN with error: \n$e"; color=:red)
+                    println("$case, $alg failed with error: \n$e")
+                    println("retrying..")
+                    try
+                        res = bboptimize(opt_func, initial_guesses; method=alg, NumDimensions=years_to_optimize,
+                                        SearchRange=bounds, MaxTime=maxtime, TraceInterval=2, TraceMode=:silent) #TargetFitness=88355.583298,FitnessTolerance=0.0001
+                    catch e
+                        printstyled("$case, $alg failed AGAIN with error: \n$e"; color=:red)
+                    end
                 end
+                local weights_list = best_candidate(res)
+                local e = opt_func(weights_list)
+                alg_solutions[alg] = (e, weights_list)
             end
-            local weights_list = best_candidate(res)
-            local e = opt_func(weights_list)
-            alg_solutions[alg] = (e, weights_list)
-        end
-        #print each alg's solution
-        lock(print_lock) do
-            _best_alg = BBO_algs[argmin([alg_solutions[alg][1] for alg in BBO_algs])]
-            best_errors[case] = alg_solutions[_best_alg][1]
-            years_not_optimized==0 ? best_weights[case] = alg_solutions[_best_alg][2] : best_weights[case] = vcat([1/40 for i in 1:years_not_optimized],alg_solutions[_best_alg][2])
-            best_alg[case] = _best_alg
-            if alg_solutions[_best_alg][1] < global_best
-                printstyled("years: $(case)"; color=:green)
-                printstyled("       <-- best so far\n"; color=:red)
-                global_best = best_errors[case]
-            else
-                printstyled("years: $(case)\n"; color=:green)
-            end
-            # find for which alg the error is the lowest
-            for alg in BBO_algs
-                print("$(round(alg_solutions[alg][1],digits=1)) $(round.(alg_solutions[alg][2],digits=3)) $(rpad(round(sum(alg_solutions[alg][2]),digits=2)+years_not_optimized*1/40,4)) $(alg)")
-                if alg == _best_alg
-                    printstyled(" <-\n"; color=:green)
-                else
-                    print("\n")
-                end
-
-            end
-        end
-        #if case not in best_errors
-        if !(case in keys(best_errors))
-            printstyled("did not find $case in best_errors\n"; color=:red)
-            best_errors[case] = alg_solutions[_best_alg][1]
-            best_weights[case] = alg_solutions[_best_alg][2]
-            best_alg[case] = _best_alg
-        end
-        if !(case in keys(best_errors))
-            printstyled("AGAIN did not find $case in best_weights\n"; color=:red)
+            #print each alg's solution
             lock(print_lock) do
+                _best_alg = BBO_algs[argmin([alg_solutions[alg][1] for alg in BBO_algs])]
+                best_errors[case] = alg_solutions[_best_alg][1]
+                years_not_optimized==0 ? best_weights[case] = alg_solutions[_best_alg][2] : best_weights[case] = vcat([1/40 for i in 1:years_not_optimized],alg_solutions[_best_alg][2])
+                best_alg[case] = _best_alg
+                if alg_solutions[_best_alg][1] < global_best
+                    printstyled("years: $(case)"; color=:green)
+                    printstyled("       <-- best so far\n"; color=:red)
+                    global_best = best_errors[case]
+                else
+                    printstyled("years: $(case)\n"; color=:green)
+                end
+                # find for which alg the error is the lowest
+                for alg in BBO_algs
+                    print("$(round(alg_solutions[alg][1],digits=1)) $(round.(alg_solutions[alg][2],digits=3)) $(rpad(round(sum(alg_solutions[alg][2]),digits=2)+years_not_optimized*1/40,4)) $(alg)")
+                    if alg == _best_alg
+                        printstyled(" <-\n"; color=:green)
+                    else
+                        print("\n")
+                    end
+
+                end
+            end
+            #if case not in best_errors
+            if !(case in keys(best_errors))
+                printstyled("did not find $case in best_errors\n"; color=:red)
                 best_errors[case] = alg_solutions[_best_alg][1]
                 best_weights[case] = alg_solutions[_best_alg][2]
                 best_alg[case] = _best_alg
             end
-        end
-        if !(case in keys(best_errors))
-            printstyled("AGAIN AGAIN did not find $case in best_alg\n"; color=:red)
-            error("failed to add $case to best_errors")
+            if !(case in keys(best_errors))
+                printstyled("AGAIN did not find $case in best_weights\n"; color=:red)
+                lock(print_lock) do
+                    best_errors[case] = alg_solutions[_best_alg][1]
+                    best_weights[case] = alg_solutions[_best_alg][2]
+                    best_alg[case] = _best_alg
+                end
+            end
+            if !(case in keys(best_errors))
+                printstyled("AGAIN AGAIN did not find $case in best_alg\n"; color=:red)
+                error("failed to add $case to best_errors")
+            end
         end
     end
 end
