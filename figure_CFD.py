@@ -35,7 +35,7 @@ def get_ref_folder():
             ref_folders.append(folder)
     ref_folders.sort(key=lambda x: int(x[3:]))
     ref_folder = ref_folders[-1]
-    #ref_folder = "ref26"
+    ref_folder = "ref28"
     return ref_folder
 
 placeholder_ref_folder = get_ref_folder()
@@ -122,15 +122,17 @@ def fast_cfd(df_netload, xmin, xmax, amp_length=0.1, area_method=False, thread=F
     if debugging: print("")
     print(f"{thread} finished building output[amp] after {round((timer() - start_time)/60, 1)} minutes. Now building df_out_tot")
     timer_dfouttot = timer()
-    df_out_tot = pd.DataFrame()
+    #df_out_tot = pd.DataFrame()
+    df_out_list = []
     for amp in amps:
         df_out = output[amp]
         df_out = df_out.iloc[1:]
         df_out.index.name = 'Duration'
         df_out = pd.concat([df_out], keys=[amp], names=['Amplitude'])
         df_out.rename(columns={'count2': 'Occurences'}, inplace=True)
-        df_out_tot = pd.concat([df_out_tot, df_out])
-    print_green(f"time to build df_out_tot = {round((timer() - timer_dfouttot)/60, 1)} min",replace_this_line=True)
+        df_out_list.append(df_out)
+    df_out_tot = pd.concat(df_out_list)
+    print_green(f"time to build df_out_tot = {round((timer() - timer_dfouttot)/60, 1)} min")
     if area_method:
         print_red(f"Starting second area_method loop with {len(df_out_tot.index)} rows at {dt.datetime.now().strftime('%H:%M:%S')}",replace_this_line=True)
         start_time = timer()
@@ -155,7 +157,7 @@ def fast_cfd(df_netload, xmin, xmax, amp_length=0.1, area_method=False, thread=F
     return df_out_tot
 
 
-def create_df_out_tot(year, xmin, xmax, ref_folder, rolling_hours=12, amp_length=1, area_mode_in_cfd=True, debugging=False):
+def create_df_out_tot(year, xmin, xmax, ref_folder, rolling_hours=12, amp_length=1, area_mode_in_cfd=True, debugging=False, thread=False):
     print_cyan(f"create_df_out_tot({year}, {xmin}, {xmax}, {rolling_hours}, {amp_length}, {area_mode_in_cfd})")
     data = pickle.load(open(f"PickleJar\\{ref_folder}\\netload_components_small_{year}.pickle", "rb"))
     #VRE_profiles = data["VRE_profiles"]
@@ -188,7 +190,7 @@ def create_df_out_tot(year, xmin, xmax, ref_folder, rolling_hours=12, amp_length
     xmax = max(xmax, int(math.ceil(df_netload["net load"].max())))
     xmin = min(xmin, int(math.floor(df_netload["net load"].min())))
     print_cyan(f"Done preparing the netload ({round(max(RA_netload))}/{round(RA_netload.mean())}/{round(min(RA_netload))}), starting fast_cfd now")
-    df_out_tot = fast_cfd(df_netload, xmin, xmax, amp_length=amp_length, area_method=area_mode_in_cfd, debugging=debugging)
+    df_out_tot = fast_cfd(df_netload, xmin, xmax, amp_length=amp_length, area_method=area_mode_in_cfd, debugging=debugging, thread=thread)
     return df_out_tot, xmin, xmax
 
 
@@ -229,7 +231,7 @@ def main(year, ref_folder, amp_length=1, rolling_hours=12, area_mode_in_cfd=True
         except Exception as e:
             if read_pickle: print_red(f"Failed due to {type(e)} .. creating a new one instead")
             start_time = timer()
-            df_out_tot, xmin, xmax = create_df_out_tot(year, xmin, xmax, ref_folder, rolling_hours=rolling_hours, amp_length=amp_length, debugging=debugging, )
+            df_out_tot, xmin, xmax = create_df_out_tot(year, xmin, xmax, ref_folder, rolling_hours=rolling_hours, amp_length=amp_length, debugging=debugging, thread=thread_nr, area_mode_in_cfd=area_mode_in_cfd)
             # 248s at 1 year then more changes and now 156-157s at 1 year
             end_time = timer()
             print(f"elapsed time to build CFD in thread {thread_nr} = {round(end_time - start_time, 1)}")
