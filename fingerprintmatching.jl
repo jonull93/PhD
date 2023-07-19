@@ -2,7 +2,7 @@
 fingerprintmatching:
 - Julia version: 
 - Author: Jonathan Ullmark
-- Date: 2023-01-18
+- Date of creation: 2023-01-18
 =#
 
 import Combinatorics: combinations
@@ -15,6 +15,17 @@ using Printf
 using LinearAlgebra
 using Plots
 using JSON
+
+#=
+This script is currently set up to run with one or multiple heuristic optimization algorithms for a certain amount of time, then stop.
+To circumvent the issue of spending up to an hour per year-combination for up to 5e5 (5 out of 39 years) combinations, the script can
+be run for a very short time initially and then rerun for the 100 best combinations (after running figure_CFD.py inbetween).
+
+A better solution would be to manually test all of the starting points (would probably take <1 second per combination) and then run the
+optimization algorithm for some longer duration for the best 5-10% of solutions. This would make the script more automatic and could
+ensure that the aborted optimization algorithm doesn't return a solution worse than the starting points (happens sometimes but is
+counteracted by long optimization times and multiple algorithms).
+=#
 
 #make it clear in the command prompt that the code is running
 timestamp = Dates.format(now(), "u_dd_HH.MM.SS")
@@ -41,17 +52,17 @@ ref_folder = find_max_ref_folder("./output")
 
 maxtime = 60*5 # 60*30=30 minutes
 algs_size = "single" # "small" or "large" or "single" or "adaptive"
-years_per_combination = 6
+years_per_combination = 3
 import_combinations = false
 optimize_all = false
-requested_sum_func = "sse" # "abs_sum" or "sqrt_sum" or "log_sum" or "sse"
-simultaneous_extreme_years = 2
+requested_sum_func = "abs_sum" # "abs_sum" or "sqrt_sum" or "log_sum" or "sse"
+simultaneous_extreme_years = 0
 years_to_add = years_per_combination - simultaneous_extreme_years # number of years to add to the extreme years for each combination
 years_to_optimize = years_to_add + simultaneous_extreme_years*optimize_all
 # ask the user whether to import the 100 best combinations from the previous run
 while true
     printstyled("
-    Run is set up with the following parameters:
+      The script is set up with the following parameters:
     maxtime = $(maxtime/60) minutes,
     algs_size = $(algs_size),
     years_per_combination = $(years_per_combination),
@@ -64,7 +75,7 @@ while true
         - Enter a number to set the max number of minutes for each optimization
         - Enter 'single', 'small', 'adaptive' or 'large' to change the size of the algorithm
         - Enter '#years' (e.g 4years) to change the number of years in each combination
-        - Enter 'i' to change the toggle on whether to attempt to import (100 best) combinations from previous run
+        - Enter 'ifalse'/'i50'/'i100' to change the whether to attempt to import (50/100 best) combinations from previous run
         - Enter 'o' to optimize the weights also for the extreme years
         - Enter '#ey' (e.g 2ey) to change the number of extreme years in each combination
         - Enter 'abs', 'sqrt', 'log' or 'sse' to change the sum function
@@ -73,13 +84,15 @@ while true
     input = readline()
     if input == "exit" || input == "e" || input == ""
         break
-    elseif input == "i"
-        global import_combinations = !import_combinations
-        if import_combinations
-            printstyled("Will attempt to import combinations from previous run \n"; color=:green)
-        else
-            printstyled("Will not attempt to import combinations from previous run \n"; color=:red)
+    #import combinations?
+    elseif input == "ifalse" || input == "i50" || input == "i100"
+        if input == "ifalse"
+            global import_combinations = false
+        else:
+            #parse the input to an integer
+            global import_combinations = parse(Int, input[2:end])
         end
+        printstyled("Importing combinations: $(import_combinations) \n"; color=:green)
     elseif input == "a"
         global simultaneous_extreme_years = length(extreme_years)  # if true, use all years in extreme_years, if false, use only one at a time
         global years_to_add = years_per_combination - simultaneous_extreme_years
@@ -164,16 +177,16 @@ weights = Dict()
 queue = Queue{Any}()
 cores = Threads.nthreads()
 all_combinations = []
-if import_combinations
+if import_combinations != false
     # read folder_name from results/most_recent_results.txt
     folder_name = readlines("results/$ref_folder/most_recent_results.txt")[1]
     # read folder_name/best_100.json, or skip to the else-block if the file does not exist
-    if !isfile("$(folder_name)/best_100.json")
-        printstyled("File $(folder_name)/best_100.json does not exist, skipping import of combinations\n", color=:red)
-        sleep(3)
+    if !isfile("$folder_name/best_$import_combinations.json")
+        printstyled("File $(folder_name)/best_$import_combinations.json does not exist, skipping import of combinations\n", color=:red)
+        sleep(5)
         @goto skip_import
     end
-    best_100 = JSON.parsefile("$(folder_name)/best_100.json")
+    best_100 = JSON.parsefile("$(folder_name)/best_$import_combinations.json")
     # add each item in best_100 to all_combinations and queue
     for item in best_100
         enqueue!(queue,item)
@@ -319,7 +332,7 @@ BBO_algs_single = [:probabilistic_descent]
 if maxtime>120
     BBO_algs_adaptive = [:probabilistic_descent, :adaptive_de_rand_1_bin]
 else
-    BBO_algs_adaptive = [:pso, :probabilistic_descent]
+    BBO_algs_adaptive = [:pso]
 end
 if typeof(algs_size) == String
     BBO_algs = eval(Meta.parse("BBO_algs_$(algs_size)"))
