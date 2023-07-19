@@ -23,21 +23,22 @@ Outputs:
 CFD plot and VRE event df for fingerprint matching
 """
 
-print_cyan(f"Starting figure_CFD.py at {dt.datetime.now().strftime('%d-%m-%Y, %H:%M:%S')}")
 os.system('color')
+print_cyan(f"Starting figure_CFD.py at {dt.datetime.now().strftime('%d-%m-%Y, %H:%M:%S')}")
 
 # in \output\ there are subfolders called "ref#", save the name of the ref folder with the highest number
-ref_folders = []
-for folder in os.listdir("PickleJar"):
-    if folder.startswith("ref"):
-        ref_folders.append(folder)
-ref_folders.sort(key=lambda x: int(x[3:]))
-ref_folder = ref_folders[-1]
-#ref_folder = "ref23"
-print_magenta(f"ref_folder: {ref_folder}")
-#mkdir figures\\CFD plots\\{ref_folder}
-os.makedirs(f"figures\\CFD plots\\{ref_folder}", exist_ok=True)
+global ref_folder
+def get_ref_folder():
+    ref_folders = []
+    for folder in os.listdir("PickleJar"):
+        if folder.startswith("ref"):
+            ref_folders.append(folder)
+    ref_folders.sort(key=lambda x: int(x[3:]))
+    ref_folder = ref_folders[-1]
+    #ref_folder = "ref26"
+    return ref_folder
 
+placeholder_ref_folder = get_ref_folder()
 
 def sign(num):
     if num==0: return 1
@@ -154,7 +155,7 @@ def fast_cfd(df_netload, xmin, xmax, amp_length=0.1, area_method=False, thread=F
     return df_out_tot
 
 
-def create_df_out_tot(year, xmin, xmax, rolling_hours=12, amp_length=1, area_mode_in_cfd=True, debugging=False):
+def create_df_out_tot(year, xmin, xmax, ref_folder, rolling_hours=12, amp_length=1, area_mode_in_cfd=True, debugging=False):
     print_cyan(f"create_df_out_tot({year}, {xmin}, {xmax}, {rolling_hours}, {amp_length}, {area_mode_in_cfd})")
     data = pickle.load(open(f"PickleJar\\{ref_folder}\\netload_components_small_{year}.pickle", "rb"))
     #VRE_profiles = data["VRE_profiles"]
@@ -212,7 +213,7 @@ def make_cfd_plot(ax, Xnetload, Ynetload, Znetload, xmin=False, xmax=False, ymin
     ax.set_ylabel("Duration [days]")
     return cm
 
-def main(year, amp_length=1, rolling_hours=12, area_mode_in_cfd=True, write_files=True, read_pickle=True, xmin=0,
+def main(year, ref_folder, amp_length=1, rolling_hours=12, area_mode_in_cfd=True, write_files=True, read_pickle=True, xmin=0,
          xmax=0, ymin=0, ymax=0, weights=False, thread_nr=False, debugging=False, sum_func="", errors=False):
     if not thread_nr:
         thread_nr = "MAIN"
@@ -223,11 +224,12 @@ def main(year, amp_length=1, rolling_hours=12, area_mode_in_cfd=True, write_file
         # df_netload = df_netload.reset_index()[["net load", "count1", "count2"]]
         try:
             if not read_pickle: raise ImportError
+            print_yellow(f"Attempting to read {pickle_read_name}")
             df_out_tot = pickle.load(open(pickle_read_name, "rb"))
         except Exception as e:
-            if read_pickle: print_red(f"Failed to read {pickle_read_name} due to {type(e)}")
+            if read_pickle: print_red(f"Failed due to {type(e)} .. creating a new one instead")
             start_time = timer()
-            df_out_tot, xmin, xmax = create_df_out_tot(year, xmin, xmax, rolling_hours=rolling_hours, amp_length=amp_length, debugging=debugging)
+            df_out_tot, xmin, xmax = create_df_out_tot(year, xmin, xmax, ref_folder, rolling_hours=rolling_hours, amp_length=amp_length, debugging=debugging, )
             # 248s at 1 year then more changes and now 156-157s at 1 year
             end_time = timer()
             print(f"elapsed time to build CFD in thread {thread_nr} = {round(end_time - start_time, 1)}")
@@ -368,7 +370,7 @@ def main(year, amp_length=1, rolling_hours=12, area_mode_in_cfd=True, write_file
     return xmin, xmax, ymin, ymax
 
 
-def crawler(queue_years,thread_nr,amp_length,rolling_hours,area_mode_in_cfd,write_pickle,read_pickle,xmin,xmax,ymin,ymax,sum_func,errors):
+def crawler(queue_years,thread_nr,amp_length,rolling_hours,area_mode_in_cfd,write_pickle,read_pickle,xmin,xmax,ymin,ymax,sum_func,errors,ref_folder):
     while not queue_years.empty():
         year = queue_years.get()  # fetch new work from the Queue
         weights = False
@@ -376,13 +378,16 @@ def crawler(queue_years,thread_nr,amp_length,rolling_hours,area_mode_in_cfd,writ
             year, weights = year
         print_green(f"Starting Year {year} in thread {thread_nr}. Remaining years: {queue_years.qsize()}")
         start_time_thread = timer()
-        main(year,amp_length=amp_length,rolling_hours=rolling_hours,area_mode_in_cfd=area_mode_in_cfd,write_files=write_pickle,
+        main(year,ref_folder,amp_length=amp_length,rolling_hours=rolling_hours,area_mode_in_cfd=area_mode_in_cfd,write_files=write_pickle,
              read_pickle=read_pickle,xmin=xmin,xmax=xmax,ymin=ymin,ymax=ymax,weights=weights,thread_nr=thread_nr, sum_func=sum_func, errors=errors)
         print_green(f"   Finished Year {year} after {round(timer() - start_time_thread, 1)} seconds")
         #queue_years.task_done()
     return None
 
-def initiate():
+def initiate(ref_folder):
+    print_magenta(f"ref_folder: {ref_folder}")
+    os.makedirs(f"figures\\CFD plots\\{ref_folder}", exist_ok=True)
+
     amp_length = 1
     rolling_hours = 12
     test_mode = False
@@ -396,7 +401,7 @@ def initiate():
     long_period = f"1980-2019"
 
     xmax= 0
-    xmin, xmax, ymin, ymax = main(long_period, amp_length=amp_length, rolling_hours=rolling_hours, area_mode_in_cfd=area_mode_in_cfd,
+    xmin, xmax, ymin, ymax = main(long_period, ref_folder, amp_length=amp_length, rolling_hours=rolling_hours, area_mode_in_cfd=area_mode_in_cfd,
                                   write_files=True, read_pickle=True, debugging=debugging)
     print("Xmin =", xmin, "Xmax =", xmax, "Ymin =", ymin, "Ymax =", ymax)
     queue_years = Queue(maxsize=0)
@@ -437,7 +442,10 @@ def initiate():
         with open(f"{results_folder_name}/best_100.json", "w") as f:
             to_dump = [key.replace('Any','').replace('"', '').replace('[', '').replace(']', '').replace(' ', '').split(',') for key, value in errors_sorted[:100]]
             json.dump(to_dump, f, indent=4)
-
+        #save the best 50 combinations to a JSON file
+        with open(f"{results_folder_name}/best_50.json", "w") as f:
+            to_dump = [key.replace('Any','').replace('"', '').replace('[', '').replace(']', '').replace(' ', '').split(',') for key, value in errors_sorted[:50]]
+            json.dump(to_dump, f, indent=4)
         # save the keys to the items in errors_sorted where the value is at most 5% higher than the best error
         for percent in list(range(5,55,5))+[100]:
             percent = percent/10
@@ -455,7 +463,7 @@ def initiate():
         if len(combinations) > 8:
             combinations = combinations[:6] + combinations[-2:]
             combinations_strings = combinations_strings[:6] + combinations_strings[-2:]
-            print_red(errors)
+            print_yellow(errors)
             weights = {key: weights[key] for key in combinations_strings}
             errors = {key: errors[key] for key in combinations_strings}
         # make errors also accept keys with only ' instead of "
@@ -486,7 +494,7 @@ def initiate():
         #if errors is not defined, make it None
         if "errors" not in locals():
             errors = None
-        workers.append(Process(target=crawler, args=(queue_years,i,amp_length,rolling_hours,area_mode_in_cfd,write_pickle,read_pickle,xmin,xmax,ymin,ymax,sum_func,errors)))
+        workers.append(Process(target=crawler, args=(queue_years,i,amp_length,rolling_hours,area_mode_in_cfd,write_pickle,read_pickle,xmin,xmax,ymin,ymax,sum_func,errors,ref_folder)))
         # setting threads as "daemon" allows main program to exit eventually even if these dont finish correctly
         workers[-1].start()
         tm.sleep(0.05)
@@ -495,5 +503,6 @@ def initiate():
         worker.join()
 
 if __name__ == "__main__":
-    initiate()
-
+    ref_folder = get_ref_folder()
+    #ref_folder = "ref23"
+    initiate(ref_folder)
