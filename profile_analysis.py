@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import pickle
 import pandas as pd
 import numpy as np
-from os import mkdir
+import os
 from statistics import mean
 from my_utils import fast_rolling_average, write_inc_from_df_columns, write_inc, print_red, print_green, print_cyan, print_yellow, print_magenta, print_blue
 from datetime import datetime
@@ -151,7 +151,7 @@ def make_hydro_profiles(years="1980-2019"):
         write_inc_from_df_columns(path, filename, df, comment=comment)
 
 
-def make_pickles(year, VRE_profiles, cap, load, yearly_nontraditional_load, hourly_nontraditional_load, net_load):
+def make_pickles(year, VRE_profiles, cap, load, yearly_nontraditional_load, hourly_nontraditional_load, net_load, pickle_path):
     VRE_gen = (VRE_profiles * cap).sum(axis=1)
     if type(load) == dict:
         total_hourly_load_regional = {}
@@ -188,7 +188,7 @@ def create_new_tuple(t, year):
     return (t[1], year, t[0], t[2])
 
 
-def make_gams_profiles(year, VRE_profiles, load, pot_cap=False, ):
+def make_gams_profiles(year, VRE_profiles, load, regions, pot_cap=False, ):
     """
 
     Parameters
@@ -202,7 +202,7 @@ def make_gams_profiles(year, VRE_profiles, load, pot_cap=False, ):
     -------
 
     """
-    global regions
+
     timesteps = ['h' + str(i + 1).zfill(4) for i in range(len(VRE_profiles.index))]
     timestamp = datetime.now().strftime("%d-%m-%Y, %H:%M:%S")
     comment = [f"Made by Jonathan Ullmark at {timestamp}"] + \
@@ -401,44 +401,32 @@ def find_year_and_hour(index, start_year=1980):
         year += 1
 
 
-# pickle_file = "PickleJar\\data_results_3h.pickle"
-# initial_results = pickle.load(open(pickle_file, "rb"))
-# scenario_name = "nordic_lowFlex_noFC_2040_3h"
-# print(initial_results[scenario_name].keys())
-# all_cap = initial_results[scenario_name]["tot_cap"]
-# all_cap["WOFF3","DE_N"]=60
-# all_cap["WONA4","DE_S"]=45
 #get the sheet names from "input\\cap_ref.xlsx"
-sheets = pd.ExcelFile("input\\cap_ref.xlsx").sheet_names
-# make sheet_name the name of the sheet that starts with "ref" and has the highest number after it
-sheet_name = "ref" + str(max([int(i[3:]) for i in sheets if i.startswith("ref")]))
-#sheet_name = "ref16"
-print_red(f"Reading capacities from sheet {sheet_name}")
-cap_df = pd.read_excel("input\\cap_ref.xlsx", sheet_name=sheet_name, header=0, index_col=[0, 1], engine="openpyxl")
-# from cap_df, filter out all rows where the first index level does not start with "WO" or "PV"
-cap_df = cap_df[cap_df.index.get_level_values(level=0).str.startswith("WO") | cap_df.index.get_level_values(level=0).str.startswith("PV")]
-print_magenta(f"Capacities filtered to only include wind and solar:\n{cap_df}")
-all_cap = cap_df.squeeze()
-regions = ["SE_NO_N", "SE_S", "NO_S", "FI", "DE_N", "DE_S"]
-remake_heat_dataframes = False
+def get_sheet_name():
+    sheets = pd.ExcelFile("input\\cap_ref.xlsx").sheet_names
+    # make sheet_name the name of the sheet that starts with "ref" and has the highest number after it
+    sheet_name = "ref" + str(max([int(i[3:]) for i in sheets if i.startswith("ref")]))
+    #sheet_name = "ref16"
+    return sheet_name
 
-# non_traditional_load = initial_results[scenario_name]["o_yearly_nontraditional_load"]
-# non_traditional_load = non_traditional_load[non_traditional_load.index.get_level_values(level="stochastic_scenario")[0]]
-non_traditional_load = pd.Series([
-    34_677,
-    38_450,
-    14_791,
-    20_092,
-    129_826,
-    206_243,
-# values from 2023-05-02 after setting H2_veh=yes
-], index=regions)
+if __name__ == "__main__":
+    sheet_name = get_sheet_name()
+
+def read_capacities(sheet_name):
+    print_red(f"Reading capacities from sheet {sheet_name}")
+    cap_df = pd.read_excel("input\\cap_ref.xlsx", sheet_name=sheet_name, header=0, index_col=[0, 1], engine="openpyxl")
+    # from cap_df, filter out all rows where the first index level does not start with "WO" or "PV"
+    cap_df = cap_df[cap_df.index.get_level_values(level=0).str.startswith("WO") | cap_df.index.get_level_values(level=0).str.startswith("PV")]
+    print_magenta(f"Capacities filtered to only include wind and solar:\n{cap_df}")
+    global all_cap
+    all_cap = cap_df.squeeze()
+    return all_cap
 
 # heat demand
 # load heat demand from SyntheticHeatDemand_1980-2019.csv with the columns localtime,AT,BE,BG,CZ,DE,DK,EE,ES,FI,FR,GB,GR,HR,HU,IE,IT,LT,LU,LV,NL,PL,PT,RO,SE,SI,SK
 # and rows 1980-01-01T00:00:00.0, 1980-01-01T01:00:00.0 etc, i.e. one row per hour
-print_cyan("Making heat demand dataframe..",replace_this_line=True)
-if remake_heat_dataframes:
+def make_heat_demand_dataframe(regions):
+    print_cyan("Making heat demand dataframe..", replace_this_line=True)
     heat_demand = pd.read_csv("input\\SyntheticHeatDemand_1980-2019.csv", header=0, index_col=0, parse_dates=True)
     #convert the country codes to country names
     heat_demand = heat_demand.rename(columns={"AT": "Austria", "BE": "Belgium", "BG": "Bulgaria", "CZ": "Czech_Republic",
@@ -516,47 +504,66 @@ if remake_heat_dataframes:
     for region in heat_demand_regions.columns:
         electrified_heat_demand.loc[:, region] = heat_demand_regions.loc[:, region] * heatshare_to_electrify.loc[region, 1]
     pickle.dump(electrified_heat_demand, open("PickleJar\\electrified_heat_demand_dataframe.pickle", "wb"))
-else:
+
+
+def initiate_parameters(sheet_name):
+    WON = ["WONA" + str(i) for i in range(1, 6)]
+    WOFF = ["WOFF" + str(i) for i in range(1, 6)]
+    PV = ["PVPA" + str(i) for i in range(1, 6)]
+    PVR = ["PVR" + str(i) for i in range(1, 6)]
+    VRE_tech = WON + WOFF + PV + PVR
+    all_cap = read_capacities(sheet_name)
+    all_cap = all_cap[all_cap.index.isin(VRE_tech, level=0)]
+    # print(all_cap)
+    years = range(1980, 2020)
+    reseamed_years = [f"{years[i_y]}-{year}" for i_y, year in enumerate(range(1981,2020))]
+    sites = range(1, 6)
+    regions = ["SE_NO_N", "SE_S", "NO_S", "FI", "DE_N", "DE_S"]
+
+    non_traditional_load = pd.Series([
+        34_677,
+        38_450,
+        14_791,
+        20_092,
+        129_826,
+        206_243,
+        # values from 2023-05-02 after setting H2_veh=yes
+    ], index=regions)
+
+    # instead of switching to a new year at Jan 1st, a seam in summer gives a whole winter period
+    # 4344 = hours until 1st of July
+    
+    region_name = "nordic_L"
+    VRE_groups = ["WON", "WOFF", "solar", "solar_rooftop"]
+    VRE_tech_dict = {"WON": WON, "WOFF": WOFF, "solar": PV, "solar_rooftop": PVR}
+    VRE_tech_name_dict = {"WON": "WONA", "WOFF": "WOFF", "solar": "PVPA", "solar_rooftop": "PVR"}
+    filenames = {"WON": f"GISdata_windYEAR_{region_name}.mat", "WOFF": f"GISdata_windYEAR_{region_name}.mat",
+                 "solar": f"GISdata_solarYEAR_{region_name}.mat", "solar_rooftop": f"GISdata_solarYEAR_{region_name}.mat"}
+    profile_keys = {"WON": 'CFtime_windonshoreA', "WOFF": 'CFtime_windoffshore', 'solar': 'CFtime_pvplantA',
+                    'solar_rooftop': 'CFtime_pvrooftop'}
+    capacity_keys = {"WON": 'capacity_onshoreA', "WOFF": 'capacity_offshore', 'solar': 'capacity_pvplantA',
+                     'solar_rooftop': 'capacity_pvrooftop'}
+    capacity = {"WON": all_cap[all_cap.index.isin(WON, level=0)], "WOFF": all_cap[all_cap.index.isin(WOFF, level=0)],
+                'solar': all_cap[all_cap.index.isin(PV, level=0)],
+                'solar_rooftop': all_cap[all_cap.index.isin(PVR, level=0)]}
+    fig_path = f"figures\\profile_analysis\\{sheet_name}\\"
+    mat_path = f"output\\{sheet_name}\\"
+    pickle_path = f"PickleJar\\{sheet_name}\\"
+    for path in [fig_path, mat_path, pickle_path]:
+        try:
+            os.mkdir(path)
+        except FileExistsError:
+            None
+    if not os.path.exists("PickleJar\\electrified_heat_demand_dataframe.pickle"):
+        print_cyan("Making heat demand dataframe...")
+        make_heat_demand_dataframe()
+        print_cyan("Done making heat demand dataframe!")
     electrified_heat_demand = pickle.load(open("PickleJar\\electrified_heat_demand_dataframe.pickle", "rb"))
-print_cyan("Done making heat demand dataframe!")
-
-WON = ["WONA" + str(i) for i in range(1, 6)]
-WOFF = ["WOFF" + str(i) for i in range(1, 6)]
-PV = ["PVPA" + str(i) for i in range(1, 6)]
-PVR = ["PVR" + str(i) for i in range(1, 6)]
-VRE_tech = WON + WOFF + PV + PVR
-all_cap = all_cap[all_cap.index.isin(VRE_tech, level=0)]
-# print(all_cap)
-years = range(1980, 2020)
-reseamed_years = [f"{years[i_y]}-{year}" for i_y, year in enumerate(range(1981,2020))]
-sites = range(1, 6)
-# instead of switching to a new year at Jan 1st, a seam in summer gives a whole winter period
-# 4344 = hours until 1st of July
-
-region_name = "nordic_L"
-VRE_groups = ["WON", "WOFF", "solar", "solar_rooftop"]
-VRE_tech_dict = {"WON": WON, "WOFF": WOFF, "solar": PV, "solar_rooftop": PVR}
-VRE_tech_name_dict = {"WON": "WONA", "WOFF": "WOFF", "solar": "PVPA", "solar_rooftop": "PVR"}
-filenames = {"WON": f"GISdata_windYEAR_{region_name}.mat", "WOFF": f"GISdata_windYEAR_{region_name}.mat",
-             "solar": f"GISdata_solarYEAR_{region_name}.mat", "solar_rooftop": f"GISdata_solarYEAR_{region_name}.mat"}
-profile_keys = {"WON": 'CFtime_windonshoreA', "WOFF": 'CFtime_windoffshore', 'solar': 'CFtime_pvplantA',
-                'solar_rooftop': 'CFtime_pvrooftop'}
-capacity_keys = {"WON": 'capacity_onshoreA', "WOFF": 'capacity_offshore', 'solar': 'capacity_pvplantA',
-                 'solar_rooftop': 'capacity_pvrooftop'}
-capacity = {"WON": all_cap[all_cap.index.isin(WON, level=0)], "WOFF": all_cap[all_cap.index.isin(WOFF, level=0)],
-            'solar': all_cap[all_cap.index.isin(PV, level=0)],
-            'solar_rooftop': all_cap[all_cap.index.isin(PVR, level=0)]}
-fig_path = f"figures\\profile_analysis\\{sheet_name}\\"
-mat_path = f"output\\{sheet_name}\\"
-pickle_path = f"PickleJar\\{sheet_name}\\"
-for path in [fig_path, mat_path, pickle_path]:
-    try:
-        mkdir(path)
-    except FileExistsError:
-        None
+    return all_cap, VRE_groups, VRE_tech, VRE_tech_dict, VRE_tech_name_dict, years, reseamed_years, sites, region_name,\
+        regions, non_traditional_load, filenames, profile_keys, capacity_keys, fig_path, pickle_path, electrified_heat_demand
 
 
-def remake_profile_seam(new_profile_seam=4344, profile_starts_in_winter=False, years=range(1980,2020), verbose=False, make_profiles=False):
+def remake_profile_seam(pickle_path, new_profile_seam=4344, profile_starts_in_winter=False, years=range(1980,2020), verbose=False, make_profiles=False):
     VRE_profile_dict = {}
     load_dict = {}
     net_load_dict = {}
@@ -606,12 +613,12 @@ def remake_profile_seam(new_profile_seam=4344, profile_starts_in_winter=False, y
         # print_cyan(VRE_profile_dict[years[i_y - 1]], VRE_profile_dict[years[i_y]])
         # print_green(VRE_df)
         # print_cyan(load)
-        if make_profiles: make_gams_profiles(f"{years[i_y - 1]}-{year}", VRE_df, load_df)
-        make_pickles(f"{years[i_y - 1]}-{year}", VRE_df, all_cap, load_df, non_traditional_load, heat_demand_to_add, net_load_df)
+        if make_profiles: make_gams_profiles(f"{years[i_y - 1]}-{year}", VRE_df, load_df, regions)
+        make_pickles(f"{years[i_y - 1]}-{year}", VRE_df, all_cap, load_df, non_traditional_load, heat_demand_to_add, net_load_df, pickle_path)
     pass
 
 
-def get_demand_as_df(year, reseamed=False):
+def get_demand_as_df(year, regions, reseamed=False):
     if not reseamed:
         demand_filename = f'SyntheticDemand_nordic_L_ssp2-26-2050_{year}.mat'
         mat_demand = mat73.loadmat(mat_folder + demand_filename)
@@ -623,32 +630,43 @@ def get_demand_as_df(year, reseamed=False):
     return demand_df
 
 
-def separate_years(years, add_nontraditional_load=True, make_profiles=False, make_figure=False, window_size_days=3,
-                   threshold=False):
+def separate_years(years, VRE_tech, VRE_tech_name_dict, filenames, profile_keys, capacity_keys, fig_path, regions,
+                   VRE_groups, sites, non_traditional_load, electrified_heat_demand, pickle_path,
+                   add_nontraditional_load=True, make_profiles=False, make_figure=False, window_size_days=3,threshold=False):
     print_cyan(f"Starting the 'separate_years()' script")
     if type(years) == type(1980): years = [years]
     for year in years:
         print_green(f"Year {year}")
         leap = year % 4 == 0
-        VRE_profiles = pd.DataFrame(index=range(8760 + leap * 24),
-                                    columns=pd.MultiIndex.from_product([VRE_tech, regions], names=["tech", "I_reg"]))
-        FLHs = {}
-        pot_cap = {reg: {} for reg in regions}
-        for VRE in VRE_groups:
-            filename = filenames[VRE].replace("YEAR", str(year))
-            VRE_mat = mat73.loadmat(mat_folder + filename)
-            # [site,region]
-            # if there is a time dimension, the dimensions are [time,region,site]
-            profiles = VRE_mat[profile_keys[VRE]]
-            # VRE_mat[capacity_keys[VRE]] is a 2D array with dimensions [region,site
-            for site in sites:
-                tech_name = VRE_tech_name_dict[VRE] + str(site)
-                VRE_profiles[tech_name] = profiles[:, :, site - 1]
-                capacities = VRE_mat[capacity_keys[VRE]]
-                for i_r, region in enumerate(regions):
-                    pot_cap[region][tech_name] = capacities[i_r, site - 1]
-            FLHs[VRE] = get_FLH(profiles[:, :, :])
-        demand = get_demand_as_df(year)
+        if not os.path.exists(f"PickleJar/VRE_mat_data/VRE_mat_data_{year}.pickle"):
+            print_cyan(f"Making VRE_mat_data_{year}.pickle")
+            VRE_profiles = pd.DataFrame(index=range(8760 + leap * 24),
+                                        columns=pd.MultiIndex.from_product([VRE_tech, regions], names=["tech", "I_reg"]))
+            FLHs = {}
+            pot_cap = {reg: {} for reg in regions}
+            for VRE in VRE_groups:
+                filename = filenames[VRE].replace("YEAR", str(year))
+                VRE_mat = mat73.loadmat(mat_folder + filename)
+                # [site,region]
+                # if there is a time dimension, the dimensions are [time,region,site]
+                profiles = VRE_mat[profile_keys[VRE]]
+                # VRE_mat[capacity_keys[VRE]] is a 2D array with dimensions [region,site
+                for site in sites:
+                    tech_name = VRE_tech_name_dict[VRE] + str(site)
+                    VRE_profiles[tech_name] = profiles[:, :, site - 1]
+                    capacities = VRE_mat[capacity_keys[VRE]]
+                    for i_r, region in enumerate(regions):
+                        pot_cap[region][tech_name] = capacities[i_r, site - 1]
+                FLHs[VRE] = get_FLH(profiles[:, :, :])
+            os.makedirs("PickleJar/VRE_mat_data", exist_ok=True)
+            pickle.dump({"FLHs": FLHs, "pot_cap": pot_cap, "VRE_profiles": VRE_profiles}, open(f"PickleJar/VRE_mat_data/VRE_mat_data_{year}.pickle", "wb"))
+        else:
+            print_cyan(f"Loading data from PickleJar/VRE_mat_data/VRE_mat_data_{year}.pickle")
+            VRE_data = pickle.load(open(f"PickleJar/VRE_mat_data/VRE_mat_data_{year}.pickle", "rb"))
+            #FLHs = VRE_data["FLHs"]
+            pot_cap = VRE_data["pot_cap"]
+            VRE_profiles = VRE_data["VRE_profiles"]
+        demand = get_demand_as_df(year, regions)
         prepped_tot_demand = demand.sum(axis=1)
         if add_nontraditional_load:
             prepped_tot_demand += non_traditional_load.sum() / len(prepped_tot_demand)
@@ -696,9 +714,9 @@ def separate_years(years, add_nontraditional_load=True, make_profiles=False, mak
             print_cyan("Making output..", replace_this_line=True)
             net_load = pd.DataFrame(net_load, columns=["net_load"], index=demand.index)
             make_pickles(year, VRE_profiles, all_cap, demand, non_traditional_load, electrified_heat_demand.loc[year],
-                         net_load)
+                         net_load, pickle_path)
         if make_profiles:
-            make_gams_profiles(year, VRE_profiles, demand, pot_cap)
+            make_gams_profiles(year, VRE_profiles, demand, regions, pot_cap)
     return net_load
 
 
@@ -777,56 +795,64 @@ def plot_reseamed_years(years, threshold=False, window_size_days=3):
 
 
 
-def combined_years(years, threshold=False, window_size_days=3):
+def combined_years(years, VRE_tech, VRE_tech_name_dict, filenames, profile_keys, regions,
+                   VRE_groups, sites, non_traditional_load, electrified_heat_demand, pickle_path,
+                   threshold=False, window_size_days=3):
     print_cyan(f"Starting the 'combined_years()' script")
     VRE_profiles = pd.DataFrame(columns=pd.MultiIndex.from_product([VRE_tech, regions], names=["tech", "I_reg"]))
     demands = {}
+    VRE_profile_dict = {}
     for year in years:
         print_green(f"\n- Reading data for Year {year}")
         leap = year % 4 == 0
-        VRE_profile = pd.DataFrame(index=range(8760 + 24 * leap),
+        VRE_profile_dict[year] = pd.DataFrame(index=range(8760 + 24 * leap),
                                    columns=pd.MultiIndex.from_product([VRE_tech, regions], names=["tech", "I_reg"]))
         # regions = ["SE_NO_N", "SE_S", "NO_S", "FI", "DE_N", "DE_S"]
-        FLHs = {}
-        for VRE in VRE_groups:  # ["WON", "WOFF", "solar", "solar_rooftop"]
-            # print(f"- {VRE} -")
-            filename = filenames[VRE].replace("YEAR", str(year))
-            # [site,region]
-            # if there is a time dimension, the dimensions are [time,region,site]
-            VRE_mat = mat73.loadmat(mat_folder + filename)
-            profiles = VRE_mat[profile_keys[VRE]]
-            for site in sites:
-                tech_name = VRE_tech_name_dict[VRE] + str(site)
-                VRE_profile[tech_name] = profiles[:, :, site - 1]
-                # pot_cap = pd.DataFrame(capacities.T, index=sites, columns=regions, )
-            FLHs[VRE] = get_FLH(profiles[:, :, :])
-        VRE_profile.index = pd.MultiIndex.from_product([[year], [f"h{h:04}" for h in range(1, len(VRE_profile) + 1)]],
+        # FLHs = {}
+        if not os.path.exists(f"PickleJar/VRE_mat_data/VRE_mat_data_{year}.pickle"):
+            #print(f"Making new VRE_mat_data_{year}.pickle")
+            raise Exception("No pickle files found, run separate_years() first")
+            """for VRE in VRE_groups:  # ["WON", "WOFF", "solar", "solar_rooftop"]
+                # print(f"- {VRE} -")
+                filename = filenames[VRE].replace("YEAR", str(year))
+                # [site,region]
+                # if there is a time dimension, the dimensions are [time,region,site]
+                VRE_mat = mat73.loadmat(mat_folder + filename)
+                profiles = VRE_mat[profile_keys[VRE]]
+                for site in sites:
+                    tech_name = VRE_tech_name_dict[VRE] + str(site)
+                    VRE_profile_dict[year][tech_name] = profiles[:, :, site - 1]
+                    # pot_cap = pd.DataFrame(capacities.T, index=sites, columns=regions, )
+                # FLHs[VRE] = get_FLH(profiles[:, :, :])"""
+        else:
+            print(f"Loading VRE_mat_data_{year}.pickle")
+            VRE_mat_data = pickle.load(open(f"PickleJar/VRE_mat_data/VRE_mat_data_{year}.pickle", "rb"))
+            VRE_profile_dict[year] = VRE_mat_data["VRE_profiles"]
+            VRE_profile_dict[year].index = pd.MultiIndex.from_product([[year], [f"h{h:04}" for h in range(1, len(VRE_profile_dict[year]) + 1)]],
                                                        names=["year", "timestep"])
-        VRE_profiles = pd.concat([VRE_profiles, VRE_profile])
-        VRE_profiles.index = pd.MultiIndex.from_tuples(VRE_profiles.index)
-        error_labels = []
-        for label, col in VRE_profiles.items():
-            if pd.isna(max(col)) != pd.isna(sum(col)):
-                print_red("inconsistent NA at", label)
-                error_labels.append(label)
-        demand = get_demand_as_df(year)
+        demand = get_demand_as_df(year, regions)
         #demand_filename = f'SyntheticDemand_nordic_L_ssp2-26-2050_{year}.mat'
         #mat_demand = mat73.loadmat(mat_folder + demand_filename)
         #demand = mat_demand["demand"]  # np.ndarray
         if len(set([type(i) for i in demand])) > 1:
             print_red("! More than one datatype in demand in combined_years()")
         print_green("Average net-load per region:")
-        print_green((-(VRE_profile * all_cap).sum(axis=0).groupby(level="I_reg").sum() + demand.sum(
+        print_green((-(VRE_profile_dict[year] * all_cap).sum(axis=0).groupby(level="I_reg").sum() + demand.sum(
             axis=0) + electrified_heat_demand.loc[year].sum(axis=0) + non_traditional_load) / 8766)
-        #prepped_tot_demand = demand.sum(axis=1) / 1000
-        #prepped_tot_demand += non_traditional_load.sum() / len(prepped_tot_demand)
         # take the rows from electrified_heat_demand where the first level of the multiindex equals year
         # add the electrified_heat_demand after summing the columns to one column
         #prepped_tot_demand += heat_demand_to_add
         demands[year] = demand
         # print_red(demands[year].shape)
-        print(
-            f"VRE_profiles and demands are now appended and the lengths are {len(VRE_profiles)} and {sum([len(load) for load in demands.values()])}, respectively")
+    VRE_profiles = pd.concat(VRE_profile_dict.values())
+    VRE_profiles.index = pd.MultiIndex.from_tuples(VRE_profiles.index)
+    error_labels = []
+    for label, col in VRE_profiles.items():
+        if pd.isna(max(col)) != pd.isna(sum(col)):
+            print_red("inconsistent NA at", label)
+            error_labels.append(label)
+    print(
+        f"VRE_profiles and demands are now appended and the lengths are {len(VRE_profiles)} and {sum([len(load) for load in demands.values()])}, respectively")
     heat_demand_to_add = electrified_heat_demand.sum(axis=1)
     if len(error_labels) > 0:
         print_red(VRE_profiles[error_labels].loc[(slice(None), "h0012"), :])
@@ -858,21 +884,26 @@ def combined_years(years, threshold=False, window_size_days=3):
     net_load = pd.DataFrame(net_load, columns=["net_load"], index=VRE_profiles.index)
     # the second level of the multiindex is now "h0001" but should just be 1
     net_load.index = pd.MultiIndex.from_tuples([(i[0], int(i[1][1:])) for i in net_load.index])
-    make_pickles(f"{years[0]}-{years[-1]}", VRE_profiles, all_cap, demands, non_traditional_load, electrified_heat_demand, net_load)
+    make_pickles(f"{years[0]}-{years[-1]}", VRE_profiles, all_cap, demands, non_traditional_load, electrified_heat_demand, net_load, pickle_path)
 
 
 if __name__ == "__main__":
+    all_cap, VRE_groups, VRE_tech, VRE_tech_dict, VRE_tech_name_dict, years, reseamed_years, sites, region_name, regions, \
+        non_traditional_load, filenames, profile_keys, capacity_keys, fig_path, pickle_path, electrified_heat_demand \
+        = initiate_parameters(sheet_name)
     #separate_years(2012, make_figure=True, make_output=True)
     #make_heat_profiles()
     #make_hydro_profiles()
-    separate_years(years, make_profiles=False, make_figure=True)
-    combined_years(years)
+    separate_years(years, VRE_tech_name_dict, filenames, profile_keys, capacity_keys, fig_path, regions, VRE_groups,
+                   sites, non_traditional_load, electrified_heat_demand, pickle_path, make_profiles=False, make_figure=True)
+    combined_years(years, VRE_tech, VRE_tech_name_dict, filenames, profile_keys, regions,
+                   VRE_groups, sites, non_traditional_load, electrified_heat_demand, pickle_path,)
     #combined_years(range(1980,1982))
-    remake_profile_seam(make_profiles=False)
+    remake_profile_seam(pickle_path, make_profiles=False)
     plot_reseamed_years(range(1980,2020))
     if False:
         for nr, years_to_summarize in enumerate([reseamed_years, years]):
-            df = pd.DataFrame(index=pd.MultiIndex.from_tuples([(tech, reg) for tech in VRE_tech for reg in regions]),
+            df = pd.DataFrame(index=pd.MultiIndex.from_tuples([(tech, reg) for tech in VRE_tech_name_dict for reg in regions]),
                                     columns=["pot_cap"] + [str(year) for year in years_to_summarize])
             for year in years_to_summarize:
                 data = pickle.load(open(rf"PickleJar\ref14\netload_components_large_{year}.pickle", "rb"))
