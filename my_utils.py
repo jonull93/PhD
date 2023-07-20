@@ -495,3 +495,10 @@ def fast_rolling_average(my_list, window_size, wraparound=True, **kwargs):
         df = my_list
     if wraparound: df = pd.concat([df.iloc[-wraparound:], df, df.iloc[:wraparound]])
     return df.rolling(window_size, **kwargs).mean().fillna(method="bfill").iloc[final_index]
+
+
+def completion_sound():
+    import winsound
+    notes = [(440, 200), (494, 200), (523, 200), (587, 200), (659, 200)]  # Pairs of (frequency, duration)
+    for note, duration in notes:
+        winsound.Beep(note, duration)

@@ -1,5 +1,7 @@
 import pandas as pd
 import os
+from my_utils import completion_sound
+import winsound
 if __name__ == "__main__":
     import multiprocessing
     import time
@@ -19,7 +21,7 @@ if __name__ == "__main__":
     sheet_name = "ref" + str(max([int(i[3:]) for i in sheets if i.startswith("ref")]))
     ref_folder = sheet_name
     # This is the latest ref_folder from the cap_ref.xlsx file
-    print("The latest ref  in ref_cap.xlsx is: " + ref_folder)
+    print("The latest ref in ref_cap.xlsx is: " + ref_folder)
 
     ref_folders = []
     for folder in os.listdir("PickleJar"):
@@ -32,11 +34,15 @@ if __name__ == "__main__":
     ref_folder_input = input("Enter the ref_folder to use: ")
     if ref_folder_input == "":
         ref_folder = ref_folder
+        print("Using ref_folder from PickleJar: " + ref_folder)
         #elif numerical
     elif ref_folder_input.isnumeric():
         ref_folder = "ref" + ref_folder_input
+        print("Setting ref_folder to: " + ref_folder)
     else:
         ref_folder = ref_folder_input
+        print("Setting ref_folder to: " + ref_folder)
+
 
 
     if choice == "":
@@ -44,30 +50,28 @@ if __name__ == "__main__":
     else:
         choice = int(choice)
     if choice == 1:
-        print("Starting at profile analysis")
+        print("Starting at profile analysis with ref_folder: " + ref_folder)
     elif choice == 2:
-        print("Starting at figure generation")
+        print("Starting at figure generation with ref_folder: " + ref_folder)
     elif choice == 3:
         print("Starting at fingerprint matching")
     else:
         print("Invalid choice")
-        exit()
 
     #Step 1
     if choice==1: 
         import profile_analysis
         all_cap, VRE_groups, VRE_tech, VRE_tech_dict, VRE_tech_name_dict, years, reseamed_years, sites, region_name, \
             regions, non_traditional_load, filenames, profile_keys, capacity_keys, fig_path, pickle_path, electrified_heat_demand \
-            = profile_analysis.initiate_parameters(sheet_name)
+            = profile_analysis.initiate_parameters(ref_folder)
         profile_analysis.separate_years(years, VRE_tech, VRE_tech_name_dict, filenames, profile_keys, capacity_keys,
                                         fig_path, regions, VRE_groups, sites, non_traditional_load, electrified_heat_demand,
                                         pickle_path, make_profiles=False, make_figure=True)
         profile_analysis.combined_years(years, VRE_tech, VRE_tech_name_dict, filenames, profile_keys, regions,
                    VRE_groups, sites, non_traditional_load, electrified_heat_demand, pickle_path,)
         #combined_years(range(1980,1982))
-        profile_analysis.remake_profile_seam(make_profiles=False)
+        profile_analysis.remake_profile_seam(pickle_path, electrified_heat_demand, non_traditional_load, make_profiles=False)
         #plot_reseamed_years(range(1980,2020))
-
 
     #Step 2
     if choice<=2:
@@ -75,7 +79,9 @@ if __name__ == "__main__":
         multiprocessing.freeze_support()
         #profile_analysis.initiate()
         figure_CFD.initiate(ref_folder)
+        completion_sound()
         time.sleep(3)
+
     # run the julia script by using the following powershell command: julia --threads 60 fingerprintmatching.jl
     #Step 3
     if choice<=3:
