@@ -35,7 +35,7 @@ def get_ref_folder():
             ref_folders.append(folder)
     ref_folders.sort(key=lambda x: int(x[3:]))
     ref_folder = ref_folders[-1]
-    ref_folder = "ref28"
+    ref_folder = "ref27"
     return ref_folder
 
 placeholder_ref_folder = get_ref_folder()
@@ -447,6 +447,14 @@ def initiate(ref_folder):
         #save the best 50 combinations to a JSON file
         with open(f"{results_folder_name}/best_50.json", "w") as f:
             to_dump = [key.replace('Any','').replace('"', '').replace('[', '').replace(']', '').replace(' ', '').split(',') for key, value in errors_sorted[:50]]
+            json.dump(to_dump, f, indent=4)
+        with open(f"{results_folder_name}/best_25.json", "w") as f:
+            to_dump = [key.replace('Any','').replace('"', '').replace('[', '').replace(']', '').replace(' ', '').split(',') for key, value in errors_sorted[:25]]
+            json.dump(to_dump, f, indent=4)
+        with open(f"{results_folder_name}/best_2x.json", "w") as f:
+            #calculate how many combinations are within 200% of the best case
+            best_keys = [key for key, value in errors_sorted if value <= errors_sorted[0][1] * 2]
+            to_dump = [key.replace('Any','').replace('"', '').replace('[', '').replace(']', '').replace(' ', '').split(',') for key in best_keys]
             json.dump(to_dump, f, indent=4)
         # save the keys to the items in errors_sorted where the value is at most 5% higher than the best error
         for percent in list(range(5,55,5))+[100]:
