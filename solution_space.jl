@@ -17,6 +17,8 @@ function find_max_ref_folder(parent_directory)
 end
 
 ref_folder = find_max_ref_folder("./output")
+ref_folder = "ref26"
+println("ref_folder = $ref_folder")
 
 
 function diff_sum_weighted_mats(matrices,weights)
@@ -155,7 +157,7 @@ function indexmins2(A::AbstractArray{T,N}, n::Integer) where {T,N}
 end
 square_best_index = indexmins2(square_error,1)[1]
 abs_best_index = indexmins2(abs_errors,1)[1]
-println("abs_best_index = $abs_best_index")
+println("abs_best_index = $(str(abs_best_index))")
 sqrt_best_index = [indexmins2(sqrt_errors,1)[1][i] for i in 1:2]
 log_best_index = [indexmins2(log_errors,1)[1][i] for i in 1:2]
 #wmat_best_index = [indexmins2(wmat_errors,1)[1][i] for i in 1:2]
@@ -189,10 +191,15 @@ for (i, heatmap) in enumerate([square_error, abs_errors, sqrt_errors, log_errors
     annotate!(p[i], [(center,center,text("x",8,:left))])
     annotate!(p[i], [(best_index[2],best_index[1],text("+",18,:center))])
 end
-
+# print the difference between the error in (center,center) and the best error
+printstyled("Difference between center and best error for each metric: \n"; color=:green)
+printstyled("square_error: $(round(square_error[center,center])) / $(round(square_error[square_best_index])) \n"; color=:green)
+printstyled("abs_errors: $(round(abs_errors[center,center])) / $(round(abs_errors[abs_best_index])) \n"; color=:green)
+printstyled("sqrt_errors: $(round(sqrt_errors[center,center])) / $(round(sqrt_errors[sqrt_best_index[1]])) \n"; color=:green)
+printstyled("log_errors: $(round(log_errors[center,center])) / $(round(log_errors[log_best_index[1]])) \n"; color=:green)
 # Save the figure
 combination_string = join(combination,", ")
-path = "figures/$ref_folder/$combination_string"
+path = "figures/solution_space/$ref_folder/$combination_string"
 mkpath(path)
 savefig(joinpath(path,"res$(res)_error_triangles.png"))
 

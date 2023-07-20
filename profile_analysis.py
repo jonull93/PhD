@@ -403,6 +403,7 @@ def find_year_and_hour(index, start_year=1980):
 
 #get the sheet names from "input\\cap_ref.xlsx"
 def get_sheet_name():
+    print_cyan("Getting sheet name from input\\cap_ref.xlsx")
     sheets = pd.ExcelFile("input\\cap_ref.xlsx").sheet_names
     # make sheet_name the name of the sheet that starts with "ref" and has the highest number after it
     sheet_name = "ref" + str(max([int(i[3:]) for i in sheets if i.startswith("ref")]))
@@ -507,6 +508,7 @@ def make_heat_demand_dataframe(regions):
 
 
 def initiate_parameters(sheet_name):
+    print_yellow("Initiating parameters with sheet name " + sheet_name + "...")
     WON = ["WONA" + str(i) for i in range(1, 6)]
     WOFF = ["WOFF" + str(i) for i in range(1, 6)]
     PV = ["PVPA" + str(i) for i in range(1, 6)]
@@ -563,7 +565,7 @@ def initiate_parameters(sheet_name):
         regions, non_traditional_load, filenames, profile_keys, capacity_keys, fig_path, pickle_path, electrified_heat_demand
 
 
-def remake_profile_seam(pickle_path, new_profile_seam=4344, profile_starts_in_winter=False, years=range(1980,2020), verbose=False, make_profiles=False):
+def remake_profile_seam(pickle_path, electrified_heat_demand, non_traditional_load, new_profile_seam=4344, profile_starts_in_winter=False, years=range(1980,2020), verbose=False, make_profiles=False):
     VRE_profile_dict = {}
     load_dict = {}
     net_load_dict = {}
@@ -848,7 +850,7 @@ def combined_years(years, VRE_tech, VRE_tech_name_dict, filenames, profile_keys,
     VRE_profiles.index = pd.MultiIndex.from_tuples(VRE_profiles.index)
     error_labels = []
     for label, col in VRE_profiles.items():
-        if pd.isna(max(col)) != pd.isna(sum(col)):
+        if pd.isna(max(col)) != pd.isna(sum(col)): # this line is currently taking 40% of the function call time
             print_red("inconsistent NA at", label)
             error_labels.append(label)
     print(
