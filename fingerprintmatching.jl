@@ -54,15 +54,15 @@ maxtime = 60*5 # 60*30=30 minutes
 algs_size = "adaptive" # "small" or "large" or "single" or "adaptive"
 years_per_combination = 3
 import_combinations = false
-optimize_all = false
 requested_sum_func = "abs_sum" # "abs_sum" or "sqrt_sum" or "log_sum" or "sse"
 simultaneous_extreme_years = 0
 years_to_add = years_per_combination - simultaneous_extreme_years # number of years to add to the extreme years for each combination
-years_to_optimize = years_to_add + simultaneous_extreme_years*optimize_all
+years_to_optimize = years_to_add
+optimize_all = years_to_optimize == years_per_combination
 # ask the user whether to import the 100 best combinations from the previous run
 while true
     printstyled("
-      The script is set up with the following parameters:
+  The script is set up with the following parameters:
     maxtime = $(maxtime/60) minutes,
     algs_size = $(algs_size),
     years_per_combination = $(years_per_combination),
@@ -75,7 +75,7 @@ while true
         - Enter a number to set the max number of minutes for each optimization
         - Enter 'single', 'small', 'adaptive' or 'large' to change the size of the algorithm
         - Enter '#years' (e.g 4years) to change the number of years in each combination
-        - Enter 'ifalse'/'i50'/'i100' to change the whether to attempt to import (50/100 best) combinations from previous run
+        - Enter 'ifalse'/'i25'/'i50'/'i100'/'i2x' to change the number of combinations to import
         - Enter 'o' to optimize the weights also for the extreme years
         - Enter '#ey' (e.g 2ey) to change the number of extreme years in each combination
         - Enter 'abs', 'sqrt', 'log' or 'sse' to change the sum function
@@ -85,12 +85,12 @@ while true
     if input == "exit" || input == "e" || input == ""
         break
     #import combinations?
-    elseif input == "ifalse" || input == "i50" || input == "i100"
+    elseif input == "ifalse" || input == "i25" || input == "i50" || input == "i100" || input == "i2x"
         if input == "ifalse"
             global import_combinations = false
         else
             #parse the input to an integer
-            global import_combinations = parse(Int, input[2:end])
+            global import_combinations = input[2:end]
         end
         printstyled("Importing combinations: $(import_combinations) \n"; color=:green)
     elseif input == "a"
@@ -103,7 +103,7 @@ while true
         global maxtime = parse(Float32,input)*60
         printstyled("Max time set to $(maxtime/60) minutes \n"; color=:green)
     elseif input == "o"
-        global optimize_all = !optimize_all
+        global optimize_all = years_to_optimize == years_per_combination
         global years_to_optimize = years_to_add + simultaneous_extreme_years*optimize_all
         printstyled("Optimizing weights for all years \n"; color=:green)
     elseif input == "single" || input == "small" || input == "adaptive" || input == "large"
@@ -302,6 +302,9 @@ function diff_sum_weighted_mats(matrices,weights)
         end
         matrices_left = matrices[years_not_optimized+1:end]
         print("matrices_left = $(matrices_left)")
+    elseif length(matrices) < length(weights)
+        printstyled("Warning: more weights than matrices\n"; color=:red)
+        return false
     else
         matrices_left = matrices
     end
@@ -328,13 +331,13 @@ BBO_algs_large = [:generating_set_search,
 BBO_algs_small = [:pso,
 :probabilistic_descent,
 :adaptive_de_rand_1_bin,]
-BBO_algs_single = [:probabilistic_descent]
+BBO_algs_single = [:adaptive_de_rand_1_bin_radiuslimited] #adaptive_de_rand_1_bin_radiuslimited() is recommended in the bboxoptim documentation
 if maxtime >= 29*60 # 29 minutes
     BBO_algs_adaptive = BBO_algs_single
 elseif maxtime > 60 # 1 minute
     BBO_algs_adaptive = [:probabilistic_descent, :adaptive_de_rand_1_bin]
 else
-    BBO_algs_adaptive = BBO_algs_small
+    BBO_algs_adaptive = BBO_algs_single # at less than 1 minute, manual mode is used anyway so the alg doesn't matter
 end
 if typeof(algs_size) == String
     BBO_algs = eval(Meta.parse("BBO_algs_$(algs_size)"))
@@ -439,6 +442,9 @@ Threads.@threads for thread = 1:threads_to_start
         end
         function abs_sum(x)
             diff = diff_sum_weighted_mats(matrices,x)
+            if diff == false
+                return 0
+            end
             result = 0.0
             @inbounds @simd for i in eachindex(diff)
                 result += abs(diff[i])
@@ -491,20 +497,19 @@ Threads.@threads for thread = 1:threads_to_start
 
         local alg_solutions = Dict()
         if maxtime < 61
-            if thread == 1
+            if thread == 1 && global_best > 1e9
                 lock(print_lock) do
                     printstyled("maxtime is less than 61 seconds, testing starting points manually\n"; color=:magenta)
                 end
             end
             #manually test the initial guesses one by one using opt_func() instead of the BBOptim.jl package
-            best_guess = (0,Inf)
-            for i in 1:length(initial_guesses)
+            local best_guess = (0,Inf)
+            local x = initial_guesses[1]
+            local e = opt_func(x)
+            local midpoint_error = e
+            best_guess = (x,e)
+            for i in 2:length(initial_guesses)
                 # if the thread is the first one, print which starting point is being tested
-                if thread == 1
-                    lock(print_lock) do
-                        printstyled("Trying initial guess $(i) of $(length(initial_guesses))\n"; color=:magenta)
-                    end
-                end
                 local x = initial_guesses[i]
                 local e = opt_func(x)
                 if e < best_guess[2]
@@ -513,11 +518,22 @@ Threads.@threads for thread = 1:threads_to_start
             end
             best_weights[case] = best_guess[1]
             best_errors[case] = best_guess[2]
-            best_alg[case] = "manual"
+            #let best_alg say "-20% from mid-point" if the best guess is 20% from the mid-point guess, since there is no alg anyway
+            best_alg[case] = "-$(round((best_guess[2]-midpoint_error)/midpoint_error*100))% from mid-point"
 
             lock(print_lock) do
                 printstyled("Thread $(thread) finished working on $(case) at $(Dates.format(now(), "HH:MM:SS")), after $(round(Dates.now()-start_time,Dates.Second))\n"; color=:green)
-                printstyled("Best error is $(round(best_guess[2],digits=1)) for $(round.(best_weights[case],digits=3))\n"; color=:white)
+                printstyled("Best error is $(round(best_guess[2],digits=1)) for $(round.(best_weights[case],digits=3))"; color=:white)
+                if best_guess[2] <= global_best
+                    global_best = best_guess[2]
+                    printstyled(" <-- GLOBAL BEST\n"; color=:red)
+                else
+                    printstyled("\n"; color=:white)
+                end
+
+                if thread == 1
+                    printstyled("Global best so far = $(round(global_best))\n"; color=:magenta)
+                end
             end
 
         else
@@ -593,6 +609,9 @@ Threads.@threads for thread = 1:threads_to_start
         end
     end
 end
+
+println('\a') #beep
+
 for comb in all_combinations
     #if comb not in best_errors
     if !(comb in keys(best_errors))
@@ -605,7 +624,7 @@ end
 sum_func = split(opt_func_str, "(")[1]
 
 # Find the 3 best combinations (lowest SSE), print their SSE and weights
-println("Done optimizing all combinations at $(Dates.format(now(), "HH:MM:SS"))")
+println("Done optimizing all combinations for $ref_folder at $(Dates.format(now(), "HH:MM:SS"))")
 printstyled("The 3 best combinations are ($(years[1])-$(years[end])) [sum_func=$(sum_func)()]:\n", color=:cyan)
 try
     global sorted_cases = sort(collect(best_errors), by=x->x[2])
