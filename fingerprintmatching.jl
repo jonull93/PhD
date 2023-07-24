@@ -73,6 +73,7 @@ while true
     requested_sum_func = $(requested_sum_func),
     ref_folder = $(ref_folder)
         - Enter a number to set the max number of minutes for each optimization
+          (<= 1 min will start a 'manual' search of the starting points to filter out the bad combinations)
         - Enter 'single', 'small', 'adaptive' or 'large' to change the size of the algorithm
         - Enter '#years' (e.g 4years) to change the number of years in each combination
         - Enter 'ifalse'/'i25'/'i50'/'i100'/'i2x' to change the number of combinations to import
@@ -148,7 +149,7 @@ if optimize_all && years_to_optimize == years_per_combination
     printstyled("All years will be optimized, so optimize_all will be set to true\n"; color=:green)
 end
 
-# sleep(60*60*2)
+#sleep_time=60*60*1;println("Sleeping for $(sleep_time/3600) hr");sleep(sleep_time)
 # years_to_add scales insanely with the number of years, so it is not recommended to use more than 2
 
 years_list = map(x -> string(x, "-", x+1), years)
@@ -198,7 +199,14 @@ else
     printstyled("Building combinations instead of importing! \n"; color=:red)
     println("Years: $(years_list)")
     println("Number of years: $(length(years_list))")
-
+    good_candidates = [
+    ["1981-1982", "1982-1983", "1985-1986", "2018-2019"],
+    ["2000-2001", "2002-2003", "2014-2015", "2017-2018"],
+    ["1980-1981", "1992-1993", "1996-1997", "2014-2015"],
+    ["1981-1982", "2014-2015", "2016-2017"],
+    ["1981-1982", "1999-2000", "2016-2017"],
+    ["2000-2001", "2016-2017"]
+    ]
     extreme_year_combinations = combinations(extreme_years, simultaneous_extreme_years)
     for extreme_year_set in extreme_year_combinations
         years_to_use = [i for i in years_list if !(i in extreme_year_set)]
@@ -207,9 +215,20 @@ else
             for combination in year_combinations
                 case = copy(extreme_year_set)
                 append!(case, combination)
-                enqueue!(queue,case)
+                #enqueue!(queue,case)
                 push!(all_combinations,case)
             end
+        end
+    end
+    # add all combinations to the queue, but add the good_candidates, if in all_combinations, to the front of the queue
+    for candidate in good_candidates
+        if candidate in all_combinations
+            enqueue!(queue, candidate)
+        end
+    end
+    for combination in all_combinations
+        if !(combination in good_candidates)
+            enqueue!(queue, combination)
         end
     end
 end
@@ -350,6 +369,7 @@ printstyled("At $maxtime s per solve, $(length(BBO_algs)) algs and $(threads_to_
 longest_alg_name = maximum([length(string(alg)) for alg in BBO_algs])
 #print, in yellow and with ######-separation, the maxtime and algs that the loop is ran with
 global_best = 9e9
+global_midpoint_tracker = 0  # keeps track of the highest midpoint among solutions that are still good (within x% of the best solution)
 printstyled("############# -- Starting optimization loop with maxtime=$(maxtime)s and algs_size '$(algs_size)' -- #############\n"; color=:yellow)
 global initial_guesses_3 = [
     # considering the solution space as a triangle where each corner is 100% of one axis such as (1,0,0)
@@ -418,9 +438,10 @@ end=#
 
 Threads.@threads for thread = 1:threads_to_start
     #sleep for 250 ms to stagger thread starts
-    time_to_sleep = 0.2*thread
+    time_to_sleep = 0.33*thread
     sleep(time_to_sleep)
     global global_best
+    global global_midpoint_tracker
     global requested_sum_func
     while true
         if length(queue) == 0
@@ -430,8 +451,10 @@ Threads.@threads for thread = 1:threads_to_start
         start_time = Dates.now()
         local case = []
         lock(print_lock) do # for some reason, julia would freeze and the dequeue would bug out if this was not locked
-            case = dequeue!(queue)
-            printstyled("Thread $(thread) started working on $(case) at $(Dates.format(now(), "HH:MM:SS")), $(length(queue)) left in queue\n"; color=:cyan)
+            if length(queue) > 0
+                case = dequeue!(queue)
+                printstyled("Thread $(thread) started working on $(case) at $(Dates.format(now(), "HH:MM:SS")), $(length(queue)) left in queue\n"; color=:cyan)
+            end
         end
         convert(Vector{String},case)
         matrices = [cfd_data[year] for year in case if !(year in extreme_years && !optimize_all)]
@@ -493,10 +516,12 @@ Threads.@threads for thread = 1:threads_to_start
                 error("Invalid requested_sum_func")
             end
         end
-        
 
         local alg_solutions = Dict()
-        if maxtime < 61
+        # define paramters for maxtime and midpoint_factor_for_skipping
+        local maxtime_manual = 61
+        local midpoint_factor_for_skipping = 1.4 # from testing, it seems like 25% is about as much as the error can get improved (for abs_sum)
+        if maxtime < maxtime_manual
             if thread == 1 && global_best > 1e9
                 lock(print_lock) do
                     printstyled("maxtime is less than 61 seconds, testing starting points manually\n"; color=:magenta)
@@ -508,35 +533,46 @@ Threads.@threads for thread = 1:threads_to_start
             local e = opt_func(x)
             local midpoint_error = e
             best_guess = (x,e)
-            for i in 2:length(initial_guesses)
-                # if the thread is the first one, print which starting point is being tested
-                local x = initial_guesses[i]
-                local e = opt_func(x)
-                if e < best_guess[2]
-                    best_guess = (x,e)
+            if midpoint_error > global_best*midpoint_factor_for_skipping
+                lock(print_lock) do
+                    printstyled("Midpoint error is more than $(midpoint_factor_for_skipping) ($(round(midpoint_error/global_best,digits=2))) of the global best, skipping this case\n"; color=:yellow)
+                end
+            else
+                for i in 2:length(initial_guesses)
+                    # if the thread is the first one, print which starting point is being tested
+                    local x = initial_guesses[i]
+                    local e = opt_func(x)
+                    if e < best_guess[2]
+                        best_guess = (x,e)
+                    end
                 end
             end
             best_weights[case] = best_guess[1]
             best_errors[case] = best_guess[2]
             #let best_alg say "-20% from mid-point" if the best guess is 20% from the mid-point guess, since there is no alg anyway
-            best_alg[case] = "-$(round((best_guess[2]-midpoint_error)/midpoint_error*100))% from mid-point"
+            best_alg[case] = "$(round(Int,(best_guess[2]-midpoint_error)/midpoint_error*100))% from mid-point"
 
             lock(print_lock) do
                 printstyled("Thread $(thread) finished working on $(case) at $(Dates.format(now(), "HH:MM:SS")), after $(round(Dates.now()-start_time,Dates.Second))\n"; color=:green)
-                printstyled("Best error is $(round(best_guess[2],digits=1)) for $(round.(best_weights[case],digits=3))"; color=:white)
+                printstyled("Error = $(round(best_guess[2],digits=1)) for $(round.(best_weights[case],digits=3))"; color=:white)
                 if best_guess[2] <= global_best
+                    global_midpoint_tracker *= best_guess[2]/global_best
                     global_best = best_guess[2]
                     printstyled(" <-- GLOBAL BEST\n"; color=:red)
                 else
                     printstyled("\n"; color=:white)
+                    if best_guess[2] < global_best*1.2
+                        printstyled("Only $(round(best_guess[2]/global_best,digits=2)) from the global best with the midpoint error at $(round(midpoint_error/global_best,digits=2))\n"; color=:blue)
+                        if midpoint_error > global_midpoint_tracker
+                            global_midpoint_tracker = midpoint_error
+                        end
+                    end
                 end
-
                 if thread == 1
                     printstyled("Global best so far = $(round(global_best))\n"; color=:magenta)
                 end
             end
-
-        else
+        else # if the maxtime is not less than maxtime_manual, use the BBOptim.jl package
             for alg in BBO_algs
                 #print the next line only if thread==1
                 if thread == 1
@@ -610,6 +646,8 @@ Threads.@threads for thread = 1:threads_to_start
     end
 end
 
+println('\a') #beep
+sleep(1)
 println('\a') #beep
 
 for comb in all_combinations
