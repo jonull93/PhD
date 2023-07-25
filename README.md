@@ -24,13 +24,16 @@ This repository includes several scripts primarily written in Python and Julia, 
 
 These scripts are used for building representative sets of typical and particularly challenging net-load events. This is done by running the `year_selection` script first, followed by `fingerprintmatching` script (with a start-up parameter of max_time=1 min), and then `year_selection` script again. After these, `fingerprintmatching` is run again with a longer max_time option (60-120 mins). 
 
+Both `year_selection.py` and `fingerprintmatching.jl` prompt the user for a 'ref#' which refers to a sheet with installed capacity of each technology in each region from `input/cap_ref.xlsx`. 
+The script `year_selection.py` loads functions from `profile_analysis.py` and `figure_CFD.py`, and executes them in a that generates .mat files for as well as figures for visual analysis. When ran for a 'ref#' that already has been fingerprintmatched, figure_CFD will create combination-specific figures and create files containing the best 25/50/100 combinations. `fingerprintmatching.jl`, in turn, can read these files and optimize for only the best 25/50/100 combinations by entering 'i50' (or one of the other numbers) after starting the script.
+
 **Data Processing** 
 
 5.  `gdx_processing.py`
 6.  `gdx_processing_functions.py`
 7.  `get_from_gams_db.py`
 
-These scripts are used for reading the GAMS output in gdx format and turning it into .pickle files for further processing and analysis. This is done by setting up variables in, and running, `gdx_processing.py`.
+These scripts are used for reading the GAMS output in gdx format and turning it into .pickle files for further processing and analysis. This is done by setting up variables in, and running, `gdx_processing.py`. `gdx_processing_functions.py` loads variables/parameters/sets from the gdxes specified in `gdx_processing.py` and, possibly, calculates new values that will be included in the .pickle file output. To add new data to the .pickle files, add their collection in `gdx_processing_functions.py`.
 
 **Visualization** 
 Several other scripts in this repository are used for generating figures out of the model results stored in the .pickle files created by 5.
@@ -58,7 +61,7 @@ Input for running these scripts is either provided in the `/input` folder or `.g
 
 ## Contact
 
-If you have questions or need further clarification, feel free to reach out to Jonathan Ullmark at `jonathan [dot] ullmark@chalmers.se` (obfuscated to prevent spam).
+If you have questions or need further clarification, feel free to reach out to Jonathan Ullmark at `jonathan[dot]ullmark@chalmers.se` (obfuscated to prevent spam).
 
 ## License
 
