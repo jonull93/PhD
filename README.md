@@ -2,7 +2,7 @@
 
 ## Introduction
 
-This repository is part of a broader research focused on electricity system modeling and analysis using a GAMS model. The primary focus of this project is on the management of net load variations in the electricity system. The scripts herein have been used in the following publications:
+This repository is part of a broader research focused on electricity system modeling and analysis using a GAMS model. The primary focus of this project is on the management of net load variations in the electricity system. Most scripts herein have been used at some point (and in some version) for the following publications:
 - [Actuating the European Energy System Transition: Indicators for Translating Energy Systems Modelling Results into Policy-Making](https://doi.org/10.3389/fenrg.2021.677208)
 - [Inclusion of frequency control constraints in energy system investment modeling](https://doi.org/10.1016/j.renene.2021.03.114)
 - [Optimization modeling of frequency reserves and inertia in the transition to a climate-neutral electricity system](https://research.chalmers.se/en/publication/530495)
@@ -34,17 +34,25 @@ These scripts are used for reading the GAMS output in gdx format and turning it 
 
 **Visualization** Several other scripts in this repository are used for generating figures out of the model results stored in the .pickle files created by 5.
 
-**\[Placeholder for Detailed Instructions\]**
 
 ## Dependencies
 
-\[Placeholder for dependencies information\]
+The Data Processing scripts use the `gdx-reader` package developed by [Joel Goop](https://github.com/joelgoop/gdx-reader) and are run from an Anaconda environment exported to `environment_pygams.yml`. All other scripts are ran in an environment with a more recent version of Python, found in `environment_py311.yml`
 
-## Input and Output
+To install these environments in the Anaconda command prompt, this command should do the trick:
+```
+conda env create -f environment[..].yml
+```
+Note that you may have to manually install the GAMS API package by running: 
+```
+python "C:\GAMS\37\apifiles\Python\api_36\setup.py" install
+```
 
-Input for running these scripts is either provided in the `/input` folder or as `.gdx` files from the Multinode GAMS model.
+If the environment packages provided do not work then you may find more success using the `incomplete_pygams.yml` file or following the instructions https://github.com/joelgoop/gdx-reader, then manually installing the missing packages using `pip install package_name_1` in the Anaconda environment.
 
-**\[Placeholder for Output Details\]**
+## Input 
+
+Input for running these scripts is either provided in the `/input` folder or `.gdx` files generated from the Multinode GAMS model. 
 
 ## Contact
 
@@ -53,5 +61,3 @@ If you have questions or need further clarification, feel free to reach out to J
 ## License
 
 This repository is licensed under the Creative Commons Attribution 4.0 International license (CC BY 4.0). You are free to share and adapt the material for any purpose, even commercially, as long as you give appropriate credit, provide a link to the license, and indicate if changes were made.
-
-**\[Placeholder for Known Issues or Future Implementations\]**
