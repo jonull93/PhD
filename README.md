@@ -3,12 +3,13 @@
 ## Introduction
 
 This repository is part of a broader research focused on electricity system modeling and analysis using a GAMS model. The primary focus of this project is on the management of net load variations in the electricity system. Most scripts herein have been used at some point (and in some version) for the following publications:  
-- [Actuating the European Energy System Transition: Indicators for Translating Energy Systems Modelling Results into Policy-Making](https://doi.org/10.3389/fenrg.2021.677208)  
-- [Inclusion of frequency control constraints in energy system investment modeling](https://doi.org/10.1016/j.renene.2021.03.114)  
-- [Optimization modeling of frequency reserves and inertia in the transition to a climate-neutral electricity system](https://research.chalmers.se/en/publication/530495)  
-- [Frequency reserves and inertia in the transition to future electricity systems](https://doi.org/10.1007/s12667-023-00568-1)  
-- "Potential revenue from reserve market participation in wind power- and solar power-dominated electricity grids" submitted for publication  
-- "Selecting weather-years to represent high net load events in electricity system capacity expansion models" submitted for publication
+- Lehtveer et al. (2021), [Actuating the European Energy System Transition: Indicators for Translating Energy Systems Modelling Results into Policy-Making](https://doi.org/10.3389/fenrg.2021.677208)  
+- Ullmark et al. (2021), [Inclusion of frequency control constraints in energy system investment modeling](https://doi.org/10.1016/j.renene.2021.03.114)  
+- Licentiate thesis by J. Ullmark (2022), [Optimization modeling of frequency reserves and inertia in the transition to a climate-neutral electricity system](https://research.chalmers.se/en/publication/530495)  
+- Ullmark et al. (2023), [Frequency reserves and inertia in the transition to future electricity systems](https://doi.org/10.1007/s12667-023-00568-1)  
+- Ullmark et al., "Potential revenue from reserve market participation in wind power- and solar power-dominated electricity grids", submitted for publication  
+- Ullmark et al., "Selecting weather-years to represent high net load events in electricity system capacity expansion models", in progress
+- Doctoral thesis by J. Ullmark (2023), in progress
 
 
 ## Repository Contents
