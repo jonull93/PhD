@@ -498,7 +498,7 @@ def fast_rolling_average(my_list, window_size, wraparound=True, **kwargs):
 
 
 def completion_sound():
-    import winsound
-    notes = [(440, 200), (494, 200), (523, 200), (587, 200), (659, 200)]  # Pairs of (frequency, duration)
+    from winsound import Beep
+    notes = [(440, 300), (494, 300), (523, 300), (587, 300), (659, 300)]  # Pairs of (frequency, duration)
     for note, duration in notes:
-        winsound.Beep(note, duration)
+        Beep(note, duration)
