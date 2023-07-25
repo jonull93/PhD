@@ -32,7 +32,8 @@ These scripts are used for building representative sets of typical and particula
 
 These scripts are used for reading the GAMS output in gdx format and turning it into .pickle files for further processing and analysis. This is done by setting up variables in, and running, `gdx_processing.py`.
 
-**Visualization** Several other scripts in this repository are used for generating figures out of the model results stored in the .pickle files created by 5.
+**Visualization** 
+Several other scripts in this repository are used for generating figures out of the model results stored in the .pickle files created by 5.
 
 
 ## Dependencies
@@ -43,6 +44,7 @@ To install these environments in the Anaconda command prompt, this command shoul
 ```
 conda env create -f environment[..].yml
 ```
+
 Note that you may have to manually install the GAMS API package by running: 
 ```
 python "C:\GAMS\37\apifiles\Python\api_36\setup.py" install
@@ -56,7 +58,7 @@ Input for running these scripts is either provided in the `/input` folder or `.g
 
 ## Contact
 
-If you have questions or need further clarification, feel free to reach out to Jonathan Ullmark at <ins>jonathan.ullmark@chalmers.se</ins>.
+If you have questions or need further clarification, feel free to reach out to Jonathan Ullmark at `jonathan [dot] ullmark@chalmers.se` (obfuscated to prevent spam).
 
 ## License
 
