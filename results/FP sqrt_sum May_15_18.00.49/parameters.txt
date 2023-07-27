@@ -1,1 +1,0 @@
-{"BBO_algs":["probabilistic_descent"],"opt_func":"sqrt_sum(x) + weights_penalty(x,fixed_weights=length(matrices)-length(x),slack_distance=0.011,amplitude=1e6)","maxtime":5}

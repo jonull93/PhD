@@ -1,1 +1,0 @@
-{"BBO_algs":["probabilistic_descent","adaptive_de_rand_1_bin"],"opt_func":"abs_sum(x) + (sigmoid((sum(x)-1.011)*1000) + sigmoid((0.989-sum(x))*1000))*100000","maxtime":1200}

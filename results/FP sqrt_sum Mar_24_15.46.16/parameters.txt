@@ -1,1 +1,0 @@
-{"BBO_algs":["generating_set_search","adaptive_de_rand_1_bin_radiuslimited","simulated_annealing","probabilistic_descent","pso","adaptive_de_rand_1_bin","dxnes"],"opt_func":"sqrt_sum(x) + (sigmoid((sum(x)-1.011)*1000) + sigmoid((0.989-sum(x))*1000))*100000","maxtime":60}
