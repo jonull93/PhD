@@ -70,7 +70,7 @@ for reg in regions:
 
 # Or overwrite the cases list manually
 # iter2_3 = "2002-2003", "1996-1997", "2014-2015"
-cases = [#"singleyear_2002to2003_1h", "singleyear_1996to1997_1h", "singleyear_2014to2015_1h", "singleyear_1989to1990_1h", "singleyear_2010to2011_1h", "singleyear_2003to2004_1h",
+cases1 = [#"singleyear_2002to2003_1h", "singleyear_1996to1997_1h", "singleyear_2014to2015_1h", "singleyear_1989to1990_1h", "singleyear_2010to2011_1h", "singleyear_2003to2004_1h",
          #"singleyear_1990to1991_1h", 
         # years to include: ['89', '95', '96', '97', '02', '03', '04', '09', '10', '18']
         "singleyear_1989to1990_1h", "singleyear_1995to1996_1h", "singleyear_1996to1997_1h", 
@@ -80,9 +80,24 @@ cases = [#"singleyear_2002to2003_1h", "singleyear_1996to1997_1h", "singleyear_20
         # also 2012 and 2016-2017
         "singleyear_1h_2012", "singleyear_2016to2017_1h",
 
-         "iter2_3_1h", "iter3_16start_2002to2003_1h",
-         "base3extreme2_3_2002to2003_1h", "base4extreme2_12s_i1_2002to2003_1h",
-         "base4extreme2_5_2002to2003_1h", "base4extreme2_even_2002to2003_1h",]
+         "set1_1opt", "set1_2opt", "set1_3opt", "set1_4opt"]
+cases2 = [
+    "set1_2opt", "set1_3opt", "set1_4opt",
+    "allopt2_final",
+    "allopt3_final_a", "allopt3_final_b",
+    "allopt4_final_a", "allopt4_final_b",
+]
+cases3 = [
+    "set1_3opt", "set1_4opt",
+
+    "set1_4opt_alt",
+    "set1_6even",
+
+    "singleyear_1996to1997_1h", "singleyear_2002to2003_1h", #extremes
+    "singleyear_1h_2012", "singleyear_2016to2017_1h", #start-points
+]
+
+cases = cases2
 #cases = ["singleyear_"+str(year)+"to"+str(year+1)+"_1h" for year in range(1980, 2018)]
 
 comp_name = os.environ['COMPUTERNAME']
