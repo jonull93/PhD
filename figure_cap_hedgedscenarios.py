@@ -41,7 +41,7 @@ def shorten_year(scenario):
         return "'" + match.group()[-2:]
 
     # use re.sub to replace all occurrences of 4-digit years
-    return re.sub(r'(19|20)\d{2}', replacer, scenario)
+    return re.sub(r'(19|20)\d{2}', replacer, scenario).removeprefix("singleyear_")
 
 def select_pickle(use_defaults):
     pickle_files = glob.glob(os.path.join(pickle_folder, "data_results_*.pickle"))
@@ -136,9 +136,21 @@ def load_data(pickle_file, use_defaults):
         excluded = input("Please enter the scenarios you want to exclude, separated by commas (or H for the hardcoded list): ").split(',')
         if excluded == ['H'] or excluded == ['h']:
             # Use the hardcoded list
-            selected_scenarios = [] # Replace with the hardcoded list
+            selected_scenarios = [#'singleyear_1989to1990_1h', 'singleyear_1995to1996_1h',
+                                  'singleyear_1996to1997_1h', #'singleyear_1997to1998_1h',
+                                  'singleyear_2002to2003_1h', 'singleyear_2003to2004_1h', #'singleyear_2004to2005_1h',
+                                  'singleyear_2009to2010_1h', #'singleyear_2010to2011_1h', 'singleyear_2018to2019_1h', 'singleyear_2014to2015_1h',
+                                  'singleyear_1h_2012', 'singleyear_2016to2017_1h',
+                                  'set1_1opt', 'set1_2opt', 'set1_3opt', 'set1_4opt'] # Replace with the hardcoded list
         else:
-            excluded = [s.strip() for s in excluded]  # Remove leading/trailing spaces
+            print_red(f"Excluding scenarios: {excluded}")
+            # the input is a string but if there is an , in the input it will be split into a list
+            if ',' not in excluded:
+                excluded = [e.strip().replace("'", "").replace('"', '') for e in excluded]
+            else:
+                parts = excluded.split(',')
+                print_red(f"parts: {parts}")
+                excluded = [p.strip().replace("'", "").replace('"', '') for p in parts]
             selected_scenarios = [s for s in all_scenarios if s not in excluded]
 
     # Handle alternative scenarios
@@ -162,7 +174,7 @@ def load_data(pickle_file, use_defaults):
 
     # Remove "ref_cap" from scenario names 
     selected_data = {s.replace("ref_cap_", ""): selected_data[s] for s in selected_data.keys()}
-    selected_data = {s.replace("singleyear_", ""): selected_data[s] for s in selected_data.keys()}
+    #selected_data = {s.replace("singleyear_", ""): selected_data[s] for s in selected_data.keys()}
     selected_data = {s.replace("to", "-"): selected_data[s] for s in selected_data.keys()}
     selected_data = {s.replace("_1h", ""): selected_data[s] for s in selected_data.keys()}
     selected_data = {s.replace("_tight", ""): selected_data[s] for s in selected_data.keys()}
@@ -184,7 +196,8 @@ def load_data(pickle_file, use_defaults):
             print_yellow("Invalid input. Keeping all scenarios")
     if has_altscenarios and use_defaults:
         print_yellow("There are alternative scenarios in the data.")
-
+    # reorder the keys in alphabetical order
+    selected_data = {k: selected_data[k] for k in sorted(selected_data.keys())}
     selected_scenarios_to_print = "\n".join(selected_data.keys())
     print_blue(f"Selected scenarios: \n{selected_scenarios_to_print}")
     return selected_data
@@ -224,10 +237,28 @@ def group_technologies(data):
 
 
 def prettify_scenario_name(name):
+    #print_yellow(f"Prettifying scenario name: {name}")
+    if "set1" in name:
+        #print_yellow("Set 1 scenario detected")
+        # turn set1_4opt into Set 1 (4 opt.)
+        nr = name.split("_")[1].replace("opt", "")
+        alt = " alt."*('alt' in name)
+        return f"Set 1 ({nr} opt.)" + alt
+    if "allopt" in name:
+        # turn allopt2_final into All opt. (2 yr), and allopt2_final_a into All opt. (2 yr) a
+        nr = name.split("_")[0].replace("allopt", "")
+        if len(name.split("_")) == 3:
+            abc = name.split("_")[2]
+        else:
+            abc = ""
+        return f"Set 2{abc} ({nr} yr.)"
     if "iter2_3" in name:
         return "Set (1 opt.)"
     elif "iter3_16start" in name:
         return "Set (2 opt.)"
+    if "singleyear" in name:
+        # turn 'singleyear_1989to1990_1h' into "'89-'90" using regex
+        return shorten_year(name)
     # remove 'base' and 'extreme' and split into a list
     parts = name.replace('base', '').replace('extreme', ' ').split()
     if "v2" in name or "_5_" in name:
@@ -338,7 +369,7 @@ def create_figure(grouped_data, pickle_timestamp, use_defaults):
     new_labels = []#[f"{f'{scenario}, '*(len(scenario.replace(year,''))>3)}" + f"{year}" for scenario, year in zip(all_scenarios, all_years)]
     for scenario in x_ticks:
         scenario = scenario.get_text()
-        if len(scenario) > 10 or "iter" in scenario:
+        if len(scenario) > 10 or "_" in scenario:
             # change labels from "base#extreme#" (where # is a number) to "#b #e"
             temp_label = f"{scenario.replace('_tight','').replace('_1h','')}"
             temp_label = prettify_scenario_name(temp_label)
@@ -409,8 +440,13 @@ def create_figure_separated_techs(grouped_data, pickle_timestamp, use_defaults):
         for bars in ax.containers:
             # Apply this function to each bar
             for bar in bars:
+                #if in the Battery or Hydrogen group, make the label text white
+                if group_name in ['Battery', 'Hydrogen']:
+                    textcolor = 'white'
+                else:
+                    textcolor = 'black'
                 label = conditional_label(bar, 10)
-                ax.text(bar.get_x() + bar.get_width() / 2, bar.get_y() + bar.get_height()-max_y*0.04, label, ha='center', va='center', fontsize=6)
+                ax.text(bar.get_x() + bar.get_width() / 2, bar.get_y() + bar.get_height()-max_y*0.04, label, ha='center', va='center', fontsize=6, color=textcolor)
 
     # Add overall title, labels, legend etc. to your liking
     # Change the x-labels to be right-aligned
@@ -419,7 +455,7 @@ def create_figure_separated_techs(grouped_data, pickle_timestamp, use_defaults):
         new_labels = []#[f"{f'{scenario}, '*(len(scenario.replace(year,''))>3)}" + f"{year}" for scenario, year in zip(all_scenarios, all_years)]
         for scenario in x_ticks:
             scenario = scenario.get_text()
-            if len(scenario) > 10 or "iter" in scenario:
+            if len(scenario) > 10 or "_" in scenario:
                 # change labels from "base#extreme#" (where # is a number) to "#b #e"
                 temp_label = f"{scenario.replace('_tight','').replace('_1h','')}"
                 temp_label = prettify_scenario_name(temp_label)
@@ -442,6 +478,8 @@ def create_figure_separated_techs(grouped_data, pickle_timestamp, use_defaults):
         ax.legend(handles[::-1], new_labels[::-1], loc='lower center', framealpha=0.65, ncols=2, fontsize="small") # [::-1] to reverse the order of the legend entries
         if i_a==0:
             ax.set_ylabel('Installed capacity [GW(h)]')
+        elif i_a == 1:
+            ax.set_ylabel('Installed storage capacity [GWh]')
         else:
             ax.set_ylabel('Installed power capacity [GW]')
     fig.tight_layout(pad=0.5)
