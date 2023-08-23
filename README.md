@@ -1,4 +1,5 @@
-# Electricity System Capacity Expansion Modeling
+# Information about this repository
+To access the files, click [here](https://github.com/jonull93/PhD).
 
 ## Introduction
 
