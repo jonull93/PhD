@@ -196,8 +196,9 @@ def load_data(pickle_file, use_defaults):
             print_yellow("Invalid input. Keeping all scenarios")
     if has_altscenarios and use_defaults:
         print_yellow("There are alternative scenarios in the data.")
-    # reorder the keys in alphabetical order
-    selected_data = {k: selected_data[k] for k in sorted(selected_data.keys())}
+    # reorder the keys in alphabetical order, but with scenarios starting with set1.. first
+    sorted_keys = [s for s in selected_data.keys() if "set1" in s] + [s for s in selected_data.keys() if "set1" not in s]
+    selected_data = {s: selected_data[s] for s in sorted_keys}
     selected_scenarios_to_print = "\n".join(selected_data.keys())
     print_blue(f"Selected scenarios: \n{selected_scenarios_to_print}")
     return selected_data
@@ -243,15 +244,18 @@ def prettify_scenario_name(name):
         # turn set1_4opt into Set 1 (4 opt.)
         nr = name.split("_")[1].replace("opt", "")
         alt = " alt."*('alt' in name)
-        return f"Set 1 ({nr} opt.)" + alt
+        even = ", eq. w."*('even' in name)
+        if "even" in name: nr = 4
+        return f"2 HP + {nr}{alt} opt." + even # 2 opt., 2 HP
     if "allopt" in name:
         # turn allopt2_final into All opt. (2 yr), and allopt2_final_a into All opt. (2 yr) a
         nr = name.split("_")[0].replace("allopt", "")
         if len(name.split("_")) == 3:
             abc = name.split("_")[2]
+            abc = f" ({abc})"
         else:
             abc = ""
-        return f"Set 2{abc} ({nr} yr.)"
+        return f"{nr} opt.{abc}"
     if "iter2_3" in name:
         return "Set (1 opt.)"
     elif "iter3_16start" in name:
@@ -415,10 +419,10 @@ def create_figure_separated_techs(grouped_data, pickle_timestamp, use_defaults):
     for ax, (group_name, tech_list) in zip(axes, tech_groups2.items()):
         # Filter data for the current technology group
         group_data = combined_data.loc[combined_data.index.intersection(tech_list)].dropna(how='all')
-        
+
         # Plot the data for this group
         group_data.T.plot(kind='bar', stacked=True, ax=ax, color=[color_dict.get(tech, 'gray') for tech in group_data.index], width=0.8)
-        
+
         # Set the title for this subplot
         ax.set_title(group_name)
 
@@ -434,7 +438,7 @@ def create_figure_separated_techs(grouped_data, pickle_timestamp, use_defaults):
                 return f'{height:.0f}'
             else:
                 return ''
-        
+
         # get the max y-value for this subplot
         max_y = ax.get_ylim()[1]
         for bars in ax.containers:
