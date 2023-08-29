@@ -4,12 +4,11 @@ import numpy as np
 import matplotlib.pyplot as plt
 import glob
 import re
-from my_utils import color_dict, tech_names, print_red, print_cyan, print_green, print_magenta, print_blue, print_yellow
+from my_utils import color_dict, tech_names, print_red, print_cyan, print_green, print_magenta, print_blue, print_yellow, select_pickle
 from order_cap import wind, PV, baseload, peak, CCS, CHP, midload, hydro, PtH, order_cap, order_cap2, order_cap3
 from datetime import datetime
 
-# Path to the pickle files and figures
-pickle_folder = 'PickleJar/'
+# Path to the figures
 figures_folder = 'figures/gen/'
 
 # Hardcoded scenario selection
@@ -36,44 +35,6 @@ def shorten_year(scenario):
 
     # use re.sub to replace all occurrences of 4-digit years
     return re.sub(r'(19|20)\d{2}', replacer, scenario)
-
-def select_pickle(use_defaults):
-    pickle_files = glob.glob(os.path.join(pickle_folder, "data_results_*.pickle"))
-    if not pickle_files:
-        print_red("No data_results_*.pickle file found in PickleJar folder.")
-        return None
-    
-    pickle_files.sort(key=os.path.getmtime, reverse=True)
-    print_blue(f"Found {len(pickle_files)} data_results_*.pickle files.")
-    print_blue(f"Most recent file: {pickle_files[0]}")
-
-    if use_defaults or len(pickle_files) == 1:
-        # Either use defaults or no appropriate pickle files were found, so just use the most recent file
-        #most_recent_file = max(pickle_files, key=lambda x: os.path.getctime(pickle_folder + x))
-        return pickle_files[0]
-
-    print_yellow("Select the pickle file to load:")
-    print_yellow("1. Most recent file")
-    print_yellow("2. Largest file")
-    print_yellow("3. Hardcoded filename")
-
-    user_input = input("Please enter the option number: ")
-    if user_input == '1':
-        # Most recent file
-        return pickle_files[0]  # The list is already sorted by modification time
-    elif user_input == '2':
-        # Largest file
-        pickle_files.sort(key=os.path.getsize, reverse=True)
-        return pickle_files[0]
-    elif user_input == '3':
-        # Hardcoded filename
-        hardcoded_filename = pickle_folder + 'data_results_20230601_195204.pickle'  # Replace with the filename you want
-        if hardcoded_filename in pickle_files or hardcoded_filename.replace("/", "\\") in pickle_files:
-            return hardcoded_filename
-        else:
-            print_red(f"The hardcoded file ({hardcoded_filename}) was not found in the directory. Falling back to the most recent file. The available files are:")
-            print(pickle_files)
-            return pickle_files[0] # The list is already sorted by modification time
 
 
 def load_data(pickle_file, use_defaults):
@@ -174,6 +135,23 @@ def load_data(pickle_file, use_defaults):
 
 
 def prettify_scenario_name(name,year):
+    if "set1" in name:
+        #print_yellow("Set 1 scenario detected")
+        # turn set1_4opt into Set 1 (4 opt.)
+        nr = name.split("_")[1].replace("opt", "")
+        alt = " alt."*('alt' in name)
+        even = ", eq. w."*('even' in name)
+        if "even" in name: nr = 4
+        return f"2 HP + {nr}{alt} opt." + even # 2 opt., 2 HP
+    if "allopt" in name:
+        # turn allopt2_final into All opt. (2 yr), and allopt2_final_a into All opt. (2 yr) a
+        nr = name.split("_")[0].replace("allopt", "")
+        if len(name.split("_")) == 3:
+            abc = name.split("_")[2]
+            abc = f" ({abc})"
+        else:
+            abc = ""
+        return f"{nr} opt.{abc}"
     if "iter2" in name:
         return "Set (1 opt.)"
     elif "iter3" in name:
@@ -283,14 +261,13 @@ def create_figure(grouped_data, pickle_timestamp, use_defaults):
     combined_data = grouped_data.unstack(level=0).fillna(0)/1e3  # Move 'year' to column
 
     # Order the bars according to order_cap
-    #First get the current order of the first level of the index
+    # First get the current order of the first level of the index
     scenarios = combined_data.index.get_level_values(0).unique().tolist()
     
     new_index = pd.MultiIndex.from_product([scenarios, order_cap3], names=['scenario', 'tech'])
     combined_data = combined_data.reindex(new_index)
     combined_data = combined_data.dropna(how='all')
-    #print_magenta(combined_data)
-    
+
     # Specify the scenario you want to move
     move_scenario = 'Single year'
 
@@ -452,10 +429,9 @@ def main():
     pickle_file = select_pickle(use_defaults)
     pickle_timestamp = pickle_filename = os.path.basename(pickle_file).replace(".pickle", "").replace("data_results_", "")
     print_cyan(f"Selected pickle file: {pickle_file}")
-    
     data = load_data(pickle_file, use_defaults)
     print_yellow(f"Data loaded from pickle file")
-    print_yellow(f"Data: \n{data.index.get_level_values('year').unique()}")
+    print_yellow(f"Years in data: \n{data.index.get_level_values('year').unique()}")
     grouped_data = group_technologies(data)
     print_green(f"Technologies grouped successfully")
     print_yellow(f"Grouped data: \n{grouped_data}")

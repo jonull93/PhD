@@ -1,9 +1,8 @@
 import os
 import pandas as pd
 import matplotlib.pyplot as plt
-import glob
 import re
-from my_utils import color_dict, tech_names, print_red, print_cyan, print_green, print_magenta, print_blue, print_yellow
+from my_utils import color_dict, tech_names, print_red, print_cyan, print_green, print_magenta, print_blue, print_yellow, select_pickle
 from order_cap import wind, PV, baseload, peak, CCS, CHP, midload, hydro, PtH, order_cap, order_cap2
 from datetime import datetime
 
@@ -42,68 +41,6 @@ def shorten_year(scenario):
 
     # use re.sub to replace all occurrences of 4-digit years
     return re.sub(r'(19|20)\d{2}', replacer, scenario).removeprefix("singleyear_")
-
-def select_pickle(use_defaults):
-    pickle_files = glob.glob(os.path.join(pickle_folder, "data_results_*.pickle"))
-    if not pickle_files:
-        print_red("No data_results_*.pickle file found in PickleJar folder.")
-        return None
-    
-    pickle_files.sort(key=os.path.getmtime, reverse=True)
-    print_blue(f"Found {len(pickle_files)} data_results_*.pickle files.")
-    print_blue(f"Most recent file: {pickle_files[0]}")
-
-    if use_defaults or len(pickle_files) == 1:
-        # Either use defaults or no appropriate pickle files were found, so just use the most recent file
-        #most_recent_file = max(pickle_files, key=lambda x: os.path.getctime(pickle_folder + x))
-        return pickle_files[0]
-
-    print_yellow("Select the pickle file to load:")
-    print_yellow("1. Most recent file")
-    print_yellow("2. Largest file")
-    print_yellow("3. Hardcoded filename")
-    print_yellow("4. Pick among the 10 most recent files")
-    print_yellow("5. Enter the filename manually")
-
-    user_input = input("Please enter the option number: ")
-    if user_input == '1':
-        # Most recent file
-        return pickle_files[0]  # The list is already sorted by modification time
-    elif user_input == '2':
-        # Largest file
-        pickle_files.sort(key=os.path.getsize, reverse=True)
-        return pickle_files[0]
-    elif user_input == '3':
-        # Hardcoded filename
-        hardcoded_filename = pickle_folder + 'data_results_20230529_162027.pickle'  # Replace with the filename you want
-        if hardcoded_filename in pickle_files:
-            return hardcoded_filename
-        else:
-            print_red("The hardcoded file was not found in the directory. Falling back to the most recent file.")
-            return pickle_files[0] # The list is already sorted by modification time
-    elif user_input == '4':
-        # Pick among the 10 most recent files
-        print_yellow("Pick among the 10 most recent files:")
-        for i, f in enumerate(pickle_files[:10]):
-            print_yellow(f"{i+1}. {f}")
-        user_input = input("Please enter the option number: ")
-        try:
-            return pickle_files[int(user_input)-1]
-        except:
-            print_red("Invalid input. Falling back to the most recent file.")
-            return pickle_files[0]
-    elif user_input == '5':
-        # Enter the filename manually
-        user_input = input("Please enter the filename: ")
-        if user_input in pickle_files or "PickleJar\\" + user_input in pickle_files or "PickleJar\\"+user_input+".pickle" in pickle_files:
-            if ".pickle" not in user_input:
-                user_input = user_input + ".pickle"
-            if "PickleJar\\" not in user_input:
-                user_input = "PickleJar\\" + user_input
-            return user_input
-        else:
-            print_red("The file was not found in the directory. Falling back to the most recent file.")
-            return pickle_files[0]
 
 
 def load_data(pickle_file, use_defaults):

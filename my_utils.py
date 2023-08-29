@@ -502,3 +502,58 @@ def completion_sound():
     notes = [(440, 300), (494, 300), (523, 300), (587, 300), (659, 300)]  # Pairs of (frequency, duration)
     for note, duration in notes:
         Beep(note, duration)
+
+
+def select_pickle(use_defaults, pickle_folder="PickleJar\\"):
+    import glob
+    pickle_files = glob.glob(os.path.join(pickle_folder, "data_results_*.pickle"))
+    if not pickle_files:
+        print_red("No data_results_*.pickle file found in PickleJar folder.")
+        return None
+
+    pickle_files.sort(key=os.path.getmtime, reverse=True)
+    print_blue(f"Found {len(pickle_files)} data_results_*.pickle files.")
+    print_blue(f"Most recent file: {pickle_files[0]}")
+
+    if use_defaults or len(pickle_files) == 1:
+        # Either use defaults or no appropriate pickle files were found, so just use the most recent file
+        # most_recent_file = max(pickle_files, key=lambda x: os.path.getctime(pickle_folder + x))
+        return pickle_files[0]
+
+    print_yellow("Select the pickle file to load:")
+    print_yellow("1. Most recent file")
+    print_yellow("2. Largest file")
+    print_yellow("3. Pick among the 10 most recent files")
+    print_yellow("4. Enter the filename manually")
+
+    user_input = input("Please enter the option number: ")
+    if user_input == '1':
+        # Most recent file
+        return pickle_files[0]  # The list is already sorted by modification time
+    elif user_input == '2':
+        # Largest file
+        pickle_files.sort(key=os.path.getsize, reverse=True)
+        return pickle_files[0]
+    elif user_input == '3':
+        # Pick among the 10 most recent files
+        print_yellow("Pick among the 10 most recent files:")
+        for i, f in enumerate(pickle_files[:10]):
+            print_yellow(f"{i + 1}. {f}")
+        user_input = input("Please enter the option number: ")
+        try:
+            return pickle_files[int(user_input) - 1]
+        except:
+            print_red("Invalid input. Falling back to the most recent file.")
+            return pickle_files[0]
+    elif user_input == '4':
+        # Enter the filename manually
+        user_input = input("Please enter the filename: ")
+        if user_input in pickle_files or "PickleJar\\" + user_input in pickle_files or "PickleJar\\" + user_input + ".pickle" in pickle_files:
+            if ".pickle" not in user_input:
+                user_input = user_input + ".pickle"
+            if "PickleJar\\" not in user_input:
+                user_input = "PickleJar\\" + user_input
+            return user_input
+        else:
+            print_red("The file was not found in the directory. Falling back to the most recent file.")
+            return pickle_files[0]
