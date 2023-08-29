@@ -73,12 +73,15 @@ for reg in regions:
 cases1 = [#"singleyear_2002to2003_1h", "singleyear_1996to1997_1h", "singleyear_2014to2015_1h", "singleyear_1989to1990_1h", "singleyear_2010to2011_1h", "singleyear_2003to2004_1h",
          #"singleyear_1990to1991_1h", 
         # years to include: ['89', '95', '96', '97', '02', '03', '04', '09', '10', '18']
-        "singleyear_1989to1990_1h", "singleyear_1995to1996_1h", "singleyear_1996to1997_1h", 
-        "singleyear_1997to1998_1h", "singleyear_2002to2003_1h", "singleyear_2003to2004_1h", 
-        "singleyear_2004to2005_1h", "singleyear_2009to2010_1h", "singleyear_2010to2011_1h", 
+        #"singleyear_1989to1990_1h",
+        "singleyear_1995to1996_1h",
+        "singleyear_1996to1997_1h", "singleyear_2002to2003_1h",
+        "singleyear_1997to1998_1h", "singleyear_2003to2004_1h",
+        "singleyear_2004to2005_1h", "singleyear_2009to2010_1h",
+        #"singleyear_2010to2011_1h",
         "singleyear_2018to2019_1h", "singleyear_2014to2015_1h",
         # also 2012 and 2016-2017
-        "singleyear_1h_2012", "singleyear_2016to2017_1h",
+        #"singleyear_1h_2012", "singleyear_2016to2017_1h",
 
          "set1_1opt", "set1_2opt", "set1_3opt", "set1_4opt"]
 cases2 = [
@@ -97,7 +100,7 @@ cases3 = [
     "singleyear_1h_2012", "singleyear_2016to2017_1h", #start-points
 ]
 
-cases = cases2
+cases = cases1
 #cases = ["singleyear_"+str(year)+"to"+str(year+1)+"_1h" for year in range(1980, 2018)]
 
 comp_name = os.environ['COMPUTERNAME']
