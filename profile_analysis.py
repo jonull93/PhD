@@ -722,7 +722,7 @@ def separate_years(years, VRE_tech, VRE_tech_name_dict, filenames, profile_keys,
     return net_load
 
 
-def plot_reseamed_years(years, threshold=False, window_size_days=3):
+def plot_reseamed_years(years, threshold=False, window_size_days=3, skip_netload=False):
     print_cyan(f"Starting the 'plot_reseamed_years()' script")
     # make a plot, similar to separate_years, but with the reseamed data found in netload_components_YEAR1-YEAR2.pickle
     # build a list of year combinations, e.g. "1980-1981", "1981-1982", "1982-1983", etc.
@@ -774,11 +774,15 @@ def plot_reseamed_years(years, threshold=False, window_size_days=3):
                  label="Load (excl. new heat)", linewidth=0.5)
         plt.plot(hourly_traditional_demand, color="hotpink", linestyle=":",
                  label="Traditional load", linewidth=0.5)
-        plt.axhline(y=mean(net_load), color="black", linestyle="-.", label=f"Average net load ({round(mean(net_load))} GW)")
-        plt.plot(fast_rolling_average(net_load, 24 * window_size_days), label="Net load (roll. mean, 3d)")
-        if threshold:
-            plt.axhline(y=threshold_to_beat, color="red", label=f"{threshold * 100:.0f}% of peak load")
-        plt.axvline(x=max_val_start, color="red", label="Start of longest period")
+        if not skip_netload:
+            plt.axhline(y=mean(net_load), color="black", linestyle="-.", label=f"Average net load ({round(mean(net_load))} GW)")
+            plt.plot(fast_rolling_average(net_load, 24 * window_size_days), label=f"Net load (roll. mean, {window_size_days}d)")
+            if threshold:
+                plt.axhline(y=threshold_to_beat, color="red", label=f"{threshold * 100:.0f}% of peak load")
+            plt.axvline(x=max_val_start, color="red", label="Start of longest period")
+        else:
+            # set ymin to 0
+            plt.ylim(bottom=0)
         plt.xticks(range(0, 8760, 730),
                    labels=["Jul.", "Aug.","Sep.", "Oct.", "Nov.", "Dec.","Jan.", "Feb.", "Mar.", "Apr.", "May", "Jun.", ])
         plt.title(
@@ -790,7 +794,7 @@ def plot_reseamed_years(years, threshold=False, window_size_days=3):
         plt.tight_layout()
         # plt.show()
         threshold_string = f"{int(threshold * 100)}" if threshold else f"avgnetload"
-        filename = f"{fig_path}over{threshold_string}_netload_events_{year_combination}.png"
+        filename = f"{fig_path}over{threshold_string}_netload_events_{year_combination}_RA{window_size_days}.png"
         plt.savefig(filename, dpi=400)
         plt.close()
     pass
@@ -892,17 +896,17 @@ def combined_years(years, VRE_tech, VRE_tech_name_dict, filenames, profile_keys,
 if __name__ == "__main__":
     all_cap, VRE_groups, VRE_tech, VRE_tech_dict, VRE_tech_name_dict, years, reseamed_years, sites, region_name, regions, \
         non_traditional_load, filenames, profile_keys, capacity_keys, fig_path, pickle_path, electrified_heat_demand \
-        = initiate_parameters(sheet_name)
+        = initiate_parameters("ref23")
     #separate_years(2012, make_figure=True, make_output=True)
     #make_heat_profiles()
     #make_hydro_profiles()
-    separate_years(years, VRE_tech_name_dict, filenames, profile_keys, capacity_keys, fig_path, regions, VRE_groups,
-                   sites, non_traditional_load, electrified_heat_demand, pickle_path, make_profiles=False, make_figure=True)
-    combined_years(years, VRE_tech, VRE_tech_name_dict, filenames, profile_keys, regions,
-                   VRE_groups, sites, non_traditional_load, electrified_heat_demand, pickle_path,)
+    #separate_years(years, VRE_tech_name_dict, filenames, profile_keys, capacity_keys, fig_path, regions, VRE_groups,
+    #               sites, non_traditional_load, electrified_heat_demand, pickle_path, make_profiles=False, make_figure=True)
+    #combined_years(years, VRE_tech, VRE_tech_name_dict, filenames, profile_keys, regions,
+    #               VRE_groups, sites, non_traditional_load, electrified_heat_demand, pickle_path,)
     #combined_years(range(1980,1982))
-    remake_profile_seam(pickle_path, make_profiles=False)
-    plot_reseamed_years(range(1980,2020))
+    #remake_profile_seam(pickle_path, make_profiles=False)
+    plot_reseamed_years(range(1980,2020),window_size_days=1, skip_netload=True)
     if False:
         for nr, years_to_summarize in enumerate([reseamed_years, years]):
             df = pd.DataFrame(index=pd.MultiIndex.from_tuples([(tech, reg) for tech in VRE_tech_name_dict for reg in regions]),

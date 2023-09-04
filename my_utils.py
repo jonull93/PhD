@@ -483,6 +483,8 @@ def fast_rolling_average(my_list, window_size, wraparound=True, **kwargs):
         if type(my_list) in [list, np.ndarray]:
             return pd.DataFrame(my_list)
         return my_list
+    elif type(window_size) == float:
+        window_size = round(window_size)
     if type(my_list) == np.ndarray:
         my_list = list(my_list)
     if wraparound:

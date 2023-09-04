@@ -24,7 +24,7 @@ tech_groups = {
     'Other thermals': CCS + CHP + ["W"]
 }
 tech_groups2 = {
-    "Battery": ["bat_cap", "bat"],
+    "Battery": ["bat"], # "bat_cap"
     "Hydrogen": ["H2store", "electrolyser","FC"],
     "VRE": PV + wind,
     "Thermals": CCS + CHP + midload + ["W", "U", "Other thermals"] + peak,
@@ -33,6 +33,7 @@ tech_groups2 = {
 techs_to_exclude = PtH + ["Electrolyser", "electrolyser", "H", "b", "H_CHP", "B_CHP"]
 storage_techs = ["bat", "H2store"]
 storage_techs = storage_techs + [tech_names[t] for t in storage_techs if t in tech_names]
+
 
 def shorten_year(scenario):
     # define a function to be used in re.sub
@@ -340,6 +341,18 @@ def create_figure(grouped_data, pickle_timestamp, use_defaults):
     print_green(f"Figure saved as '{fig_name_base}_{fig_num}.png'.")
 
 def create_figure_separated_techs(grouped_data, pickle_timestamp, use_defaults):
+    def conditional_label(bar, cutoff):
+        # Get the height of the bar
+        height = bar.get_height()
+        # If height is greater than or equal to cutoff, return label
+        if abs(height) >= 100:
+            return f'{height:.0f}'
+        # Otherwise, return an empty string
+        elif abs(height) >= cutoff:
+            return f'{height:.0f}'
+        else:
+            return ''
+
     # Create a directory for the figures if it doesn't already exist
     if not os.path.exists('figures/capacity'):
         os.makedirs('figures/capacity')
@@ -357,24 +370,28 @@ def create_figure_separated_techs(grouped_data, pickle_timestamp, use_defaults):
         # Filter data for the current technology group
         group_data = combined_data.loc[combined_data.index.intersection(tech_list)].dropna(how='all')
 
-        # Plot the data for this group
-        group_data.T.plot(kind='bar', stacked=True, ax=ax, color=[color_dict.get(tech, 'gray') for tech in group_data.index], width=0.8)
+        if group_name == 'Battery' and 'bat_cap' in group_data.index:
+            width = 0.4
+            x_values_storage = [x - width / 2 for x in range(len(group_data.columns))]
+            x_values_power = [x + width / 2 for x in range(len(group_data.columns))]
+
+            print(group_data)
+            ax2 = ax.twinx()  # instantiate a second axes that shares the same x-axis
+
+            ax.bar(x_values_storage, group_data.loc["bat"].values, color=color_dict.get('storage', 'gray'), width=width)
+            ax.set_ylabel('Installed storage capacity [GWh]')
+
+            ax2.bar(x_values_power, group_data.loc["bat_cap"].values, color=color_dict.get('power', 'gray'), alpha=0.5, width=width)
+            ax2.set_ylabel('Installed power capacity [GW]')
+        else:
+            # Plot the data for this group
+            group_data.T.plot(kind='bar', stacked=True, ax=ax, color=[color_dict.get(tech, 'gray') for tech in group_data.index], width=0.8)
 
         # Set the title for this subplot
         ax.set_title(group_name)
 
         # After plotting, iterate over the bars and add labels
-        def conditional_label(bar, cutoff):
-            # Get the height of the bar
-            height = bar.get_height()
-            # If height is greater than or equal to cutoff, return label
-            if abs(height) >= 100:
-                return f'{height:.0f}'
-            # Otherwise, return an empty string
-            elif abs(height) >= cutoff:
-                return f'{height:.0f}'
-            else:
-                return ''
+
 
         # get the max y-value for this subplot
         max_y = ax.get_ylim()[1]
@@ -418,13 +435,13 @@ def create_figure_separated_techs(grouped_data, pickle_timestamp, use_defaults):
         ncols = 1+(len(new_labels)>2)
         ax.legend(handles[::-1], new_labels[::-1], loc='lower center', framealpha=0.65, ncols=2, fontsize="small") # [::-1] to reverse the order of the legend entries
         if i_a==0:
-            ax.set_ylabel('Installed capacity [GW(h)]')
+            ax.set_ylabel('Installed storage capacity [GWh]')
         elif i_a == 1:
             ax.set_ylabel('Installed storage capacity [GWh]')
         else:
             ax.set_ylabel('Installed power capacity [GW]')
-    fig.tight_layout(pad=0.5)
-    plt.subplots_adjust(wspace=0.29)
+    fig.tight_layout(pad=0.5, rect=(0,0,1,0.98))
+    plt.subplots_adjust(wspace=0.35)
     # Save and close the figure as in your original function
     # Save the figure as PNG and SVG (or EPS)
     fig_name_base = f"figures/capacity/{pickle_timestamp}"
