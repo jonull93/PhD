@@ -439,6 +439,8 @@ elseif years_to_optimize == 5
 elseif years_to_optimize == 6
     initial_guesses = initial_guesses_6
     printstyled("Initial guesses: initial_guesses_6\n"; color=:yellow)
+else
+    error("years_to_optimize = $(years_to_optimize) is not supported")
 end
 # decrease all values in the lists in initial_guesses by 1/40
 for i in 1:length(initial_guesses)
