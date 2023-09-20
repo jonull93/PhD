@@ -35,10 +35,22 @@ def get_ref_folder():
             ref_folders.append(folder)
     ref_folders.sort(key=lambda x: int(x[3:]))
     ref_folder = ref_folders[-1]
-    ref_folder = "ref33"
+    # ask user whether to use the latest ref_folder or to enter a new one
+    print(f"The latest ref in the PickleJar is: {ref_folder}")
+    ref_folder_input = input("Enter the ref_folder to use (or press enter to use the latest): ")
+    if ref_folder_input == "":
+        print(f"Using ref_folder from PickleJar: {ref_folder}")
+    elif ref_folder_input.isnumeric():
+        ref_folder = "ref" + ref_folder_input
+        print(f"Setting ref_folder to: {ref_folder}")
+    else:
+        if ref_folder_input.startswith("ref"):
+            ref_folder = ref_folder_input
+            print(f"Setting ref_folder to: {ref_folder}")
+        else:
+            raise ValueError(f"ref_folder {ref_folder_input} not recognized")
     return ref_folder
 
-placeholder_ref_folder = get_ref_folder()
 
 def sign(num):
     if num==0: return 1
@@ -276,7 +288,10 @@ def main(year, ref_folder, amp_length=1, rolling_hours=12, area_mode_in_cfd=True
         print_cyan(f"\nStarting loop for years -- {year} --")
         year, weights = year
         if len(year) != len(weights):
-            raise ValueError("years and weights must have the same length")
+            if len(year) == len(weights) + 2:
+                weights = [0.025, 0.025] + weights
+            else:
+                raise ValueError(f"years {year} and weights {weights} must have the same length")
         m = {}
         Zs = {}
         for y in year:
@@ -327,7 +342,8 @@ def main(year, ref_folder, amp_length=1, rolling_hours=12, area_mode_in_cfd=True
         else:
             raise NotImplementedError(f"sum_func {sum_func} not recognized")
         Z_contour = {y: get_contour(Zs[y]) for y in year}
-        if round(Z_error.sum()) != round(errors[str(year)]):
+        _diff = round(Z_error.sum())/round(errors[str(year)])
+        if _diff < 0.99 or _diff > 1.01:
             print_red(f"Error in {year}: {Z_error.sum():.01f} != {errors[str(year)]:.01f}")
         # restore nans so that plot is white instead of black
         Z = np.where(Z == 0., np.nan, Z)
@@ -456,6 +472,13 @@ def initiate(ref_folder):
             best_keys = [key for key, value in errors_sorted if value <= errors_sorted[0][1] * 2]
             to_dump = [key.replace('Any','').replace('"', '').replace('[', '').replace(']', '').replace(' ', '').split(',') for key in best_keys]
             json.dump(to_dump, f, indent=4)
+        with open(f"{results_folder_name}/best_1.5x.json", "w") as f:
+            # calculate how many combinations are within 200% of the best case
+            best_keys = [key for key, value in errors_sorted if value <= errors_sorted[0][1] * 1.5]
+            to_dump = [
+                key.replace('Any', '').replace('"', '').replace('[', '').replace(']', '').replace(' ', '').split(
+                    ',') for key in best_keys]
+            json.dump(to_dump, f, indent=4)
         # save the keys to the items in errors_sorted where the value is at most 5% higher than the best error
         for percent in list(range(5,55,5))+[100]:
             percent = percent/10
@@ -473,7 +496,7 @@ def initiate(ref_folder):
         if len(combinations) > 8:
             combinations = combinations[:6] + combinations[-2:]
             combinations_strings = combinations_strings[:6] + combinations_strings[-2:]
-            print_yellow(errors)
+            print_yellow(f"Making figures for {len(combinations_strings)} / {len(errors)} combinations")
             weights = {key: weights[key] for key in combinations_strings}
             errors = {key: errors[key] for key in combinations_strings}
         # make errors also accept keys with only ' instead of "

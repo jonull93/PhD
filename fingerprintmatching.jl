@@ -42,7 +42,8 @@ if false
     years = [i for i in years if !(i in to_remove)]
     println("Removed years: $(to_remove)")
 end
-extreme_years = ["2002-2003", "1996-1997"]#["1986-1987","1989-1990"]["1989-1990","2005-2006"]#["1984-1985", "1995-1996"]#["2010-2011","2002-2003",]
+extreme_years = ["2002-2003", "1996-1997"]#["1986-1987","1989-1990"]["2002-2003", "1996-1997"]["1989-1990","2005-2006"]#["1984-1985", "1995-1996"]#["2010-2011","2002-2003",]
+#extreme_years = ["1986-1987","1989-1990"]
 function find_max_ref_folder(parent_directory)
     ref_folders = filter(x -> occursin(r"^ref\d+$", x), readdir(parent_directory))
     isempty(ref_folders) ? nothing : "ref" * string(maximum(parse(Int, replace(x, "ref" => "")) for x in ref_folders))
@@ -50,12 +51,12 @@ end
 ref_folder = find_max_ref_folder("./output")
 #ref_folder = "ref14"
 
-maxtime = 60*5 # 60*30=30 minutes
+maxtime = 60*1 # 60*30=30 minutes
 algs_size = "adaptive" # "small" or "large" or "single" or "adaptive"
 years_per_combination = 3
 import_combinations = false
-requested_sum_func = "abs_sum" # "abs_sum" or "sqrt_sum" or "log_sum" or "sse"
-simultaneous_extreme_years = 0
+requested_sum_func = "sse" # "abs_sum" or "sqrt_sum" or "log_sum" or "sse"
+simultaneous_extreme_years = 2
 years_to_add = years_per_combination - simultaneous_extreme_years # number of years to add to the extreme years for each combination
 years_to_optimize = years_to_add
 optimize_all = years_to_optimize == years_per_combination
@@ -86,7 +87,7 @@ while true
     if input == "exit" || input == "e" || input == ""
         break
     #import combinations?
-    elseif input == "ifalse" || input == "i25" || input == "i50" || input == "i100" || input == "i2x"
+    elseif input == "ifalse" || occursin(r"^i\d+x?$", input) #input == "i25" || input == "i50" || input == "i100" || input == "i2x" || occursin(r"^\d+$", input)
         if input == "ifalse"
             global import_combinations = false
         else
@@ -200,11 +201,23 @@ else
     println("Years: $(years_list)")
     println("Number of years: $(length(years_list))")
     good_candidates = [
+    ["1986-1987", "1989-1990", "1982-1983", "1991-1992", "1996-1997", "2004-2005", "2018-2019"],
+    ["1986-1987", "1989-1990", "1982-1983", "1991-1992", "1996-1997", "2004-2005", "2016-2017"],
+    ["1986-1987", "1989-1990", "1982-1983", "1991-1992", "1996-1997", "2004-2005"],
+    ["2002-2003", "1996-1997", "1980-1981", "1981-1982", "1992-1993", "2003-2004", "2018-2019", "1982-1983"],
+    ["1986-1987", "1989-1990", "1980-1981", "1981-1982", "1992-1993", "2003-2004", "2018-2019", "1982-1983"],
+    ["1986-1987", "1989-1990", "1981-1982", "1985-1986", "1988-1989", "1999-2000", "2016-2017", "1982-1983"],
+    ["2002-2003", "1996-1997", "1986-1987", "1995-1996", "2003-2004", "2014-2015", "2016-2017"],
+    ["2002-2003", "1996-1997", "1980-1981", "1981-1982", "1992-1993", "2003-2004", "2018-2019"],
+    ["2002-2003", "1996-1997", "1993-1994", "2012-2013", "2013-2014"],
     ["1981-1982", "1982-1983", "1985-1986", "2018-2019"],
     ["2000-2001", "2002-2003", "2014-2015", "2017-2018"],
     ["1980-1981", "1992-1993", "1996-1997", "2014-2015"],
+    ["2002-2003", "1996-1997", "2003-2004", "2009-2010"],
+    ["2002-2003", "1996-1997", "2014-2015"],
     ["1981-1982", "2014-2015", "2016-2017"],
     ["1981-1982", "1999-2000", "2016-2017"],
+    ["2002-2003", "1996-1997", "2014-2015"],
     ["2000-2001", "2016-2017"]
     ]
     extreme_year_combinations = combinations(extreme_years, simultaneous_extreme_years)
@@ -317,10 +330,10 @@ function diff_sum_weighted_mats(matrices,weights)
     m_sum = zeros(size(matrices[1]))
     if length(matrices) > length(weights)
         for i in 1:years_not_optimized
-            m_sum .+= matrices[i] .* 1/40
+            m_sum .+= matrices[i] .* 1/40 # assuming the hand-picked years' matrices are first in the list
         end
         matrices_left = matrices[years_not_optimized+1:end]
-        print("matrices_left = $(matrices_left)")
+        #println("matrices_left = $(length(matrices_left))")
     elseif length(matrices) < length(weights)
         printstyled("Warning: more weights than matrices\n"; color=:red)
         return false
@@ -377,7 +390,7 @@ global initial_guesses_3 = [
     [1/3, 1/3, 1/3], [18/40, 18/40, 4/40], [4/40, 18/40, 18/40], [18/40, 4/40, 18/40],
     # then divide the triangle into 4 new triangles (like a triforce) and do the same again
     [2/3, 1/6, 1/6], [1/6, 2/3, 1/6], [1/6, 1/6, 2/3], # center of smaller triangles
-    #[1/2, 1/4, 1/4], [1/4, 1/2, 1/4], [1/4, 1/4, 1/2], # center of inner edges of smaller triangles
+    [1/2, 1/4, 1/4], [1/4, 1/2, 1/4], [1/4, 1/4, 1/2], # center of inner edges of smaller triangles
     #[29, 9, 2]./40, [2, 29, 9]./40, [9, 2, 29]./40, # center of outer edges of smaller triangles
     #[29, 2, 9]./40, [9, 29, 2]./40, [2, 9, 29]./40, # center of outer edges of smaller triangles
     ]
@@ -439,6 +452,8 @@ elseif years_to_optimize == 5
 elseif years_to_optimize == 6
     initial_guesses = initial_guesses_6
     printstyled("Initial guesses: initial_guesses_6\n"; color=:yellow)
+else
+    error("years_to_optimize = $(years_to_optimize) is not supported")
 end
 # decrease all values in the lists in initial_guesses by 1/40
 for i in 1:length(initial_guesses)
@@ -487,45 +502,18 @@ Threads.@threads for thread = 1:threads_to_start
             end
         end
         convert(Vector{String},case)
-        matrices = [cfd_data[year] for year in case if !(year in extreme_years && !optimize_all)]
+        matrices = [cfd_data[year] for year in case]# if !(year in extreme_years && !optimize_all)]
+        if length(matrices) == 0
+            printstyled("\n!! No matrices found for $(case) in thread $(thread)\n")
+            continue
+        end
+        if thread == 1 && global_best > 1e8
+            printstyled("There are $(length(matrices)) matrices sent to diff()\n"; color=:magenta)
+        end
         # Use an optimization algorithm to find the best weights
-        function sse(x)
-           diff = diff_sum_weighted_mats(matrices,x)
-           return dot(diff,diff)
-        end
-        function abs_sum(x)
-            diff = diff_sum_weighted_mats(matrices,x)
-            if diff == false
-                return 0
-            end
-            result = 0.0
-            @inbounds @simd for i in eachindex(diff)
-                result += abs(diff[i])
-            end
-            return result
-        end
-        function sqrt_sum(x)
-            diff = diff_sum_weighted_mats(matrices,x)
-            result = 0.0
-            @inbounds @simd for i in eachindex(diff)
-                result += sqrt(abs(diff[i]))
-            end
-            return result
-        end
-        function log_sum(x)
-           diff = diff_sum_weighted_mats(matrices,x)
-           diff = replace(diff, 0 => NaN)
-           e = abs.(log10.(abs.(diff)))
-           # return sum of e but ignoring NaN
-           #penalty = sigmoid((sum(x)-1.011)*1000)+sigmoid((0.989-sum(x))*1000)
-           return sum(e[.!isnan.(e)])#+penalty*100000
-        end
-        function weighted_mat_sum(x, weight_matrix=weight_matrix_lin19diff)
-              diff = diff_sum_weighted_mats(matrices,x).*weight_matrix'
-            return sum(abs.(diff[.!isnan.(diff)]))
-        end
+
         # a vector w that is the same length as the number of matrices and equals 1/number of matrices
-        w = ones(length(matrices)) ./ length(matrices)
+        # w = ones(length(matrices)) ./ length(matrices)
         upper = ones(length(matrices))
         lower = zeros(length(matrices))
         ###----------------------------
@@ -535,14 +523,49 @@ Threads.@threads for thread = 1:threads_to_start
         global opt_func_str = "$requested_sum_func(x) + weights_penalty(x,fixed_weights=years_not_optimized,slack_distance=0.009,amplitude=2e5)" #sigmoid((sum(x)-1.011)*1000) +
         function opt_func(x)
             if requested_sum_func == "sse"
+                function sse(x)
+                    diff = diff_sum_weighted_mats(matrices,x)
+                    return dot(diff,diff)
+                 end
                 return sse(x) + weights_penalty(x, fixed_weights=years_not_optimized, slack_distance=0.009, amplitude=2e5)
             elseif requested_sum_func == "abs_sum"
+                function abs_sum(x)
+                    diff = diff_sum_weighted_mats(matrices,x)
+                    if diff == false
+                        return 0
+                    end
+                    result = 0.0
+                    @inbounds @simd for i in eachindex(diff)
+                        result += abs(diff[i])
+                    end
+                    return result
+                end
                 return abs_sum(x) + weights_penalty(x, fixed_weights=years_not_optimized, slack_distance=0.009, amplitude=2e5)
             elseif requested_sum_func == "sqrt_sum"
+                function sqrt_sum(x)
+                    diff = diff_sum_weighted_mats(matrices,x)
+                    result = 0.0
+                    @inbounds @simd for i in eachindex(diff)
+                        result += sqrt(abs(diff[i]))
+                    end
+                    return result
+                end
                 return sqrt_sum(x) + weights_penalty(x, fixed_weights=years_not_optimized, slack_distance=0.009, amplitude=2e5)
             elseif requested_sum_func == "log_sum"
+                function log_sum(x)
+                    diff = diff_sum_weighted_mats(matrices,x)
+                    diff = replace(diff, 0 => NaN)
+                    e = abs.(log10.(abs.(diff)))
+                    # return sum of e but ignoring NaN
+                    #penalty = sigmoid((sum(x)-1.011)*1000)+sigmoid((0.989-sum(x))*1000)
+                    return sum(e[.!isnan.(e)])#+penalty*100000
+                 end
                 return log_sum(x) + weights_penalty(x, fixed_weights=years_not_optimized, slack_distance=0.009, amplitude=2e5)
             else
+                function weighted_mat_sum(x, weight_matrix=weight_matrix_lin19diff)
+                    diff = diff_sum_weighted_mats(matrices,x).*weight_matrix'
+                    return sum(abs.(diff[.!isnan.(diff)]))
+                end
                 error("Invalid requested_sum_func")
             end
         end
@@ -550,7 +573,8 @@ Threads.@threads for thread = 1:threads_to_start
         local alg_solutions = Dict()
         # define paramters for maxtime and midpoint_factor_for_skipping
         local maxtime_manual = 61
-        local midpoint_factor_for_skipping = 1.4 # from testing, it seems like 25% is about as much as the error can get improved (for abs_sum)
+        local midpoint_factor_for_skipping = 3.5 # from testing, it seems like 25% is about as much as the error can get improved (for abs_sum), though this decreases as the number of years increases
+        # for sse, the improvement seems like it can be a lot higher!
         if maxtime < maxtime_manual
             if thread == 1 && global_best > 1e9
                 lock(print_lock) do
@@ -563,9 +587,14 @@ Threads.@threads for thread = 1:threads_to_start
             local e = opt_func(x)
             local midpoint_error = e
             best_guess = (x,e)
+            lock(print_lock) do # trying this to stop an error later when trying to sort best_errors, possibly because best_errors got corrupted by the multiple threads
+                best_weights[case] = best_guess[1]
+                best_errors[case] = best_guess[2]
+                best_alg[case] = "manual mid-point"
+            end
             if midpoint_error > global_best*midpoint_factor_for_skipping
                 lock(print_lock) do
-                    printstyled("Midpoint error is more than $(midpoint_factor_for_skipping) ($(round(midpoint_error/global_best,digits=2))) of the global best, skipping this case\n"; color=:yellow)
+                    printstyled("  Midpoint error is more than $(midpoint_factor_for_skipping) ($(round(midpoint_error/global_best,digits=2))) of the global best, skipping the non-mid points\n"; color=:yellow)
                 end
             else
                 for i in 2:length(initial_guesses)
@@ -577,14 +606,16 @@ Threads.@threads for thread = 1:threads_to_start
                     end
                 end
             end
-            best_weights[case] = best_guess[1]
-            best_errors[case] = best_guess[2]
-            #let best_alg say "-20% from mid-point" if the best guess is 20% from the mid-point guess, since there is no alg anyway
-            best_alg[case] = "$(round(Int,(best_guess[2]-midpoint_error)/midpoint_error*100))% from mid-point"
+            lock(print_lock) do
+                best_weights[case] = best_guess[1]
+                best_errors[case] = best_guess[2]
+                #let best_alg say "-20% from mid-point" if the best guess is 20% from the mid-point guess, since there is no alg anyway
+                best_alg[case] = "$(round(Int,(best_guess[2]-midpoint_error)/midpoint_error*100))% from mid-point"
+            end
 
             lock(print_lock) do
-                printstyled("Thread $(thread) finished working on $(case) at $(Dates.format(now(), "HH:MM:SS")), after $(round(Dates.now()-start_time,Dates.Second))\n"; color=:green)
-                printstyled("Error = $(round(best_guess[2],digits=1)) for $(round.(best_weights[case],digits=3))"; color=:white)
+                printstyled("  Thread $(thread) finished working on $(case) at $(Dates.format(now(), "HH:MM:SS")), after $(round(Dates.now()-start_time,Dates.Second))\n"; color=:green)
+                printstyled("  Error = $(round(best_guess[2],digits=1)) for $(round.(best_weights[case],digits=3))"; color=:white)
                 if best_guess[2] <= global_best
                     global_midpoint_tracker *= best_guess[2]/global_best
                     global_best = best_guess[2]
@@ -592,7 +623,7 @@ Threads.@threads for thread = 1:threads_to_start
                 else
                     printstyled("\n"; color=:white)
                     if best_guess[2] < global_best*1.2
-                        printstyled("Only $(round(best_guess[2]/global_best,digits=2)) from the global best with the midpoint error at $(round(midpoint_error/global_best,digits=2))\n"; color=:blue)
+                        printstyled(" Only $(round(best_guess[2]/global_best,digits=2)) from the global best with the midpoint error at $(round(midpoint_error/global_best,digits=2))\n"; color=:blue)
                         if midpoint_error > global_midpoint_tracker
                             global_midpoint_tracker = midpoint_error
                         end
@@ -644,7 +675,7 @@ Threads.@threads for thread = 1:threads_to_start
                 end
                 # find for which alg the error is the lowest
                 for alg in BBO_algs
-                    print("$(round(alg_solutions[alg][1],digits=1)) $(round.(alg_solutions[alg][2],digits=3)) $(rpad(round(sum(alg_solutions[alg][2]),digits=2)+years_not_optimized*1/40,4)) $(alg)")
+                    print("  $(round(alg_solutions[alg][1],digits=1)) $(round.(alg_solutions[alg][2],digits=3)) $(rpad(round(sum(alg_solutions[alg][2]),digits=3)+years_not_optimized*1/40,4)) $(alg)")
                     if alg == _best_alg
                         printstyled(" <-\n"; color=:green)
                     else
@@ -678,6 +709,10 @@ end
 
 println('\a') #beep
 sleep(1)
+#if global_midpoint_tracker is larger than 0, print it and say how many % higher it is than the global best
+if global_midpoint_tracker > 0
+    printstyled("global_midpoint_tracker = $(round(global_midpoint_tracker,digits=2)) ($(round(global_midpoint_tracker/global_best*100-100))% higher than global_best)\n"; color=:yellow)
+end
 println('\a') #beep
 
 for comb in all_combinations
@@ -687,6 +722,10 @@ for comb in all_combinations
         best_weights[comb] = zeros(length(comb))
         best_alg[comb] = "none"
     end
+    #if the length of comb is longer than best_weights[comb], add 1/40 to the start of best_weights[comb]
+    if length(comb) > length(best_weights[comb])
+        best_weights[comb] = vcat([1/40 for i in 1:length(comb)-length(best_weights[comb])],best_weights[comb])
+    end
 end
 # sum finc should be the text in opt_func_str before the first +
 sum_func = split(opt_func_str, "(")[1]
@@ -694,19 +733,19 @@ sum_func = split(opt_func_str, "(")[1]
 # Find the 3 best combinations (lowest SSE), print their SSE and weights
 println("Done optimizing all combinations for $ref_folder at $(Dates.format(now(), "HH:MM:SS"))")
 printstyled("The 3 best combinations are ($(years[1])-$(years[end])) [sum_func=$(sum_func)()]:\n", color=:cyan)
+println("best_errors is $(length(best_errors)) items long")
+global sorted_cases = sort(collect(best_errors), by=x->x[2])
+global all_combinations = sort(collect(all_combinations), by=x->best_errors[x])
 try
-    global sorted_cases = sort(collect(best_errors), by=x->x[2])
     for (case, error) in sorted_cases[1:3]
         printstyled("$(case) with error $(round(error,digits=1))\n", color=:green)
         println("weights: $(round.(best_weights[case],digits=3)) (sum: $(round(sum(best_weights[case]),digits=3)))")
         # print each item in the case and its respective weight
     end
     #sort all_combinations by its value in the dictionary best_errors
-    global all_combinations = sort(collect(all_combinations), by=x->best_errors[x])
 catch e
     printstyled("!Error: $(e)\n", color=:red)
 end
-
 # Save the results as a .json file
 folder_name = "results\\$ref_folder/FP $sum_func $timestamp $(years_per_combination)yr"
 mkpath(folder_name)
@@ -741,7 +780,6 @@ parameters_json = JSON.json(parameters)
 open(joinpath(folder_name, "parameters.txt"), "w") do f
     write(f, parameters_json)
 end
-
 #=using XLSX
 XLSX.openxlsx(joinpath(folder_name, "results $sum_func $timestamp.xlsx"), mode="w") do xf
     sheet = xf[1] # Add sheet
@@ -785,6 +823,10 @@ XLSX.openxlsx(joinpath(folder_name, "results $sum_func $timestamp.xlsx"), mode="
         combination = all_combinations[i]
         error = best_errors[combination]
         weight = best_weights[combination]
+        #if combination is longer than weight, add 0.025 to the start of weight until it is the same length as combination
+        while length(weight) < length(combination)
+            weight = vcat([0.025], weight)
+        end
         alg = best_alg[combination]
         row = i + 1
         sheet["A$row"] = error

@@ -1,6 +1,7 @@
 import pandas as pd
 import os
 from my_utils import completion_sound
+from time import sleep
 import winsound
 if __name__ == "__main__":
     import multiprocessing
@@ -44,7 +45,6 @@ if __name__ == "__main__":
         print("Setting ref_folder to: " + ref_folder)
 
 
-
     if choice == "":
         choice = 1
     else:
@@ -57,7 +57,7 @@ if __name__ == "__main__":
         print("Starting at fingerprint matching")
     else:
         print("Invalid choice")
-
+    
     #Step 1
     if choice==1: 
         import profile_analysis
