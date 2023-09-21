@@ -44,7 +44,8 @@ if false
 end
 extreme_years = ["2002-2003", "1996-1997"]#["1986-1987","1989-1990"]["2002-2003", "1996-1997"]["1989-1990","2005-2006"]#["1984-1985", "1995-1996"]#["2010-2011","2002-2003",]
 #extreme_years = ["1986-1987","1989-1990"]
-extreme_years = ["1985-1986", "1996-1997"]
+#extreme_years = ["1985-1986", "1996-1997"]
+extreme_years = ["1995-1996", "1996-1997"]
 function find_max_ref_folder(parent_directory)
     ref_folders = filter(x -> occursin(r"^ref\d+$", x), readdir(parent_directory))
     isempty(ref_folders) ? nothing : "ref" * string(maximum(parse(Int, replace(x, "ref" => "")) for x in ref_folders))
@@ -213,6 +214,8 @@ else
     ["2002-2003", "1996-1997", "1986-1987", "1995-1996", "2003-2004", "2014-2015", "2016-2017"],
     ["2002-2003", "1996-1997", "1980-1981", "1981-1982", "1992-1993", "2003-2004", "2018-2019"],
     ["2002-2003", "1996-1997", "1993-1994", "2012-2013", "2013-2014"],
+    ["1995-1996", "1996-1997", "1993-1994", "2012-2013", "2013-2014"],
+    ["1995-1996", "1996-1997", "1982-1983", "1999-2000", "2002-2003"],
     ["1981-1982", "1982-1983", "1985-1986", "2018-2019"],
     ["2000-2001", "2002-2003", "2014-2015", "2017-2018"],
     ["1980-1981", "1992-1993", "1996-1997", "2014-2015"],
@@ -741,7 +744,7 @@ global sorted_cases = sort(collect(best_errors), by=x->x[2])
 global all_combinations = sort(collect(all_combinations), by=x->best_errors[x])
 try
     for (case, error) in sorted_cases[1:3]
-        printstyled("$(case) with error $(round(error,digits=1))\n", color=:green)
+        printstyled("$(case) with $sum_func error $(round(error,digits=1))\n", color=:green)
         println("weights: $(round.(best_weights[case],digits=3)) (sum: $(round(sum(best_weights[case]),digits=3)))")
         # print each item in the case and its respective weight
     end
