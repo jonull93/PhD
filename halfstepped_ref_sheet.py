@@ -64,19 +64,27 @@ def ask_for_refname():
     ref1 = input("Enter the ref to use (separated by , if multiple): ")
     if "," in ref1:
         refs = ref1.split(",")
-        ref1 = refs[0]
-        ref2 = refs[1]
-        if len(refs) > 2:
-            ref3 = refs[2]
+        ref1 = refs[0].strip()
+        ref2 = refs[1].strip()
+        if len(refs) == 3:
+            ref3 = refs[2].strip()
+        else: ref3 = False
     else:
         ref2 = False
         ref3 = False
     # new ref name will be the digits of ref except the FIRST DIGIT (not whole number) will be incremented by 2
     # e.g. ref134 -> ref334
-    id_to_keep = int(ref1[4:])
-    id_to_increment = int(ref1[3]) + 2
-    my_sheetname = f"ref{id_to_increment}{id_to_keep}"
-    
+    nr_of_opt_years_id = ref1[4]
+    iteration_id = ref1[5:]
+    algorithm_mode_id = int(ref1[3])
+    if algorithm_mode_id == 1:
+        algorithm_mode_id = 3
+    elif algorithm_mode_id == 3:
+        if "_out" in iteration_id:
+            iteration_id = int(iteration_id.replace("_out", ""))
+        iteration_id = int(iteration_id) + 1
+
+    my_sheetname = f"ref{algorithm_mode_id}{nr_of_opt_years_id}{iteration_id}"
     return ref1, ref2, ref3, my_sheetname
 
 
