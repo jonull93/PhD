@@ -20,8 +20,11 @@ if __name__ == "__main__":
             ref_folders.append(folder)
     # pick the ref_folder that was most recently modified
     ref_folders.sort(key=lambda x: os.path.getmtime(os.path.join("PickleJar", x)))
-    ref_folder = ref_folders[-1]
-    print("The latest ref in the PickleJar is: " + ref_folder)
+    if len(ref_folders) > 0:
+        ref_folder = ref_folders[-1]
+        print("The latest ref in the PickleJar is: " + ref_folder)
+    else:
+        print("No ref_folders in PickleJar")
     
     #ask the user whether to use halfstepped (avg of two latest) or fullstepped (only most recent) capacities
     while True:

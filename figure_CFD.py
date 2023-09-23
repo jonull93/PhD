@@ -131,8 +131,7 @@ def fast_cfd(df_netload, xmin, xmax, amp_length=0.1, area_method=False, thread=F
         s = df_netload.count2.value_counts()
         df_freq = pd.DataFrame(data=s)
         output[amp] = df_freq
-    if debugging: print("")
-    print(f"{thread} finished building output[amp] after {round((timer() - start_time)/60, 1)} minutes. Now building df_out_tot")
+    if debugging: print(f"{thread} finished building output[amp] after {round((timer() - start_time)/60, 1)} minutes. Now building df_out_tot")
     timer_dfouttot = timer()
     #df_out_tot = pd.DataFrame()
     df_out_list = []
@@ -146,7 +145,7 @@ def fast_cfd(df_netload, xmin, xmax, amp_length=0.1, area_method=False, thread=F
     df_out_tot = pd.concat(df_out_list)
     print_green(f"time to build df_out_tot = {round((timer() - timer_dfouttot)/60, 1)} min")
     if area_method:
-        print_red(f"Starting second area_method loop with {len(df_out_tot.index)} rows at {dt.datetime.now().strftime('%H:%M:%S')}",replace_this_line=True)
+        print_red(f"Starting second area_method loop with {len(df_out_tot.index)} rows at {dt.datetime.now().strftime('%H:%M:%S')}")
         start_time = timer()
         #print_red(df_out_tot.index.get_level_values(0).unique())
         # df_out_tot hold a single column and a few multiindexed rows
