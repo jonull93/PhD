@@ -46,7 +46,7 @@ end
 extreme_years = ["2002-2003", "1996-1997"]#["1986-1987","1989-1990"]["2002-2003", "1996-1997"]["1989-1990","2005-2006"]#["1984-1985", "1995-1996"]#["2010-2011","2002-2003",]
 #extreme_years = ["1986-1987","1989-1990"]
 #extreme_years = ["1985-1986", "1996-1997"]
-extreme_years = ["1995-1996", "1996-1997"]
+#extreme_years = ["1995-1996", "1996-1997"]
 function find_max_ref_folder(parent_directory)
     ref_folders = filter(x -> occursin(r"^ref\d+$", x), readdir(parent_directory))
     isempty(ref_folders) ? nothing : "ref" * string(maximum(parse(Int, replace(x, "ref" => "")) for x in ref_folders))
@@ -215,6 +215,7 @@ else
     ["2002-2003", "1996-1997", "1986-1987", "1995-1996", "2003-2004", "2014-2015", "2016-2017"],
     ["2002-2003", "1996-1997", "1980-1981", "1981-1982", "1992-1993", "2003-2004", "2018-2019"],
     ["2002-2003", "1996-1997", "1993-1994", "2012-2013", "2013-2014"],
+    ["2002-2003", "1996-1997", "1981-1982", "2014-2015", "2017-2018"],
     ["1995-1996", "1996-1997", "1993-1994", "2012-2013", "2013-2014"],
     ["1995-1996", "1996-1997", "1982-1983", "1999-2000", "2002-2003"],
     ["1981-1982", "1982-1983", "1985-1986", "2018-2019"],
@@ -584,7 +585,7 @@ Threads.@threads for thread = 1:threads_to_start
         local alg_solutions = Dict()
         # define paramters for maxtime and midpoint_factor_for_skipping
         local maxtime_manual = 61
-        local midpoint_factor_for_skipping = 3.5 # from testing, it seems like 25% is about as much as the error can get improved (for abs_sum), though this decreases as the number of years increases
+        local midpoint_factor_for_skipping = 2.5 # from testing, it seems like 25% is about as much as the error can get improved (for abs_sum), though this decreases as the number of years increases
         # for sse, the improvement seems like it can be a lot higher!
         if maxtime < maxtime_manual
             if thread == 1 && global_best > 1e9
