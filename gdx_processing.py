@@ -82,8 +82,9 @@ cases1 = [#"singleyear_2002to2003_1h", "singleyear_1996to1997_1h", "singleyear_2
         "singleyear_2018to2019_1h", "singleyear_2014to2015_1h",
         # also 2012 and 2016-2017
         #"singleyear_1h_2012", "singleyear_2016to2017_1h",
-
-         "set1_1opt", "set1_2opt", "set1_3opt", "set1_4opt"]
+        #"set1_1opt", "set1_2opt", "set1_3opt", "set1_4opt"
+        "2HP_1opt", "2HP_2opt", "2HP_3opt", "2HP_4opt",
+         ]
 cases2 = [
     "set1_2opt", "set1_3opt", "set1_4opt",
     "allopt2_final",

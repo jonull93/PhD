@@ -3,7 +3,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import re
 from my_utils import color_dict, tech_names, print_red, print_cyan, print_green, print_magenta, print_blue, print_yellow, select_pickle
-from order_cap import wind, PV, baseload, peak, CCS, CHP, midload, hydro, PtH, order_cap, order_cap2
+from order_cap import wind, PV, baseload, peak, CCS, CHP, midload, hydro, PtH, order_cap, order_cap2, order_cap3
 from datetime import datetime
 
 # Path to the pickle files and figures
@@ -369,6 +369,8 @@ def create_figure_separated_techs(grouped_data, pickle_timestamp, use_defaults):
     for ax, (group_name, tech_list) in zip(axes, tech_groups2.items()):
         # Filter data for the current technology group
         group_data = combined_data.loc[combined_data.index.intersection(tech_list)].dropna(how='all')
+        # Reorder the bars according to order_cap
+        group_data = group_data.reindex(order_cap3).dropna(how='all')
 
         if group_name == 'Battery' and 'bat_cap' in group_data.index:
             width = 0.4

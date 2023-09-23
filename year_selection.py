@@ -54,7 +54,7 @@ if __name__ == "__main__":
             #print a description of what halfstepped means
             print_magenta("\nHalfstepped capacities means that the capacities are averaged from the two (or three) latest refs in cap_ref.xlsx")
             print_magenta(" This should make the convergence more likely to succeed, but it MIGHT require more interations.\n\n")
-    
+
     #Step 1
     import profile_analysis
     all_cap, VRE_groups, VRE_tech, VRE_tech_dict, VRE_tech_name_dict, years, reseamed_years, sites, region_name, \

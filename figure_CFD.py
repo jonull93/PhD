@@ -33,7 +33,7 @@ def get_ref_folder():
     for folder in os.listdir("PickleJar"):
         if folder.startswith("ref"):
             ref_folders.append(folder)
-    ref_folders.sort(key=lambda x: int(x[3:]))
+    ref_folders.sort(key=lambda x: int(x[3:6]))
     ref_folder = ref_folders[-1]
     # ask user whether to use the latest ref_folder or to enter a new one
     print(f"The latest ref in the PickleJar is: {ref_folder}")
@@ -467,6 +467,9 @@ def initiate(ref_folder):
         with open(f"{results_folder_name}/best_25.json", "w") as f:
             to_dump = [key.replace('Any','').replace('"', '').replace('[', '').replace(']', '').replace(' ', '').split(',') for key, value in errors_sorted[:25]]
             json.dump(to_dump, f, indent=4)
+        with open(f"{results_folder_name}/best_15.json", "w") as f:
+            to_dump = [key.replace('Any','').replace('"', '').replace('[', '').replace(']', '').replace(' ', '').split(',') for key, value in errors_sorted[:15]]
+            json.dump(to_dump, f, indent=4)
         with open(f"{results_folder_name}/best_2x.json", "w") as f:
             #calculate how many combinations are within 200% of the best case
             best_keys = [key for key, value in errors_sorted if value <= errors_sorted[0][1] * 2]
@@ -475,6 +478,13 @@ def initiate(ref_folder):
         with open(f"{results_folder_name}/best_1.5x.json", "w") as f:
             # calculate how many combinations are within 200% of the best case
             best_keys = [key for key, value in errors_sorted if value <= errors_sorted[0][1] * 1.5]
+            to_dump = [
+                key.replace('Any', '').replace('"', '').replace('[', '').replace(']', '').replace(' ', '').split(
+                    ',') for key in best_keys]
+            json.dump(to_dump, f, indent=4)
+        with open(f"{results_folder_name}/best_1.3x.json", "w") as f:
+            # calculate how many combinations are within 200% of the best case
+            best_keys = [key for key, value in errors_sorted if value <= errors_sorted[0][1] * 1.3]
             to_dump = [
                 key.replace('Any', '').replace('"', '').replace('[', '').replace(']', '').replace(' ', '').split(
                     ',') for key in best_keys]

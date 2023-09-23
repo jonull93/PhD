@@ -30,6 +30,7 @@ counteracted by long optimization times and multiple algorithms).
 #make it clear in the command prompt that the code is running
 timestamp = Dates.format(now(), "u_dd_HH.MM.SS")
 printstyled("\n ############# -- Starting fingerprintmatching.jl at $(timestamp) -- ############# \n"; color=:yellow)
+start_time = Dates.now()
 const print_lock = ReentrantLock()
 
 #set parameters
@@ -89,7 +90,7 @@ while true
     if input == "exit" || input == "e" || input == ""
         break
     #import combinations?
-    elseif input == "ifalse" || occursin(r"^i\d+x?$", input) #input == "i25" || input == "i50" || input == "i100" || input == "i2x" || occursin(r"^\d+$", input)
+    elseif input == "ifalse" || occursin(r"^i\d+(\.\d+)?x?$", input)    #input == "i25" || input == "i50" || input == "i100" || input == "i2x" || occursin(r"^\d+$", input)
         if input == "ifalse"
             global import_combinations = false
         else
@@ -282,13 +283,17 @@ for year in years_list
     if length(findall(in(x_data[year]),ref_x))<length(x_data[year]); error("Non-matching x-axes"); end
     printstyled("Padding the matrix $(size(cfd_data[year])) for $(year) ..\n"; color=:green)
     columns_to_add = count(x -> x > maximum(x_data[year]), ref_x)
-    println("Adding $(columns_to_add) columns")
+    #println("Adding $(columns_to_add) columns")
     xpad = zeros((size(cfd_data[year])[1],columns_to_add))
     cfd_data[year] = hcat(cfd_data[year],xpad)
     #println("Added columns - new size is $(size(cfd_data[year]))")
     start_rows = count(y -> y < minimum(y_data[year]), ref_y)
     end_columns = count(y -> y > maximum(y_data[year]), ref_y)
-    println("Adding $(start_rows) rows at the top and $(end_columns) rows at the bottom")
+    #println("Adding $(start_rows) rows at the top and $(end_columns) rows at the bottom")
+    #instead of printing how many rows and columns are added, print a warning of none are added
+    if start_rows == 0 && end_columns == 0 && columns_to_add == 0
+        printstyled("Warning: no rows or columns are added to the matrix for $(year)\n"; color=:red)
+    end
     ypad1 = zeros((start_rows,size(cfd_data[year])[2]))
     ypad2 = zeros((end_columns,size(cfd_data[year])[2]))
     cfd_data[year] = vcat(ypad1,cfd_data[year],ypad2)
@@ -737,7 +742,17 @@ end
 sum_func = split(opt_func_str, "(")[1]
 
 # Find the 3 best combinations (lowest SSE), print their SSE and weights
-println("Done optimizing all combinations for $ref_folder at $(Dates.format(now(), "HH:MM:SS"))")
+
+#format elapsed time as HH:MM:SS
+elapsed_milliseconds = Dates.value(now()-start_time)
+# Convert to HH:MM:SS
+hours, rem = divrem(elapsed_milliseconds, 3600000)   # Milliseconds in an hour
+minutes, rem = divrem(rem, 60000)                    # Milliseconds in a minute
+seconds = rem ÷ 1000                                 # Milliseconds in a second
+# Format as string
+formatted_time = string(lpad(hours, 2, '0'), ":", lpad(minutes, 2, '0'), ":", lpad(seconds, 2, '0'))
+
+println("Done optimizing all combinations for $ref_folder at $(Dates.format(now(), "HH:MM:SS")) after $(formatted_time)")
 printstyled("The 3 best combinations are ($(years[1])-$(years[end])) [sum_func=$(sum_func)()]:\n", color=:cyan)
 println("best_errors is $(length(best_errors)) items long")
 global sorted_cases = sort(collect(best_errors), by=x->x[2])
