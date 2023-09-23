@@ -539,7 +539,7 @@ Threads.@threads for thread = 1:threads_to_start
                     diff = diff_sum_weighted_mats(matrices,x)
                     return dot(diff,diff)
                  end
-                return sse(x) + weights_penalty(x, fixed_weights=years_not_optimized, slack_distance=0.009, amplitude=2e5)
+                return sse(x) + weights_penalty(x, fixed_weights=years_not_optimized, slack_distance=0.009, amplitude=4e5)
             elseif requested_sum_func == "abs_sum"
                 function abs_sum(x)
                     diff = diff_sum_weighted_mats(matrices,x)
@@ -552,7 +552,7 @@ Threads.@threads for thread = 1:threads_to_start
                     end
                     return result
                 end
-                return abs_sum(x) + weights_penalty(x, fixed_weights=years_not_optimized, slack_distance=0.009, amplitude=2e5)
+                return abs_sum(x) + weights_penalty(x, fixed_weights=years_not_optimized, slack_distance=0.009, amplitude=4e5)
             elseif requested_sum_func == "sqrt_sum"
                 function sqrt_sum(x)
                     diff = diff_sum_weighted_mats(matrices,x)

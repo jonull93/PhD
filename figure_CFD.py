@@ -469,6 +469,9 @@ def initiate(ref_folder):
         with open(f"{results_folder_name}/best_15.json", "w") as f:
             to_dump = [key.replace('Any','').replace('"', '').replace('[', '').replace(']', '').replace(' ', '').split(',') for key, value in errors_sorted[:15]]
             json.dump(to_dump, f, indent=4)
+        with open(f"{results_folder_name}/best_5.json", "w") as f:
+            to_dump = [key.replace('Any','').replace('"', '').replace('[', '').replace(']', '').replace(' ', '').split(',') for key, value in errors_sorted[:5]]
+            json.dump(to_dump, f, indent=4)
         with open(f"{results_folder_name}/best_2x.json", "w") as f:
             #calculate how many combinations are within 200% of the best case
             best_keys = [key for key, value in errors_sorted if value <= errors_sorted[0][1] * 2]
