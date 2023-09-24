@@ -15,6 +15,8 @@ using Printf
 using LinearAlgebra
 using Plots
 using JSON
+using XLSX
+
 
 #=
 This script is currently set up to run with one or multiple heuristic optimization algorithms for a certain amount of time, then stop.
@@ -170,10 +172,12 @@ printstyled("\nImported total matrix $(size(ref_mat)) for $(total_year) \n"; col
 #printstyled("Sum of extreme rows: $(sum(ref_mat[1,:])) and $(sum(ref_mat[end,:])) \n"; color=:cyan)
 #printstyled("Sum of extreme columns: $(sum(ref_mat[:,1])) and $(sum(ref_mat[:,end])) \n"; color=:cyan)
 # load weight matrices to be used with the error func sum_weight_mat, see git\python\figures\weight_matrix#.png for visuals
+#=
 weight_matrices = matread("output/weight_matrices.mat", )
 weight_matrix_lin19diff = weight_matrices["Z_lin19diff"]
 weight_matrix_lin190diff = weight_matrices["Z_lin190diff"]
 weight_matrix_sqrt = weight_matrices["Z_sqrt"]  # min = 1, max = 14
+=#
 
 # Generate combinations of years to optimize match for
 year_combinations = Dict()
@@ -495,8 +499,8 @@ end=#
 
 Threads.@threads for thread = 1:threads_to_start
     #sleep for 250 ms to stagger thread starts
-    time_to_sleep = 0.33*thread
-    sleep(time_to_sleep)
+    #time_to_sleep = 0.5*thread
+    #sleep(time_to_sleep)
     global global_best
     global global_midpoint_tracker
     global requested_sum_func
@@ -574,11 +578,12 @@ Threads.@threads for thread = 1:threads_to_start
                  end
                 return log_sum(x) + weights_penalty(x, fixed_weights=years_not_optimized, slack_distance=0.009, amplitude=2e5)
             else
-                function weighted_mat_sum(x, weight_matrix=weight_matrix_lin19diff)
+                #raise error
+                error("Invalid requested_sum_func")
+                #=function weighted_mat_sum(x, weight_matrix=weight_matrix_lin19diff)
                     diff = diff_sum_weighted_mats(matrices,x).*weight_matrix'
                     return sum(abs.(diff[.!isnan.(diff)]))
-                end
-                error("Invalid requested_sum_func")
+                end=#
             end
         end
 
@@ -828,7 +833,6 @@ XLSX.openxlsx(joinpath(folder_name, "results $sum_func $timestamp.xlsx"), mode="
         sheet["H$row"] = string(alg)
     end
 end=#
-using XLSX
 XLSX.openxlsx(joinpath(folder_name, "results $sum_func $timestamp.xlsx"), mode="w") do xf
     sheet = xf[1] # Add sheet
     XLSX.rename!(sheet, "Results $maxtime s") # Rename sheet
