@@ -334,7 +334,7 @@ function sigmoid(x)
     return 1 / (1 + exp(-x))
 end
 
-function weights_penalty(weights;fixed_weights=0,slack_distance=0.009,amplitude=2e6)
+function weights_penalty(weights;fixed_weights=0,slack_distance=0.007,amplitude=2e6)
     weight_sum = sum(weights)+fixed_weights*1/40
     penalty = (sigmoid((weight_sum-(1+slack_distance))*1000) + sigmoid(((1-slack_distance)-weight_sum)*1000))*amplitude
     return penalty
@@ -536,14 +536,14 @@ Threads.@threads for thread = 1:threads_to_start
         ### SET THE ERROR FUNCTION TO OPTIMIZE WITH HERE
         ###----------------------------
         
-        global opt_func_str = "$requested_sum_func(x) + weights_penalty(x,fixed_weights=years_not_optimized,slack_distance=0.009,amplitude=2e5)" #sigmoid((sum(x)-1.011)*1000) +
+        global opt_func_str = "$requested_sum_func(x) + weights_penalty(x,fixed_weights=years_not_optimized,slack_distance=0.007,amplitude=2e5)" #sigmoid((sum(x)-1.011)*1000) +
         function opt_func(x)
             if requested_sum_func == "sse"
                 function sse(x)
                     diff = diff_sum_weighted_mats(matrices,x)
                     return dot(diff,diff)
                  end
-                return sse(x) + weights_penalty(x, fixed_weights=years_not_optimized, slack_distance=0.009, amplitude=4e5)
+                return sse(x) + weights_penalty(x, fixed_weights=years_not_optimized, slack_distance=0.007, amplitude=2e5)
             elseif requested_sum_func == "abs_sum"
                 function abs_sum(x)
                     diff = diff_sum_weighted_mats(matrices,x)
@@ -556,7 +556,7 @@ Threads.@threads for thread = 1:threads_to_start
                     end
                     return result
                 end
-                return abs_sum(x) + weights_penalty(x, fixed_weights=years_not_optimized, slack_distance=0.009, amplitude=4e5)
+                return abs_sum(x) + weights_penalty(x, fixed_weights=years_not_optimized, slack_distance=0.007, amplitude=2e5)
             elseif requested_sum_func == "sqrt_sum"
                 function sqrt_sum(x)
                     diff = diff_sum_weighted_mats(matrices,x)
@@ -566,7 +566,7 @@ Threads.@threads for thread = 1:threads_to_start
                     end
                     return result
                 end
-                return sqrt_sum(x) + weights_penalty(x, fixed_weights=years_not_optimized, slack_distance=0.009, amplitude=2e5)
+                return sqrt_sum(x) + weights_penalty(x, fixed_weights=years_not_optimized, slack_distance=0.007, amplitude=2e5)
             elseif requested_sum_func == "log_sum"
                 function log_sum(x)
                     diff = diff_sum_weighted_mats(matrices,x)
@@ -576,7 +576,7 @@ Threads.@threads for thread = 1:threads_to_start
                     #penalty = sigmoid((sum(x)-1.011)*1000)+sigmoid((0.989-sum(x))*1000)
                     return sum(e[.!isnan.(e)])#+penalty*100000
                  end
-                return log_sum(x) + weights_penalty(x, fixed_weights=years_not_optimized, slack_distance=0.009, amplitude=2e5)
+                return log_sum(x) + weights_penalty(x, fixed_weights=years_not_optimized, slack_distance=0.007, amplitude=2e5)
             else
                 #raise error
                 error("Invalid requested_sum_func")
