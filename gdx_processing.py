@@ -85,8 +85,9 @@ if __name__ == "__main__":
             "singleyear_1h_2012", "singleyear_2016to2017_1h",
             # 82-83 and 10-11
             "singleyear_1982to1983_1h", "singleyear_2010to2011_1h",
-            #"set1_1opt", "set1_2opt", "set1_3opt", "set1_4opt"
-            "2HP_1opt", "2HP_2opt", "2HP_3opt_a", "2HP_3opt_b", "2HP_3opt_mean", "2HP_4opt", "2HP_5opt",
+            #"set1_1opt", "set1_2opt", "set1_3opt", "set1_4opt" "2HP_3opt_a", "2HP_3opt_b", 
+            "2HP_1opt", "2HP_2opt","2HP_3opt_mean", "2HP_4opt", "2HP_5opt",
+            "allyears",
             ]
     cases2 = [
         "2HP_1opt", "2HP_2opt", "2HP_3opt_mean", "2HP_4opt",# "2HP_5opt",
@@ -95,6 +96,7 @@ if __name__ == "__main__":
         "allopt3_final",
         #"allopt4_final_a", "allopt4_final_b", 
         "allopt4_final",
+        "allyears",
         "singleyear_1h_2012", "singleyear_2016to2017_1h", #start-points
     ]
     cases3 = [
@@ -108,18 +110,36 @@ if __name__ == "__main__":
 
         "singleyear_1996to1997_1h", "singleyear_2002to2003_1h", #extremes
         "singleyear_1h_2012", "singleyear_2016to2017_1h", #start-points
+        "allyears"
     ]
     cases_test = [
         "2HP_1opt_2012start", "2HP_1opt"
     ]
-    cases = cases1
-    suffix = ""
-    if cases == cases1:
-        suffix = "_main"
-    elif cases == cases2:
-        suffix = "_allopt"
-    elif cases == cases3:
-        suffix = "_alt"
+    #cases = cases1
+    # instead of setting cases manually, prompt the user to select a set of cases
+    print("Select a set of cases to run:")
+    print("1: main (single years + 2HP + allyears)")
+    print("2: allopt (2HP + allopt + allyears)")
+    print("3: alt (2HP_alt + single years + allyears)")
+    print('4: test ("2HP_1opt_2012start", "2HP_1opt")')
+    cases = []
+    while cases not in [cases1, cases2, cases3, cases_test]:
+        cases = input("Enter a number: ")
+        if cases == "1":
+            cases = cases1
+            suffix = "_main"
+        elif cases == "2":
+            cases = cases2
+            suffix = "_allopt"
+        elif cases == "3":
+            cases = cases3
+            suffix = "_alt"
+        elif cases == "4":
+            cases = cases_test
+            suffix = "_test"
+        else:
+            print("Invalid input")
+
     #cases = ["singleyear_"+str(year)+"to"+str(year+1)+"_1h" for year in range(1980, 2018)]
 
     """
