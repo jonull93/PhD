@@ -214,6 +214,8 @@ else
     ["2002-2003", "1996-1997", "1980-1981", "1981-1982", "1992-1993", "2003-2004", "2018-2019", "1982-1983"],
     ["1986-1987", "1989-1990", "1980-1981", "1981-1982", "1992-1993", "2003-2004", "2018-2019", "1982-1983"],
     ["1986-1987", "1989-1990", "1981-1982", "1985-1986", "1988-1989", "1999-2000", "2016-2017", "1982-1983"],
+    ["2002-2003", "1996-1997", "1982-1983", "1990-1991", "1994-1995", "2008-2009", "2010-2011", "2015-2016"],
+    ["2002-2003", "1996-1997", "1993-1994", "1999-2000", "2000-2001", "2003-2004", "2010-2011", "2011-2012"],
     ["1985-1986", "1996-1997", "1984-1985", "1988-1989", "1989-1990", "1991-1992", "2004-2005"],
     ["1985-1986", "1996-1997", "1993-1994", "2000-2001", "2003-2004", "2010-2011", "2011-2012"],
     ["2002-2003", "1996-1997", "1986-1987", "1995-1996", "2003-2004", "2014-2015", "2016-2017"],
@@ -514,7 +516,9 @@ Threads.@threads for thread = 1:threads_to_start
         lock(print_lock) do # for some reason, julia would freeze and the dequeue would bug out if this was not locked
             if length(queue) > 0
                 case = dequeue!(queue)
+                #if thread == 1 || maxtime > 60
                 printstyled("Thread $(thread) started working on $(case) at $(Dates.format(now(), "HH:MM:SS")), $(length(queue)) left in queue\n"; color=:cyan)
+                #end
             end
         end
         convert(Vector{String},case)
@@ -530,8 +534,8 @@ Threads.@threads for thread = 1:threads_to_start
 
         # a vector w that is the same length as the number of matrices and equals 1/number of matrices
         # w = ones(length(matrices)) ./ length(matrices)
-        upper = ones(length(matrices))
-        lower = zeros(length(matrices))
+        #upper = ones(length(matrices))
+        #lower = zeros(length(matrices))
         ###----------------------------
         ### SET THE ERROR FUNCTION TO OPTIMIZE WITH HERE
         ###----------------------------
@@ -605,16 +609,14 @@ Threads.@threads for thread = 1:threads_to_start
             local e = opt_func(x)
             local midpoint_error = e
             best_guess = (x,e)
+            #=
             lock(print_lock) do # trying this to stop an error later when trying to sort best_errors, possibly because best_errors got corrupted by the multiple threads
                 best_weights[case] = best_guess[1]
                 best_errors[case] = best_guess[2]
                 best_alg[case] = "manual mid-point"
             end
-            if midpoint_error > global_best*midpoint_factor_for_skipping
-                lock(print_lock) do
-                    printstyled("  Midpoint error is more than $(midpoint_factor_for_skipping) ($(round(midpoint_error/global_best,digits=2))) of the global best, skipping the non-mid points\n"; color=:yellow)
-                end
-            else
+            =#
+            if midpoint_error < global_best*midpoint_factor_for_skipping
                 for i in 2:length(initial_guesses)
                     # if the thread is the first one, print which starting point is being tested
                     local x = initial_guesses[i]
@@ -624,31 +626,34 @@ Threads.@threads for thread = 1:threads_to_start
                     end
                 end
             end
+            if thread == 1
+                lock(print_lock) do
+                    printstyled("  Thread $(thread) finished working on $(case) at $(Dates.format(now(), "HH:MM:SS")), after $(round(Dates.now()-start_time,Dates.Second))\n"; color=:green)
+                    printstyled("  Midpoint error was $(round(midpoint_error/global_best,digits=2)) of the global best\n"; color=:yellow)
+                    #printstyled("  Error = $(round(best_guess[2],digits=1)) for $(round.(best_weights[case],digits=3))\n"; color=:white)
+                    printstyled("Global best so far = $(round(global_best))\n"; color=:magenta)
+                end
+            end
             lock(print_lock) do
                 best_weights[case] = best_guess[1]
                 best_errors[case] = best_guess[2]
                 #let best_alg say "-20% from mid-point" if the best guess is 20% from the mid-point guess, since there is no alg anyway
                 best_alg[case] = "$(round(Int,(best_guess[2]-midpoint_error)/midpoint_error*100))% from mid-point"
-            end
-
-            lock(print_lock) do
-                printstyled("  Thread $(thread) finished working on $(case) at $(Dates.format(now(), "HH:MM:SS")), after $(round(Dates.now()-start_time,Dates.Second))\n"; color=:green)
-                printstyled("  Error = $(round(best_guess[2],digits=1)) for $(round.(best_weights[case],digits=3))"; color=:white)
+                
                 if best_guess[2] <= global_best
-                    global_midpoint_tracker *= best_guess[2]/global_best
+                    #global_midpoint_tracker *= best_guess[2]/global_best
                     global_best = best_guess[2]
-                    printstyled(" <-- GLOBAL BEST\n"; color=:red)
+                    printstyled("-> New global best ($(round(best_guess[2]))) is $case\n"; color=:red)
                 else
-                    printstyled("\n"; color=:white)
+                    #printstyled("\n"; color=:white)
+                    #=
                     if best_guess[2] < global_best*1.2
-                        printstyled(" Only $(round(best_guess[2]/global_best,digits=2)) from the global best with the midpoint error at $(round(midpoint_error/global_best,digits=2))\n"; color=:blue)
+                        #printstyled(" Only $(round(best_guess[2]/global_best,digits=2)) from the global best with the midpoint error at $(round(midpoint_error/global_best,digits=2))\n"; color=:blue)
                         if midpoint_error > global_midpoint_tracker
                             global_midpoint_tracker = midpoint_error
                         end
                     end
-                end
-                if thread == 1
-                    printstyled("Global best so far = $(round(global_best))\n"; color=:magenta)
+                    =#
                 end
             end
         else # if the maxtime is not less than maxtime_manual, use the BBOptim.jl package
@@ -728,9 +733,9 @@ end
 println('\a') #beep
 sleep(1)
 #if global_midpoint_tracker is larger than 0, print it and say how many % higher it is than the global best
-if global_midpoint_tracker > 0
-    printstyled("global_midpoint_tracker = $(round(global_midpoint_tracker,digits=2)) ($(round(global_midpoint_tracker/global_best*100-100))% higher than global_best)\n"; color=:yellow)
-end
+#if global_midpoint_tracker > 0
+#    printstyled("global_midpoint_tracker = $(round(global_midpoint_tracker,digits=2)) ($(round(global_midpoint_tracker/global_best*100-100))% higher than global_best)\n"; color=:yellow)
+#end
 println('\a') #beep
 
 for comb in all_combinations
@@ -847,6 +852,9 @@ XLSX.openxlsx(joinpath(folder_name, "results $sum_func $timestamp.xlsx"), mode="
 
     # Step 6.4: Iterate through the combinations and write the results to the worksheet
     for i in 1:length(all_combinations)
+        if i>1e6
+            break # excel can't handle too many rows " LoadError: AssertionError: A1048577 is not a valid CellRef."
+        end
         combination = all_combinations[i]
         error = best_errors[combination]
         weight = best_weights[combination]
