@@ -18,7 +18,11 @@ def load_data(ref1, ref2=False, ref3=False, filename = r'input\cap_ref.xlsx'):
 
 def calculate_mean_cap(data):
     # Convert the data into a multi-indexed series and compute the average
-    avg_capacity = data.groupby(['tech', 'I_reg'])['capacity'].mean()
+    #avg_capacity = data.groupby(['tech', 'I_reg'])['capacity'].mean()
+    # to know how much to divide by, count the maximum number of rows in a groupby
+    max_rows = data.groupby(['tech', 'I_reg']).size().max()
+    print_green(f"Max number of rows in a groupby is {max_rows}")
+    avg_capacity = data.groupby(['tech', 'I_reg'])['capacity'].sum() / max_rows
     # Prepare the DataFrame to be written back to Excel
     result = avg_capacity.sort_values(ascending=False).reset_index()
     return result
@@ -74,17 +78,28 @@ def ask_for_refname():
         ref3 = False
     # new ref name will be the digits of ref except the FIRST DIGIT (not whole number) will be incremented by 2
     # e.g. ref134 -> ref334
-    nr_of_opt_years_id = ref1[4]
-    iteration_id = ref1[5:]
-    algorithm_mode_id = int(ref1[3])
-    if algorithm_mode_id == 1:
-        algorithm_mode_id = 3
-    elif algorithm_mode_id == 3:
-        if "_out" in iteration_id:
-            iteration_id = int(iteration_id.replace("_out", ""))
-        iteration_id = int(iteration_id) + 1
+    #extract the digits from ref1
+    refdigits = [char for char in ref1 if char.isdigit()]
+    if len(refdigits) >= 3:
+        nr_of_opt_years_id = ref1[4]
+        iteration_id = ref1[5:]
+        algorithm_mode_id = int(ref1[3])
+        if algorithm_mode_id == 1:
+            algorithm_mode_id = 3
+        elif algorithm_mode_id == 3:
+            if "_out" in iteration_id:
+                iteration_id = int(iteration_id.replace("_out", ""))
+            iteration_id = int(iteration_id) + 1
 
-    my_sheetname = f"ref{algorithm_mode_id}{nr_of_opt_years_id}{iteration_id}"
+        my_sheetname = f"ref{algorithm_mode_id}{nr_of_opt_years_id}{iteration_id}"
+    elif len(refdigits) < 3:
+        # increment the digit of ref1 until it is a sheet name that does not exist yet
+        refnum = int("".join(refdigits))
+        while True:
+            refnum += 1
+            my_sheetname = f"ref{refnum}"
+            if my_sheetname not in pd.ExcelFile("input\\cap_ref.xlsx").sheet_names:
+                break
     return ref1, ref2, ref3, my_sheetname
 
 

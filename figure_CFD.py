@@ -466,8 +466,8 @@ def initiate(ref_folder):
         with open(f"{results_folder_name}/best_25.json", "w") as f:
             to_dump = [key.replace('Any','').replace('"', '').replace('[', '').replace(']', '').replace(' ', '').split(',') for key, value in errors_sorted[:25]]
             json.dump(to_dump, f, indent=4)
-        with open(f"{results_folder_name}/best_15.json", "w") as f:
-            to_dump = [key.replace('Any','').replace('"', '').replace('[', '').replace(']', '').replace(' ', '').split(',') for key, value in errors_sorted[:15]]
+        with open(f"{results_folder_name}/best_10.json", "w") as f:
+            to_dump = [key.replace('Any','').replace('"', '').replace('[', '').replace(']', '').replace(' ', '').split(',') for key, value in errors_sorted[:10]]
             json.dump(to_dump, f, indent=4)
         with open(f"{results_folder_name}/best_5.json", "w") as f:
             to_dump = [key.replace('Any','').replace('"', '').replace('[', '').replace(']', '').replace(' ', '').split(',') for key, value in errors_sorted[:5]]

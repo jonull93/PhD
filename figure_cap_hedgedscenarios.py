@@ -74,22 +74,29 @@ def load_data(pickle_file, use_defaults):
         excluded = input("Please enter the scenarios you want to exclude, separated by commas (or H for the hardcoded list): ").split(',')
         if excluded == ['H'] or excluded == ['h']:
             # Use the hardcoded list
-            selected_scenarios = [#'singleyear_1989to1990_1h', 'singleyear_1995to1996_1h',
-                                  'singleyear_1996to1997_1h', #'singleyear_1997to1998_1h',
-                                  'singleyear_2002to2003_1h', 'singleyear_2003to2004_1h', #'singleyear_2004to2005_1h',
-                                  'singleyear_2009to2010_1h', #'singleyear_2010to2011_1h', 'singleyear_2018to2019_1h', 'singleyear_2014to2015_1h',
-                                  'singleyear_1h_2012', 'singleyear_2016to2017_1h',
-                                  'set1_1opt', 'set1_2opt', 'set1_3opt', 'set1_4opt'] # Replace with the hardcoded list
+            selected_scenarios = [
+                "2HP_1opt", "2HP_2opt", "2HP_3opt_mean", "2HP_4opt", "2HP_5opt",
+                #'singleyear_1989to1990_1h', 'singleyear_1995to1996_1h',
+                'singleyear_1996to1997_1h', #'singleyear_1997to1998_1h',
+                'singleyear_2002to2003_1h', 
+                #'singleyear_2003to2004_1h', #'singleyear_2004to2005_1h',
+                #'singleyear_2009to2010_1h', #'singleyear_2010to2011_1h', 'singleyear_2018to2019_1h', 'singleyear_2014to2015_1h',
+                'singleyear_1h_2012', 'singleyear_2016to2017_1h',
+                #'set1_1opt', 'set1_2opt', 'set1_3opt', 'set1_4opt',
+                ] # Replace with the hardcoded list
         else:
-            print_red(f"Excluding scenarios: {excluded}")
             # the input is a string but if there is an , in the input it will be split into a list
             if ',' not in excluded:
                 excluded = [e.strip().replace("'", "").replace('"', '') for e in excluded]
+                excluded = excluded + [e.replace('-','to') for e in excluded if '-' in e]
             else:
                 parts = excluded.split(',')
                 print_red(f"parts: {parts}")
                 excluded = [p.strip().replace("'", "").replace('"', '') for p in parts]
-            selected_scenarios = [s for s in all_scenarios if s not in excluded]
+            print_red(f"Excluding scenarios: {excluded}")
+            excluded = excluded + [e.replace('_1h','').replace('_3h','') for e in excluded]
+            sets = [s for s in all_scenarios if "singleyear" not in s and s not in excluded]
+            selected_scenarios = sets+[s for s in all_scenarios if s not in excluded+sets]
 
     # Handle alternative scenarios
     for s in selected_scenarios:
@@ -185,6 +192,13 @@ def prettify_scenario_name(name):
         even = ", eq. w."*('even' in name)
         if "even" in name: nr = 4
         return f"2 HP + {nr}{alt} opt." + even # 2 opt., 2 HP
+    if "HP" in name and "opt" in name:
+        parts = name.split("_")
+        opt = parts[1][0]
+        extra = f" ({parts[-1]})" if len(parts) == 3 and parts[-1]!="mean" else "" 
+        if "2012" in extra:
+            return f"Alt. start {name[0]} HP + {opt} opt." 
+        return f"{name[0]} HP + {opt} opt.{extra}" 
     if "allopt" in name:
         # turn allopt2_final into All opt. (2 yr), and allopt2_final_a into All opt. (2 yr) a
         nr = name.split("_")[0].replace("allopt", "")
@@ -443,7 +457,7 @@ def create_figure_separated_techs(grouped_data, pickle_timestamp, use_defaults):
         else:
             ax.set_ylabel('Installed power capacity [GW]')
     fig.tight_layout(pad=0.5, rect=(0,0,1,0.98))
-    plt.subplots_adjust(wspace=0.35)
+    plt.subplots_adjust(wspace=0.3)
     # Save and close the figure as in your original function
     # Save the figure as PNG and SVG (or EPS)
     fig_name_base = f"figures/capacity/{pickle_timestamp}"

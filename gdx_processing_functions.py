@@ -389,7 +389,7 @@ def excel(scen:str, data, row, writer, indicators):
         print(f"! Could not find tech in gen.index, {scen} probably failed the gams run. Here's gen:",gen)
         return
     for i, scen_part in enumerate(stripped_scen.split('_')):  # split up the scenario name on _
-        print_num(writer, [scen_part], "Indicators", row + 1, i, 0)  # print the (split) scenario name in Indicators
+        print_num(writer, [scen_part], "Indicators", row.value + 1, i, 0)  # print the (split) scenario name in Indicators
         if i>indicators_column: indicators_column = i
     c = indicators_column+1
 
@@ -400,16 +400,16 @@ def excel(scen:str, data, row, writer, indicators):
         except KeyError: thing = None
         ind_type = type(thing)
         if isinstance([], ind_type):
-            print_num(writer, thing, "Indicators", row + 1, c, 0)
+            print_num(writer, thing, "Indicators", row.value + 1, c, 0)
         elif ind_type in [type(1.), type(3), np.float64]:
-            print_num(writer, [round(thing,ndigits=2)], "Indicators", row + 1, c, 0)
+            print_num(writer, [round(thing,ndigits=2)], "Indicators", row.value + 1, c, 0)
         elif ind_type in [type(''), type(True)]:
-            print_num(writer, [thing], "Indicators", row + 1, c, 0)
+            print_num(writer, [thing], "Indicators", row.value + 1, c, 0)
         elif isinstance(None, ind_type):
-            print_num(writer, ["-"], "Indicators", row + 1, c, 0)
+            print_num(writer, ["-"], "Indicators", row.value + 1, c, 0)
         elif ind_type == pd.core.series.Series:
             try: 
-                print_num(writer, ["/".join(map(str, (thing*100).round(1)))], "Indicators", row + 1, c, 0)
+                print_num(writer, ["/".join(map(str, (thing*100).round(1)))], "Indicators", row.value + 1, c, 0)
                 #if "share" in 
             except: print(f"Failed to print {indicator} to excel!")
         else:
