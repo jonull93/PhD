@@ -48,7 +48,7 @@ end
 extreme_years = ["2002-2003", "1996-1997"]#["1986-1987","1989-1990"]["2002-2003", "1996-1997"]["1989-1990","2005-2006"]#["1984-1985", "1995-1996"]#["2010-2011","2002-2003",]
 #extreme_years = ["1986-1987","1989-1990"]
 #extreme_years = ["1985-1986", "1996-1997"]
-#extreme_years = ["1995-1996", "1996-1997"]
+extreme_years = ["1995-1996", "1996-1997"]
 function find_max_ref_folder(parent_directory)
     ref_folders = filter(x -> occursin(r"^ref\d+$", x), readdir(parent_directory))
     isempty(ref_folders) ? nothing : "ref" * string(maximum(parse(Int, replace(x, "ref" => "")) for x in ref_folders))
@@ -122,7 +122,7 @@ while true
     elseif input == "sse"
         global requested_sum_func = input
         printstyled("Sum function set to $requested_sum_func \n"; color=:green)
-    elseif occursin(r"^ref\d+$", input)
+    elseif occursin(r"^ref", input)
         global ref_folder = input
         printstyled("Ref folder set to $ref_folder \n"; color=:green)
     elseif occursin(r"^\d+years$", input) || occursin(r"^\d+y$", input)
@@ -547,14 +547,15 @@ Threads.@threads for thread = 1:threads_to_start
             elseif requested_sum_func == "abs_sum"
                 function abs_sum(x)
                     diff = diff_sum_weighted_mats(matrices,x)
-                    if diff == false
-                        return 0
-                    end
-                    result = 0.0
-                    @inbounds @simd for i in eachindex(diff)
-                        result += abs(diff[i])
-                    end
-                    return result
+                    #if diff == false
+                    #    return 0
+                    #end
+                    #result = 0.0
+                    #@inbounds @simd for i in eachindex(diff)
+                    #    result += abs(diff[i])
+                    #end
+                    return sum(abs.(diff))
+                    #return result
                 end
                 return abs_sum(x) + weights_penalty(x, fixed_weights=years_not_optimized, slack_distance=0.007, amplitude=2e5)
             elseif requested_sum_func == "sqrt_sum"
