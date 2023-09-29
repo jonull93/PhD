@@ -191,7 +191,6 @@ def create_df_out_tot(year, xmin, xmax, ref_folder, rolling_hours=12, amp_length
     net_load = data["net_load"].squeeze()
     #print_cyan(net_load)
     #print_cyan(type(net_load))
-    print_red(f"For year {year} the mean net load is {round(net_load.values.mean())} GW")
     # print(VRE_profiles.shape, net_load.shape, cap.shape)
     # d = {'net load': net_load,'count1':0,'count2':0}
     # df_netload = fast_rolling_average(pd.DataFrame(data=d),1)
@@ -237,7 +236,7 @@ def main(year, ref_folder, amp_length=1, rolling_hours=12, area_mode_in_cfd=True
         # df_netload = df_netload.reset_index()[["net load", "count1", "count2"]]
         try:
             if not read_pickle: raise ImportError
-            print_yellow(f"Attempting to read {pickle_read_name}")
+            print_yellow(f" Attempting to read pickle")#{pickle_read_name}")
             df_out_tot = pickle.load(open(pickle_read_name, "rb"))
         except Exception as e:
             if read_pickle: print_red(f"Failed due to {type(e)} .. creating a new one instead")
@@ -253,6 +252,8 @@ def main(year, ref_folder, amp_length=1, rolling_hours=12, area_mode_in_cfd=True
                 print_yellow(f"NOT writing {pickle_dump_name}")
         df_reset = df_out_tot.reset_index()
         df_reset.columns = ['Amplitude', 'Duration', 'Occurrence']
+        print(f" max/mean/min net load for {year} is {round(df_reset['Amplitude'].max())}/{round(df_reset['Amplitude'].mean())}/{round(df_reset['Amplitude'].min())}")
+        if int(math.ceil(df_reset["Amplitude"].max())) > xmax-2: print_magenta(f"OBS: max(Amplitude)={int(math.ceil(df_reset['Amplitude'].max()))} >= xmax-2")
         xmax = max(xmax, int(math.ceil(df_reset["Amplitude"].max())))
         xmin = min(xmin, int(math.floor(df_reset["Amplitude"].min())))
         df_pivot = df_reset.pivot(index='Amplitude', columns='Duration')
@@ -420,7 +421,7 @@ def initiate(ref_folder):
     xmax= 0
     xmin, xmax, ymin, ymax = main(long_period, ref_folder, amp_length=amp_length, rolling_hours=rolling_hours, area_mode_in_cfd=area_mode_in_cfd,
                                   write_files=True, read_pickle=True, debugging=debugging)
-    print("Xmin =", xmin, "Xmax =", xmax, "Ymin =", ymin, "Ymax =", ymax)
+    print("Xmin =", xmin, "Xmax =", xmax, "Ymin =", ymin, "Ymax =", round(ymax, 1))
     queue_years = Queue(maxsize=0)
     sum_func = ""
     make_fingerprinted_figures = os.path.exists(f"results\\{ref_folder}/most_recent_results.txt")

@@ -97,6 +97,9 @@ def load_data(pickle_file, use_defaults):
             excluded = excluded + [e.replace('_1h','').replace('_3h','') for e in excluded]
             sets = [s for s in all_scenarios if "singleyear" not in s and s not in excluded]
             selected_scenarios = sets+[s for s in all_scenarios if s not in excluded+sets]
+    #if "allyears" in selected scenarios, move it to the end
+    if "allyears" in selected_scenarios:
+        selected_scenarios = [s for s in selected_scenarios if s != "allyears"] + ["allyears"]
 
     # Handle alternative scenarios
     for s in selected_scenarios:
@@ -199,6 +202,8 @@ def prettify_scenario_name(name):
         if "2012" in extra:
             return f"Alt. start {name[0]} HP + {opt} opt." 
         return f"{name[0]} HP + {opt} opt.{extra}" 
+    if "allyears" in name:
+        return "All years"
     if "allopt" in name:
         # turn allopt2_final into All opt. (2 yr), and allopt2_final_a into All opt. (2 yr) a
         nr = name.split("_")[0].replace("allopt", "")
@@ -429,7 +434,7 @@ def create_figure_separated_techs(grouped_data, pickle_timestamp, use_defaults):
         new_labels = []#[f"{f'{scenario}, '*(len(scenario.replace(year,''))>3)}" + f"{year}" for scenario, year in zip(all_scenarios, all_years)]
         for scenario in x_ticks:
             scenario = scenario.get_text()
-            if len(scenario) > 10 or "_" in scenario:
+            if len(scenario) > 7 or "_" in scenario:
                 # change labels from "base#extreme#" (where # is a number) to "#b #e"
                 temp_label = f"{scenario.replace('_tight','').replace('_1h','')}"
                 temp_label = prettify_scenario_name(temp_label)

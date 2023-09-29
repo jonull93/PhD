@@ -6,6 +6,7 @@ fingerprintmatching:
 =#
 
 import Combinatorics: combinations
+import Statistics: mean
 using MAT
 using Optim
 using BlackBoxOptim
@@ -48,7 +49,7 @@ end
 extreme_years = ["2002-2003", "1996-1997"]#["1986-1987","1989-1990"]["2002-2003", "1996-1997"]["1989-1990","2005-2006"]#["1984-1985", "1995-1996"]#["2010-2011","2002-2003",]
 #extreme_years = ["1986-1987","1989-1990"]
 #extreme_years = ["1985-1986", "1996-1997"]
-extreme_years = ["1995-1996", "1996-1997"]
+#extreme_years = ["1995-1996", "1996-1997"]
 function find_max_ref_folder(parent_directory)
     ref_folders = filter(x -> occursin(r"^ref\d+$", x), readdir(parent_directory))
     isempty(ref_folders) ? nothing : "ref" * string(maximum(parse(Int, replace(x, "ref" => "")) for x in ref_folders))
@@ -498,8 +499,9 @@ end
     end
     printstyled("Sum of initial guesses [1]: $(sum(initial_guesses[1]))\n"; color=:yellow)
 end=#
-
+average_time_to_solve_per_thread = [0. for i in 1:threads_to_start]
 Threads.@threads for thread = 1:threads_to_start
+    time_to_solve_array = [0.]
     #sleep for 250 ms to stagger thread starts
     #time_to_sleep = 0.5*thread
     #sleep(time_to_sleep)
@@ -509,6 +511,7 @@ Threads.@threads for thread = 1:threads_to_start
     while true
         if length(queue) == 0
             #println("Nothing to do")
+            average_time_to_solve_per_thread[thread] = mean(time_to_solve_array)
             break
         end
         start_time = Dates.now()
@@ -516,9 +519,11 @@ Threads.@threads for thread = 1:threads_to_start
         lock(print_lock) do # for some reason, julia would freeze and the dequeue would bug out if this was not locked
             if length(queue) > 0
                 case = dequeue!(queue)
-                #if thread == 1 || maxtime > 60
+            end
+        end
+        if thread == 1 || maxtime > 60
+            lock(print_lock) do
                 printstyled("Thread $(thread) started working on $(case) at $(Dates.format(now(), "HH:MM:SS")), $(length(queue)) left in queue\n"; color=:cyan)
-                #end
             end
         end
         convert(Vector{String},case)
@@ -595,7 +600,7 @@ Threads.@threads for thread = 1:threads_to_start
         local alg_solutions = Dict()
         # define paramters for maxtime and midpoint_factor_for_skipping
         local maxtime_manual = 61
-        local midpoint_factor_for_skipping = 2.5 # from testing, it seems like 25% is about as much as the error can get improved (for abs_sum), though this decreases as the number of years increases
+        local midpoint_factor_for_skipping = 2.6 # from testing, it seems like 25% is about as much as the error can get improved (for abs_sum), though this decreases as the number of years increases
         # for sse, the improvement seems like it can be a lot higher!
         if maxtime < maxtime_manual
             if thread == 1 && global_best > 1e9
@@ -628,7 +633,7 @@ Threads.@threads for thread = 1:threads_to_start
             end
             if thread == 1
                 lock(print_lock) do
-                    printstyled("  Thread $(thread) finished working on $(case) at $(Dates.format(now(), "HH:MM:SS")), after $(round(Dates.now()-start_time,Dates.Second))\n"; color=:green)
+                    printstyled("  Thread $(thread) finished working on $(case) at $(Dates.format(now(), "HH:MM:SS")), after $((Dates.now()-start_time)/Dates.Millisecond(1000)) s\n"; color=:green)
                     printstyled("  Midpoint error was $(round(midpoint_error/global_best,digits=2)) of the global best\n"; color=:yellow)
                     #printstyled("  Error = $(round(best_guess[2],digits=1)) for $(round.(best_weights[case],digits=3))\n"; color=:white)
                     printstyled("Global best so far = $(round(global_best))\n"; color=:magenta)
@@ -639,23 +644,34 @@ Threads.@threads for thread = 1:threads_to_start
                 best_errors[case] = best_guess[2]
                 #let best_alg say "-20% from mid-point" if the best guess is 20% from the mid-point guess, since there is no alg anyway
                 best_alg[case] = "$(round(Int,(best_guess[2]-midpoint_error)/midpoint_error*100))% from mid-point"
-                
-                if best_guess[2] <= global_best
-                    #global_midpoint_tracker *= best_guess[2]/global_best
+            end
+            if best_guess[2] <= global_best
+                lock(print_lock) do
+                    # prepare a string that indicates +/-% from the mid-point error to the previous global best
+                    # if the midpoint_error was +30% of the previous global best, the string will be "+30%" specifically with the + sign
+                    midpoint_error_string = "$(round(Int,(midpoint_error-global_best)/global_best*100))%"
+                    if midpoint_error > global_best
+                        midpoint_error_string = "+$(midpoint_error_string)"
+                    end
+                    global_midpoint_tracker *= best_guess[2]/global_best
                     global_best = best_guess[2]
-                    printstyled("-> New global best ($(round(best_guess[2]))) is $case\n"; color=:red)
-                else
-                    #printstyled("\n"; color=:white)
-                    #=
-                    if best_guess[2] < global_best*1.2
+                    printstyled("-> New global best: $(round(best_guess[2])) for $case (midpoint was $midpoint_error_string of old best)\n"; color=:red)
+                end
+            else
+                #printstyled("\n"; color=:white)
+                if best_guess[2] < global_best*1.2
+                    lock(print_lock) do
                         #printstyled(" Only $(round(best_guess[2]/global_best,digits=2)) from the global best with the midpoint error at $(round(midpoint_error/global_best,digits=2))\n"; color=:blue)
                         if midpoint_error > global_midpoint_tracker
                             global_midpoint_tracker = midpoint_error
                         end
                     end
-                    =#
                 end
+                
             end
+            #add the time it took to solve this case (in not rounded seconds) to the array time_to_solve_array
+            push!(time_to_solve_array, (Dates.now()-start_time)/Dates.Millisecond(1000))
+
         else # if the maxtime is not less than maxtime_manual, use the BBOptim.jl package
             for alg in BBO_algs
                 #print the next line only if thread==1
@@ -707,6 +723,8 @@ Threads.@threads for thread = 1:threads_to_start
 
                 end
             end
+            #add the time it took to solve this case (in not rounded seconds) to the array time_to_solve_array
+            push!(time_to_solve_array, (Dates.now()-start_time)/Dates.Millisecond(1000))
             #if case not in best_errors
             if !(case in keys(best_errors))
                 printstyled("did not find $case in best_errors\n"; color=:red)
@@ -733,9 +751,10 @@ end
 println('\a') #beep
 sleep(1)
 #if global_midpoint_tracker is larger than 0, print it and say how many % higher it is than the global best
-#if global_midpoint_tracker > 0
-#    printstyled("global_midpoint_tracker = $(round(global_midpoint_tracker,digits=2)) ($(round(global_midpoint_tracker/global_best*100-100))% higher than global_best)\n"; color=:yellow)
-#end
+if global_midpoint_tracker > 0
+    printstyled("global_midpoint_tracker = $(round(global_midpoint_tracker,digits=2)) ($(round(global_midpoint_tracker/global_best*100-100))% higher than global_best)\n"; color=:yellow)
+    printstyled("This indicates that the threshold for skipping non-midpoints should be a bit higher than $(round(global_midpoint_tracker/global_best*100))% for $years_to_optimize years and $requested_sum_func\n"; color=:yellow)
+end
 println('\a') #beep
 
 for comb in all_combinations
@@ -764,7 +783,7 @@ seconds = rem ÷ 1000                                 # Milliseconds in a second
 # Format as string
 formatted_time = string(lpad(hours, 2, '0'), ":", lpad(minutes, 2, '0'), ":", lpad(seconds, 2, '0'))
 
-println("Done optimizing all combinations for $ref_folder at $(Dates.format(now(), "HH:MM:SS")) after $(formatted_time)")
+println("Done optimizing all combinations for $ref_folder at $(Dates.format(now(), "HH:MM:SS")) after $(formatted_time), spending $(round(mean(average_time_to_solve_per_thread),digits=1)) s per case on average")
 printstyled("The 3 best combinations are ($(years[1])-$(years[end])) [sum_func=$(sum_func)()]:\n", color=:cyan)
 println("best_errors is $(length(best_errors)) items long")
 global sorted_cases = sort(collect(best_errors), by=x->x[2])
