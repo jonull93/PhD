@@ -551,14 +551,15 @@ Threads.@threads for thread = 1:threads_to_start
             elseif requested_sum_func == "abs_sum"
                 function abs_sum(x)
                     diff = diff_sum_weighted_mats(matrices,x)
-                    if diff == false
-                        return 0
-                    end
-                    result = 0.0
-                    @inbounds @simd for i in eachindex(diff)
-                        result += abs(diff[i])
-                    end
-                    return result
+                    #if diff == false
+                    #    return 0
+                    #end
+                    #result = 0.0
+                    #@inbounds @simd for i in eachindex(diff)
+                    #    result += abs(diff[i])
+                    #end
+                    return sum(abs.(diff))
+                    #return result
                 end
                 return abs_sum(x) + weights_penalty(x, fixed_weights=years_not_optimized, slack_distance=0.007, amplitude=2e5)
             elseif requested_sum_func == "sqrt_sum"
@@ -630,6 +631,7 @@ Threads.@threads for thread = 1:threads_to_start
                     printstyled("  Thread $(thread) finished working on $(case) at $(Dates.format(now(), "HH:MM:SS")), after $(round(Dates.now()-start_time,Dates.Second))\n"; color=:green)
                     printstyled("  Midpoint error was $(round(midpoint_error/global_best,digits=2)) of the global best\n"; color=:yellow)
                     #printstyled("  Error = $(round(best_guess[2],digits=1)) for $(round.(best_weights[case],digits=3))\n"; color=:white)
+                    printstyled("Global best so far = $(round(global_best))\n"; color=:magenta)
                 end
             end
             lock(print_lock) do
@@ -652,9 +654,6 @@ Threads.@threads for thread = 1:threads_to_start
                         end
                     end
                     =#
-                end
-                if thread == 1
-                    printstyled("Global best so far = $(round(global_best))\n"; color=:magenta)
                 end
             end
         else # if the maxtime is not less than maxtime_manual, use the BBOptim.jl package
