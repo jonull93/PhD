@@ -35,6 +35,11 @@ timestamp = Dates.format(now(), "u_dd_HH.MM.SS")
 printstyled("\n ############# -- Starting fingerprintmatching.jl at $(timestamp) -- ############# \n"; color=:yellow)
 start_time = Dates.now()
 const print_lock = ReentrantLock()
+#if the script was started with more than 5 threads, print a warning in red and later reduce the number of threads to 5
+if Threads.nthreads() > 5
+    printstyled("Warning: more than 5 threads are being used, this has no benefit on the results!\n"; color=:red)
+    printstyled("Setting the max number of threads to 5..\n"; color=:red)
+end
 
 #set parameters
 amplitude_resolution = 1
@@ -58,7 +63,7 @@ ref_folder = find_max_ref_folder("./output")
 #ref_folder = "ref14"
 
 maxtime = 60*1 # 60*30=30 minutes
-algs_size = "adaptive" # "small" or "large" or "single" or "adaptive"
+algs_size = "single" # "small" or "large" or "single" or "adaptive"
 years_per_combination = 3
 import_combinations = false
 requested_sum_func = "sse" # "abs_sum" or "sqrt_sum" or "log_sum" or "sse"
@@ -107,9 +112,14 @@ while true
         global years_to_optimize = years_to_add + simultaneous_extreme_years*optimize_all
         global optimize_all = years_to_optimize == years_per_combination
         printstyled("Using all extreme years at once \n"; color=:green)
-    elseif tryparse(Float32,input) != nothing
-        global maxtime = parse(Float32,input)*60
-        printstyled("Max time set to $(maxtime/60) minutes \n"; color=:green)
+    elseif tryparse(Float32,input) != nothing || (input[end]=='s' && tryparse(Float32,input[1:end-1]) != nothing)
+        if input[end] == 's'
+            global maxtime = parse(Float32,input[1:end-1])
+            printstyled("Max time set to $(maxtime) seconds \n"; color=:green)
+        else
+            global maxtime = parse(Float32,input)*60
+            printstyled("Max time set to $(maxtime/60) minutes \n"; color=:green)
+        end
     elseif input == "o"
         global optimize_all = years_to_optimize == years_per_combination
         global years_to_optimize = years_to_add + simultaneous_extreme_years*optimize_all
@@ -320,7 +330,7 @@ end
 #dequeue!(queue)  # remove the second element
 #print number of all_combinations
 println("Number of combinations: $(length(queue))")
-threads_to_start = min(length(queue),cores)
+threads_to_start = min(length(queue),cores,5)
 consequtive_runs = div(length(queue),threads_to_start,RoundUp)
 for i in threads_to_start-1:-1:1
     if div(length(queue),threads_to_start-i,RoundUp) == consequtive_runs
@@ -599,7 +609,7 @@ Threads.@threads for thread = 1:threads_to_start
 
         local alg_solutions = Dict()
         # define paramters for maxtime and midpoint_factor_for_skipping
-        local maxtime_manual = 61
+        local maxtime_manual = 10 # seconds
         local midpoint_factor_for_skipping = 2.6 # from testing, it seems like 25% is about as much as the error can get improved (for abs_sum), though this decreases as the number of years increases
         # for sse, the improvement seems like it can be a lot higher!
         if maxtime < maxtime_manual
@@ -634,7 +644,7 @@ Threads.@threads for thread = 1:threads_to_start
             if thread == 1
                 lock(print_lock) do
                     printstyled("  Thread $(thread) finished working on $(case) at $(Dates.format(now(), "HH:MM:SS")), after $((Dates.now()-start_time)/Dates.Millisecond(1000)) s\n"; color=:green)
-                    printstyled("  Midpoint error was $(round(midpoint_error/global_best,digits=2)) of the global best\n"; color=:yellow)
+                    #printstyled("  Midpoint error was $(round(midpoint_error/global_best,digits=2)) of the global best\n"; color=:yellow)
                     #printstyled("  Error = $(round(best_guess[2],digits=1)) for $(round.(best_weights[case],digits=3))\n"; color=:white)
                     printstyled("Global best so far = $(round(global_best))\n"; color=:magenta)
                 end
@@ -677,8 +687,8 @@ Threads.@threads for thread = 1:threads_to_start
                 #print the next line only if thread==1
                 if thread == 1
                     printstyled("Trying $(alg) with bounds = $bounds and $(length(initial_guesses[1])) dims\n"; color=:yellow)
-                    hours_to_solve = Int(div(length(queue)*maxtime/60/threads_to_start*length(BBO_algs),60))
-                    minutes_to_solve = round((length(queue)*maxtime/60/threads_to_start*length(BBO_algs))%60)
+                    hours_to_solve = Int(div((length(queue)/threads_to_start+1)*maxtime/60*length(BBO_algs),60))
+                    minutes_to_solve = round(((length(queue)/threads_to_start+1)*maxtime/60*length(BBO_algs))%60)
                     printstyled("Estimated time left: $(hours_to_solve)h$(minutes_to_solve)m\n"; color=:yellow)
                 end
                 local res
@@ -753,7 +763,7 @@ sleep(1)
 #if global_midpoint_tracker is larger than 0, print it and say how many % higher it is than the global best
 if global_midpoint_tracker > 0
     printstyled("global_midpoint_tracker = $(round(global_midpoint_tracker,digits=2)) ($(round(global_midpoint_tracker/global_best*100-100))% higher than global_best)\n"; color=:yellow)
-    printstyled("This indicates that the threshold for skipping non-midpoints should be a bit higher than $(round(global_midpoint_tracker/global_best*100))% for $years_to_optimize years and $requested_sum_func\n"; color=:yellow)
+    printstyled("This indicates that the threshold for skipping non-midpoints should be a bit higher than $(round(global_midpoint_tracker/global_best),digits=2) for $years_to_optimize years and $requested_sum_func\n"; color=:yellow)
 end
 println('\a') #beep
 
@@ -783,7 +793,7 @@ seconds = rem ÷ 1000                                 # Milliseconds in a second
 # Format as string
 formatted_time = string(lpad(hours, 2, '0'), ":", lpad(minutes, 2, '0'), ":", lpad(seconds, 2, '0'))
 
-println("Done optimizing all combinations for $ref_folder at $(Dates.format(now(), "HH:MM:SS")) after $(formatted_time), spending $(round(mean(average_time_to_solve_per_thread),digits=1)) s per case on average")
+println("Done optimizing all combinations for $ref_folder at $(Dates.format(now(), "HH:MM:SS")) after $(formatted_time), spending $(round(mean(average_time_to_solve_per_thread),digits=2)) s per case on average")
 printstyled("The 3 best combinations are ($(years[1])-$(years[end])) [sum_func=$(sum_func)()]:\n", color=:cyan)
 println("best_errors is $(length(best_errors)) items long")
 global sorted_cases = sort(collect(best_errors), by=x->x[2])
@@ -799,7 +809,7 @@ catch e
     printstyled("!Error: $(e)\n", color=:red)
 end
 # Save the results as a .json file
-folder_name = "results\\$ref_folder/FP $sum_func $timestamp $(years_per_combination)yr"
+folder_name = "results\\$ref_folder/FP $sum_func $timestamp $(years_per_combination)yr $simultaneous_extreme_years eyrs"
 mkpath(folder_name)
 
 results = Dict("combinations" => all_combinations, "best_weights" => best_weights,
@@ -817,7 +827,7 @@ open(best_case_filename, "w") do f
     write(f, "")# You can write any content related to the best case here if needed
 end
 #Create a file named after the maxtime
-maxtime_filename = joinpath(folder_name, "Maxtime= $maxtime")
+maxtime_filename = joinpath(folder_name, "Maxtime= $maxtime, avg_time=$(round(mean(average_time_to_solve_per_thread),digits=2)), threads=$(threads_to_start)")
 open(maxtime_filename, "w") do f
     write(f, "")# You can write any content related to the maxtime here if needed
 end

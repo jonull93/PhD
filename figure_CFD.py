@@ -526,7 +526,8 @@ def initiate(ref_folder):
             queue_years.put(i)
             continue
     for year in years_iter2:
-        if not make_fingerprinted_figures: queue_years.put(year)
+        if True:#not make_fingerprinted_figures: 
+            queue_years.put(year)
         continue
     print("Queue contains", queue_years.qsize(), "years")
     threads = {}
