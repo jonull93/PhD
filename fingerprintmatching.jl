@@ -763,7 +763,7 @@ sleep(1)
 #if global_midpoint_tracker is larger than 0, print it and say how many % higher it is than the global best
 if global_midpoint_tracker > 0
     printstyled("global_midpoint_tracker = $(round(global_midpoint_tracker,digits=2)) ($(round(global_midpoint_tracker/global_best*100-100))% higher than global_best)\n"; color=:yellow)
-    printstyled("This indicates that the threshold for skipping non-midpoints should be a bit higher than $(round(global_midpoint_tracker/global_best),digits=2) for $years_to_optimize years and $requested_sum_func\n"; color=:yellow)
+    printstyled("This indicates that the threshold for skipping non-midpoints should be a bit higher than $(round(global_midpoint_tracker/global_best,digits=2)) for $years_to_optimize years and $requested_sum_func\n"; color=:yellow)
 end
 println('\a') #beep
 
