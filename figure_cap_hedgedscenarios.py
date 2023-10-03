@@ -200,7 +200,9 @@ def prettify_scenario_name(name):
         opt = parts[1][0]
         extra = f" ({parts[-1]})" if len(parts) == 3 and parts[-1]!="mean" else "" 
         if "2012" in extra:
-            return f"Alt. start {name[0]} HP + {opt} opt." 
+            return f"{name[0]} HP + {opt} opt. (2012)" 
+        elif "evenweights" in extra:
+            extra = ", eq. w."
         return f"{name[0]} HP + {opt} opt.{extra}" 
     if "allyears" in name:
         return "All years"

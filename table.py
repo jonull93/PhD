@@ -9,7 +9,7 @@ def get_pickle_file(default_options=True):
 # Ask the user which pickle file from PickleJar to load. Default option is file that was created last.
     directory = "PickleJar"
     pickle_files = [os.path.join(directory, f) for f in os.listdir(directory) if f.endswith(".pickle")]
-    pickle_files.sort(key=os.path.getmtime)
+    pickle_files.sort(key=os.path.getmtime, reverse=True)
     if not default_options:
         print_yellow("Choose a pickle file to load:\n")
         for i, f in enumerate(pickle_files, start=1):
@@ -55,7 +55,7 @@ def load_pickle_file(pickle_file, default_options=True):
 
 def select_indicators(data, default_options=True):
     # list the indicators in Data and ask the user whether some should be removed
-    default_indicators = ["stochastic_probability","cost_tot", "cost_variable", "cost_newinv", "cost_OMfix", "bio_use"]
+    default_indicators = ["stochastic_probability","cost_tot", "cost_variable", "bio_use"] #"cost_newinv", "cost_OMfix", 
     if not default_options:
         print_yellow("Which indicators should be included in the table? ('all' / 'item1, item2..' /'none')")
         print_yellow("[Default option (''): Total cost as well as each year's variable cost and bio use]")
@@ -65,9 +65,11 @@ def select_indicators(data, default_options=True):
             print_yellow("The following indicators are used:")
             if choice == "":
                 indicators = default_indicators
+                print(indicators)
                 break
             elif choice == "all":
                 indicators = list(data[list(data.keys())[0]].keys())
+                print(indicators)
                 break
             elif choice == "none":
                 indicators = []
@@ -75,6 +77,7 @@ def select_indicators(data, default_options=True):
             else:
                 try:
                     indicators = choice.replace("[", "").replace("]", "").replace(" ", "").split(",")
+                    print(indicators)
                     break
                 except:
                     print_red("Invalid choice")
@@ -88,25 +91,77 @@ def make_df(data, indicators, default_options=True):
     # the index should have two levels: scenario (keys from the data dictionary) and profile_year (index level name found in some indicators)
     # the columns should be the indicators
     
+    def shorten_year(scenario):
+        # define a function to be used in re.sub
+        def replacer(match):
+            return "'" + match.group()[-2:]
+
+        # use re.sub to replace all occurrences of 4-digit years
+        return re.sub(r'(19|20)\d{2}', replacer, scenario).removeprefix("singleyear_")
+
+    def prettify_scenario_name(name):
+        #print_yellow(f"Prettifying scenario name: {name}")
+        if "set1" in name:
+            #print_yellow("Set 1 scenario detected")
+            # turn set1_4opt into Set 1 (4 opt.)
+            nr = name.split("_")[1].replace("opt", "")
+            alt = " alt."*('alt' in name)
+            even = ", eq. w."*('even' in name)
+            if "even" in name: nr = 4
+            return f"2 HP + {nr}{alt} opt." + even # 2 opt., 2 HP
+        if "HP" in name and "opt" in name:
+            parts = name.split("_")
+            opt = parts[1][0]
+            extra = f" ({parts[-1]})" if len(parts) == 3 and parts[-1]!="mean" else "" 
+            if "2012" in extra:
+                return f"{name[0]} HP + {opt} opt. (2012)" 
+            elif "evenweights" in extra:
+                extra = ", eq. w."
+            return f"{name[0]} HP + {opt} opt.{extra}" 
+        if "allyears" in name:
+            return "All years"
+        if "allopt" in name:
+            # turn allopt2_final into All opt. (2 yr), and allopt2_final_a into All opt. (2 yr) a
+            nr = name.split("_")[0].replace("allopt", "")
+            if len(name.split("_")) == 3:
+                abc = name.split("_")[2]
+                abc = f" ({abc})"
+            else:
+                abc = ""
+            return f"{nr} opt.{abc}"
+        if "iter2_3" in name:
+            return "Set (1 opt.)"
+        elif "iter3_16start" in name:
+            return "Set (2 opt.)"
+        if "singleyear" in name:
+            # turn 'singleyear_1989to1990_1h' into "'89-'90" using regex
+            return shorten_year(name)
+        # remove 'base' and 'extreme' and split into a list
+        parts = name.replace('base', '').replace('extreme', ' ').split()
+        if "v2" in name or "_5_" in name:
+            return f'Alt. set ({parts[0]} opt.)'
+        elif "even" in name:
+            return f'6 yr, eq. weights'
+        # join the parts with appropriate labels
+        return f'Set ({parts[0]} opt.)'
+    
     def prettify_scenario_name(name,year):
         if "singleyear" not in name:
-            # change labels from "base#extreme#" (where # is a number) to "#b #e"
-            temp_label = f"{name.replace(year,'').replace('_tight','').replace('_1h','')}"
-            if "base" in temp_label and "extreme" in temp_label:
-                # remove 'base' and 'extreme' and split into a list
-                parts = name.replace('base', '').replace('extreme', ' ').split()
-                print_magenta(f"Renaming {name}")
-                # join the parts with appropriate labels
-                if "v2" in name or "_5_" in name:
-                    return f'Alt. set ({parts[0]} opt.)'
-                return f'Set ({parts[0]} opt.)'
+            if "HP" in name and "opt" in name:
+                parts = name.split("_")
+                opt = parts[1][0]
+                extra = f" ({parts[-1]})" if len(parts) == 3 and parts[-1]!="mean" else "" 
+                if "2012" in extra:
+                    return f"{name[0]} HP + {opt} opt. (2012)" 
+                elif "evenweights" in extra:
+                    extra = ", eq. w."
+                return f"{name[0]} HP + {opt} opt.{extra}" 
             elif "iter2_3" in temp_label:
                 return "Set (1 opt.)"
             elif "iter3_16start" in temp_label:
                 return "Set (2 opt.)"
         else:
             return "Single year"
-
 
     scenarios = list(data.keys())
     all_dfs = {}
@@ -120,8 +175,8 @@ def make_df(data, indicators, default_options=True):
         for ind in ind_data.keys():
             if ind in ["cost_newinv","cost_OMfix"]:
                 ind_data[ind] = ind_data[ind].sum(axis=None)
-        print_blue(ind_data["cost_newinv"])
-        print_green(ind_data["cost_variable"])
+        if "cost_newinv" in indicators: print_blue(ind_data["cost_newinv"])
+        if "cost_variable" in indicators: print_green(ind_data["cost_variable"])
         # find the profile_years
         profile_years = "ba"
         for ind in ind_data.keys():

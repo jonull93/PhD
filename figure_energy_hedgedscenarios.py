@@ -2,9 +2,9 @@ import os
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-import glob
-import re
-from my_utils import color_dict, tech_names, print_red, print_cyan, print_green, print_magenta, print_blue, print_yellow, select_pickle
+#import glob
+#import re
+from my_utils import color_dict, tech_names, prettify_scenario_name, shorten_year, print_red, print_cyan, print_green, print_magenta, print_blue, print_yellow, select_pickle
 from order_cap import wind, PV, baseload, peak, CCS, CHP, midload, hydro, PtH, order_cap, order_cap2, order_cap3
 from datetime import datetime
 
@@ -28,14 +28,6 @@ techs_to_exclude = PtH + ["Electrolyser", "electrolyser", "H", "b", "H_CHP", "B_
 storage_techs = ["bat", "H2store"]
 storage_techs = storage_techs + [tech_names[t] for t in storage_techs if t in tech_names]
 
-def shorten_year(scenario):
-    # define a function to be used in re.sub
-    def replacer(match):
-        return "'" + match.group()[-2:]
-
-    # use re.sub to replace all occurrences of 4-digit years
-    return re.sub(r'(19|20)\d{2}', replacer, scenario)
-
 
 def load_data(pickle_file, use_defaults):
     # Load the pickle file
@@ -43,7 +35,6 @@ def load_data(pickle_file, use_defaults):
     
     # Handle scenario selection
     all_scenarios = list(data.keys())
-    print(f"All scenarios: {all_scenarios}")
     
     selected_scenarios = []
     if use_defaults:
@@ -62,12 +53,19 @@ def load_data(pickle_file, use_defaults):
                 break
     else:
         # Let the user exclude some scenarios
-        excluded = input("Please enter the scenarios you want to exclude, separated by commas (or H for the hardcoded list): ").split(',')
+        print(f"All scenarios:")
+        for i_s, s in enumerate(all_scenarios):
+            print(f"{i_s+1}. {s}")
+        excluded = input("Please give the numbers of the scenarios you want to exclude, separated by commas (or H for the hardcoded list): ").split(',')
         if excluded == ['H'] or excluded == ['h']:
             # Use the hardcoded list
             selected_scenarios = [] # Replace with the hardcoded list
         else:
-            excluded = [s.strip() for s in excluded]  # Remove leading/trailing spaces
+            # Convert to integers
+            excluded = [int(s.strip()) for s in excluded]
+            # Convert to scenario names
+            excluded = [all_scenarios[i-1] for i in excluded]
+            #excluded = [s.strip() for s in excluded]  # Remove leading/trailing spaces
             selected_scenarios = [s for s in all_scenarios if s not in excluded]
 
     # Handle alternative scenarios
@@ -91,7 +89,7 @@ def load_data(pickle_file, use_defaults):
 
     # Remove "ref_cap" from scenario names 
     selected_data = {s.replace("ref_cap_", ""): selected_data[s] for s in selected_data.keys()}
-    selected_data = {s.replace("singleyear_", ""): selected_data[s] for s in selected_data.keys()}
+    #selected_data = {s.replace("singleyear_", ""): selected_data[s] for s in selected_data.keys()}
     selected_data = {s.replace("to", "-"): selected_data[s] for s in selected_data.keys()}
     #selected_data = {s.replace("iter", "base1extreme2_"): selected_data[s] for s in selected_data.keys()}
     for s in selected_data.copy().keys():
@@ -134,44 +132,6 @@ def load_data(pickle_file, use_defaults):
     return combined_series
 
 
-def prettify_scenario_name(name,year):
-    if "set1" in name:
-        #print_yellow("Set 1 scenario detected")
-        # turn set1_4opt into Set 1 (4 opt.)
-        nr = name.split("_")[1].replace("opt", "")
-        alt = " alt."*('alt' in name)
-        even = ", eq. w."*('even' in name)
-        if "even" in name: nr = 4
-        return f"2 HP + {nr}{alt} opt." + even # 2 opt., 2 HP
-    if "allopt" in name:
-        # turn allopt2_final into All opt. (2 yr), and allopt2_final_a into All opt. (2 yr) a
-        nr = name.split("_")[0].replace("allopt", "")
-        if len(name.split("_")) == 3:
-            abc = name.split("_")[2]
-            abc = f" ({abc})"
-        else:
-            abc = ""
-        return f"{nr} opt.{abc}"
-    if "iter2" in name:
-        return "Set (1 opt.)"
-    elif "iter3" in name:
-        return "Set (2 opt.)"
-    if len(name.replace(year,'')) > 3:
-        # change labels from "base#extreme#" (where # is a number) to "#b #e"
-        temp_label = f"{name.replace(year,'').replace('_tight','').replace('_1h','')}"
-        if "base" in temp_label and "extreme" in temp_label:
-            # remove 'base' and 'extreme' and split into a list
-            parts = name.replace('base', '').replace('extreme', ' ').split()
-            #print_magenta(f"Renaming {name}")
-            # join the parts with appropriate labels
-            if "v2" in name:
-                return f'Alt. set ({parts[0]} opt.)'
-            elif "even" in name:
-                return f'6 yr, eq. weights'
-            return f'Set ({parts[0]} opt.)'
-    else:
-        return "Single year"
-
 def group_technologies(data):
     result_list = []
     
@@ -202,7 +162,7 @@ def group_technologies(data):
             result_list.append((grouped_idx[0], grouped_idx[1], grouped_idx[2], value))
 
     # Swap the levels of the index to match the desired output structure and create series
-    result_list = [(year, prettify_scenario_name(scenario,year), tech, value) for scenario, year, tech, value in result_list]
+    result_list = [(year, prettify_scenario_name(scenario), tech, value) for scenario, year, tech, value in result_list]
     grouped_data = pd.Series((x[3] for x in result_list), index=pd.MultiIndex.from_tuples((x[0], x[1], x[2]) for x in result_list))
 
     return grouped_data
@@ -263,7 +223,6 @@ def create_figure(grouped_data, pickle_timestamp, use_defaults):
     # Order the bars according to order_cap
     # First get the current order of the first level of the index
     scenarios = combined_data.index.get_level_values(0).unique().tolist()
-    
     new_index = pd.MultiIndex.from_product([scenarios, order_cap3], names=['scenario', 'tech'])
     combined_data = combined_data.reindex(new_index)
     combined_data = combined_data.dropna(how='all')
@@ -282,14 +241,17 @@ def create_figure(grouped_data, pickle_timestamp, use_defaults):
 
     # Reindex the first level of the DataFrame's index based on the new scenario order
     combined_data = combined_data.reindex(scenarios, level=0)
-
+    print_red(combined_data)
     # Find all unique years
-    unique_years = combined_data.columns.get_level_values(0).unique()
-    years_to_add = ["1996-1997","2002-2003","2014-2015","2009-2010","2003-2004","1995-1996","1997-1998","2004-2005","2018-2019"]
-    years_to_add = [i for i in years_to_add if i in unique_years]
+    #unique_years = combined_data.columns.get_level_values(0).unique()
+    #years_to_add = ["1996-1997","2002-2003","2014-2015","2009-2010","2003-2004","1995-1996","1997-1998","2004-2005","2018-2019"]
+    #years_to_add = [i for i in years_to_add if i in unique_years]
                     #("1996-1997" in i or "2002-2003" in i or "2003-2004" in i or "2009-2010" in i or 
                     # "1995-1996" in i or "1997-1998" in i or "2004-2005" in i or "2018-2019" in i or 
                     # "2014-2015" in i)]
+    # make a a list years_to_add of all the years in combined_data where the indedx Single year has non-zero values
+    years_to_add = combined_data.loc['Single year'].columns[combined_data.loc['Single year'].any()].tolist()
+    print_magenta(f"Years to add: {years_to_add}")
 
     # Variables to collect all scenarios and their positions
     all_positions = []
@@ -329,10 +291,11 @@ def create_figure(grouped_data, pickle_timestamp, use_defaults):
 
     # Set new xticks and labels
     new_labels = []#[f"{f'{scenario}, '*(len(scenario.replace(year,''))>3)}" + f"{year}" for scenario, year in zip(all_scenarios, all_years)]
-    for scenario, year in zip(all_scenarios, all_years):
-        temp_label = prettify_scenario_name(scenario,year)
-        print_blue(f"Renaming {scenario} {year} to {temp_label}")
-        new_labels.append(temp_label)
+    #print(all_scenarios)
+    #for scenario, year in zip(all_scenarios, all_years):
+    #    temp_label = prettify_scenario_name(scenario,year)
+    #    print_blue(f"Renaming {scenario} {year} to {temp_label}")
+    #    new_labels.append(temp_label)
 
     ax1.set_xticks(all_positions)
     ax1.set_xticklabels(all_scenarios, rotation=35, ha='right', fontsize=9)
@@ -431,7 +394,9 @@ def main():
     print_cyan(f"Selected pickle file: {pickle_file}")
     data = load_data(pickle_file, use_defaults)
     print_yellow(f"Data loaded from pickle file")
-    print_yellow(f"Years in data: \n{data.index.get_level_values('year').unique()}")
+    print_yellow(f"Years in data:")
+    for s in data.index.get_level_values('year').unique():
+        print_yellow(f"{s}")
     grouped_data = group_technologies(data)
     print_green(f"Technologies grouped successfully")
     print_yellow(f"Grouped data: \n{grouped_data}")

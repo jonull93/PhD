@@ -540,7 +540,7 @@ def select_pickle(use_defaults, pickle_folder="PickleJar\\"):
         # Pick among the 10 most recent files
         print_yellow("Pick among the 10 most recent files:")
         for i, f in enumerate(pickle_files[:10]):
-            print_yellow(f"{i + 1}. {f}")
+            print(f"{i + 1}. " + f.split("\\")[-1])
         user_input = input("Please enter the option number: ")
         try:
             return pickle_files[int(user_input) - 1]
@@ -559,3 +559,61 @@ def select_pickle(use_defaults, pickle_folder="PickleJar\\"):
         else:
             print_red("The file was not found in the directory. Falling back to the most recent file.")
             return pickle_files[0]
+
+
+def shorten_year(scenario):
+    import re
+    # define a function to be used in re.sub
+    def replacer(match):
+        return "'" + match.group()[-2:]
+
+    # use re.sub to replace all occurrences of 4-digit years
+    return re.sub(r'(19|20)\d{2}', replacer, scenario)
+
+
+def prettify_scenario_name(name,return_single_as_year=False):
+    #print_yellow(f"Prettifying scenario name: {name}")
+    if "set1" in name:
+        #print_yellow("Set 1 scenario detected")
+        # turn set1_4opt into Set 1 (4 opt.)
+        nr = name.split("_")[1].replace("opt", "")
+        alt = " alt."*('alt' in name)
+        even = ", eq. w."*('even' in name)
+        if "even" in name: nr = 4
+        return f"2 HP + {nr}{alt} opt." + even # 2 opt., 2 HP
+    if "HP" in name and "opt" in name:
+        parts = name.split("_")
+        opt = parts[1][0]
+        extra = f" ({parts[-1]})" if len(parts) == 3 and parts[-1]!="mean" else "" 
+        if "2012" in extra:
+            return f"{name[0]} HP + {opt} opt. (2012)" 
+        elif "evenweights" in extra:
+            extra = ", eq. w."
+        return f"{name[0]} HP + {opt} opt.{extra}" 
+    if "allyears" in name:
+        return "All years"
+    if "allopt" in name:
+        # turn allopt2_final into All opt. (2 yr), and allopt2_final_a into All opt. (2 yr) a
+        nr = name.split("_")[0].replace("allopt", "")
+        if len(name.split("_")) == 3:
+            abc = name.split("_")[2]
+            abc = f" ({abc})"
+        else:
+            abc = ""
+        return f"{nr} opt.{abc}"
+    if "iter2_3" in name:
+        return "Set (1 opt.)"
+    elif "iter3_16start" in name:
+        return "Set (2 opt.)"
+    if "singleyear" in name:
+        # turn 'singleyear_1989to1990_1h' into "'89-'90" using regex
+        if return_single_as_year: return shorten_year(name)
+        return "Single year"
+    # remove 'base' and 'extreme' and split into a list
+    parts = name.replace('base', '').replace('extreme', ' ').split()
+    if "v2" in name or "_5_" in name:
+        return f'Alt. set ({parts[0]} opt.)'
+    elif "even" in name:
+        return f'6 yr, eq. weights'
+    # join the parts with appropriate labels
+    return f'Set ({parts[0]} opt.)'
