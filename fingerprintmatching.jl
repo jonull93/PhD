@@ -63,6 +63,7 @@ ref_folder = find_max_ref_folder("./output")
 #ref_folder = "ref14"
 
 maxtime = 60*1 # 60*30=30 minutes
+autotime = false
 algs_size = "single" # "small" or "large" or "single" or "adaptive"
 years_per_combination = 3
 import_combinations = false
@@ -84,7 +85,7 @@ while true
     optimize_all = $(optimize_all),
     requested_sum_func = $(requested_sum_func),
     ref_folder = $(ref_folder)
-        - Enter a number to set the max number of minutes for each optimization
+        - Enter a number to set the max number of minutes for each optimization (5-10 min recommended)
           (<= 1 min will start a 'manual' search of the starting points to filter out the bad combinations)
         - Enter 'single', 'small', 'adaptive' or 'large' to change the size of the algorithm
         - Enter '#years' (e.g 4years) to change the number of years in each combination
@@ -112,12 +113,18 @@ while true
         global years_to_optimize = years_to_add + simultaneous_extreme_years*optimize_all
         global optimize_all = years_to_optimize == years_per_combination
         printstyled("Using all extreme years at once \n"; color=:green)
-    elseif tryparse(Float32,input) != nothing || (input[end]=='s' && tryparse(Float32,input[1:end-1]) != nothing)
+    elseif tryparse(Float32,input) != nothing || (input[end]=='s' && tryparse(Float32,input[1:end-1]) != nothing) || input == "auto"
         if input[end] == 's'
             global maxtime = parse(Float32,input[1:end-1])
+            global autotime = false
             printstyled("Max time set to $(maxtime) seconds \n"; color=:green)
+        elseif input == "auto"
+            global maxtime = years_per_combination+1
+            global autotime = true
+            printstyled("Max time set to $(maxtime/60) minutes \n"; color=:green)
         else
             global maxtime = parse(Float32,input)*60
+            global autotime = false
             printstyled("Max time set to $(maxtime/60) minutes \n"; color=:green)
         end
     elseif input == "o"
@@ -142,6 +149,8 @@ while true
         global years_to_optimize = years_to_add + simultaneous_extreme_years*optimize_all
         global optimize_all = years_to_optimize == years_per_combination
         printstyled("Years per combination set to $years_per_combination, $years_to_add years to add from list\n"; color=:green)
+        autotime && global maxtime = years_per_combination+1
+        printstyled("Max time set to $(maxtime/60) minutes \n"; color=:green)
     elseif occursin(r"^\d+ey$", input)
         global simultaneous_extreme_years = parse(Int, replace(input, "ey" => ""))
         global years_to_add = years_per_combination - simultaneous_extreme_years
@@ -694,7 +703,7 @@ Threads.@threads for thread = 1:threads_to_start
                 local res
                 try
                     res = bboptimize(opt_func, initial_guesses; method=alg, NumDimensions=years_to_optimize,
-                                        SearchRange=bounds, MaxTime=maxtime, TraceInterval=2, TraceMode=:silent) #TargetFitness=88355.583298,FitnessTolerance=0.0001
+                                        SearchRange=bounds, MaxTime=maxtime, TraceInterval=60, TraceMode=:compact) #TargetFitness=88355.583298,FitnessTolerance=0.0001
                 catch e
                     println("$case, $alg failed with error: \n$e")
                     println("retrying..")

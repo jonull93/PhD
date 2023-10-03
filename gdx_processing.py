@@ -75,6 +75,7 @@ if __name__ == "__main__":
             #"singleyear_1990to1991_1h", 
             # years to include: ['89', '95', '96', '97', '02', '03', '04', '09', '10', '18']
             #"singleyear_1989to1990_1h",
+            "singleyear_1993to1994_1h",
             "singleyear_1995to1996_1h",
             "singleyear_1996to1997_1h", "singleyear_2002to2003_1h",
             #"singleyear_1997to1998_1h", "singleyear_2003to2004_1h",
@@ -86,7 +87,7 @@ if __name__ == "__main__":
             # 82-83 and 10-11
             "singleyear_1982to1983_1h", "singleyear_2010to2011_1h",
             #"set1_1opt", "set1_2opt", "set1_3opt", "set1_4opt" "2HP_3opt_a", "2HP_3opt_b", 
-            "2HP_1opt", "2HP_2opt","2HP_3opt_mean", "2HP_4opt", "2HP_5opt",
+            "2HP_1opt", "2HP_2opt","2HP_3opt_mean", "2HP_4opt", "2HP_5opt", "2HP_6opt",
             "allyears",
             ]
     cases2 = [
@@ -97,11 +98,13 @@ if __name__ == "__main__":
         #"allopt4_final_a", "allopt4_final_b", 
         "allopt4_final",
         "allyears",
+        "singleyear_1995to1996_1h",
+        "singleyear_1996to1997_1h", "singleyear_2002to2003_1h",
         "singleyear_1h_2012", "singleyear_2016to2017_1h", #start-points
     ]
     cases3 = [
         "2HP_1opt", "2HP_1opt_2012start",
-        "2HP_2opt", "2HP_2opt_b",
+        "2HP_2opt", "2HP_2opt_b", "2HP_2opt_evenweights",
         "2HP_3opt_a", "2HP_3opt_b",  "2HP_3opt_mean",
 
         #"set1_4opt_alt",
@@ -115,6 +118,22 @@ if __name__ == "__main__":
     cases_test = [
         "2HP_1opt_2012start", "2HP_1opt"
     ]
+    cases_manyyears = [
+        "singleyear_1995to1996_1h",
+        "singleyear_1996to1997_1h", "singleyear_2002to2003_1h",
+        "singleyear_1h_2012", "singleyear_2016to2017_1h", #start-points
+        #‘93-’94	’99-’00	‘00-’01	‘03-’04	‘10-’11	‘11-’12
+        "singleyear_1993to1994_1h", "singleyear_1999to2000_1h", "singleyear_2000to2001_1h", "singleyear_2003to2004_1h", "singleyear_2010to2011_1h", "singleyear_2011to2012_1h",
+        #‘90-’91	‘94-’95	’08-’09	‘15-’16
+        "singleyear_1990to1991_1h", "singleyear_1994to1995_1h", "singleyear_2008to2009_1h", "singleyear_2015to2016_1h",
+        # ‘12-’13	‘13-’14
+        "singleyear_2012to2013_1h", "singleyear_2013to2014_1h",
+        #‘00-’01	‘16-’17
+        "singleyear_2000to2001_1h",
+        #‘01-’02
+        "singleyear_2001to2002_1h",
+        "allyears"
+    ]
     #cases = cases1
     # instead of setting cases manually, prompt the user to select a set of cases
     print("Select a set of cases to run:")
@@ -122,8 +141,9 @@ if __name__ == "__main__":
     print("2: allopt (2HP + allopt + allyears)")
     print("3: alt (2HP_alt + single years + allyears)")
     print('4: test ("2HP_1opt_2012start", "2HP_1opt")')
+    print("5: manyyears (many single years+ allyears)")
     cases = []
-    while cases not in [cases1, cases2, cases3, cases_test]:
+    while cases not in [cases1, cases2, cases3, cases_test, cases_manyyears]:
         cases = input("Enter a number: ")
         if cases == "1":
             cases = cases1
@@ -137,8 +157,12 @@ if __name__ == "__main__":
         elif cases == "4":
             cases = cases_test
             suffix = "_test"
+        elif cases == "5":
+            cases = cases_manyyears
+            suffix = "_manyyears"
         else:
             print("Invalid input")
+    cases = list(set(cases))  # remove duplicates
 
     #cases = ["singleyear_"+str(year)+"to"+str(year+1)+"_1h" for year in range(1980, 2018)]
 
@@ -231,7 +255,7 @@ if __name__ == "__main__":
             print_red("OBS: EXCEL FILE MAY BE OPEN - PLEASE CLOSE IT BEFORE SCRIPT FINISHES ", e)
 
 # Unfortunately, global variables can only be used within the same file, so not all functions can be imported
-def crawl_gdx(q_gdx, q_excel, old_data, gdxpath, overwrite, todo_gdx_len, new_data, files, thread_nr, run_output, indicators, errors, excel):
+def crawl_gdx(q_gdx, q_excel, old_data, gdxpath, overwrite, todo_gdx_len, new_data, files, thread_nr, run_output, indicators, errors, excel, replace_with_alternative_solver_if_missing=False, alternative_solutions=[]):
     # Assign a unique identifier for the process
     pid = multiprocessing.current_process().pid
 
