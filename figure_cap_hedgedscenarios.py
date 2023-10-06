@@ -44,7 +44,7 @@ def shorten_year(scenario):
     return re.sub(r'(19|20)\d{2}', replacer, scenario).removeprefix("singleyear_")
 
 
-def load_data(pickle_file, use_defaults):
+def load_data(pickle_file, use_defaults=False):
     # Load the pickle file
     data = pd.read_pickle(pickle_file)
     

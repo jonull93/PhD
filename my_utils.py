@@ -506,7 +506,7 @@ def completion_sound():
         Beep(note, duration)
 
 
-def select_pickle(use_defaults, pickle_folder="PickleJar\\"):
+def select_pickle(use_defaults=False, pickle_folder="PickleJar\\"):
     import glob
     pickle_files = glob.glob(os.path.join(pickle_folder, "data_results_*.pickle"))
     if not pickle_files:
