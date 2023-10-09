@@ -363,6 +363,10 @@ def short_scen(scen):
     shortened_scen = shortened_scen.replace("tight", "t")
     shortened_scen = shortened_scen.replace("base", "b")
     shortened_scen = shortened_scen.replace("extreme", "e")
+    shortened_scen = shortened_scen.replace("singleyear", "year")
+    shortened_scen = shortened_scen.replace("flexlim", "flim")
+    shortened_scen = shortened_scen.replace("gurobi", "grbi")
+
     return shortened_scen
 
 def excel(scen:str, data, row, writer, indicators):

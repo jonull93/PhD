@@ -134,6 +134,23 @@ if __name__ == "__main__":
         "singleyear_2001to2002_1h",
         "allyears"
     ]
+    cases_allyears = [
+        "allyears",
+        "singleyear_1980to1981_1h_flexlim_gurobi", "singleyear_1981to1982_1h_flexlim_gurobi","singleyear_1982to1983_1h_flexlim_gurobi",
+        "singleyear_1983to1984_1h_flexlim_gurobi", "singleyear_1984to1985_1h_flexlim_gurobi","singleyear_1985to1986_1h_flexlim_gurobi",
+        "singleyear_1986to1987_1h_flexlim_gurobi", "singleyear_1987to1988_1h_flexlim_gurobi","singleyear_1988to1989_1h_flexlim_gurobi",
+        "singleyear_1989to1990_1h_flexlim_gurobi", "singleyear_1990to1991_1h_flexlim_gurobi","singleyear_1991to1992_1h_flexlim_gurobi",
+        "singleyear_1992to1993_1h_flexlim_gurobi", "singleyear_1993to1994_1h_flexlim_gurobi","singleyear_1994to1995_1h_flexlim_gurobi",
+        "singleyear_1995to1996_1h_flexlim_gurobi", "singleyear_1996to1997_1h_flexlim_gurobi","singleyear_1997to1998_1h_flexlim_gurobi",
+        "singleyear_1998to1999_1h_flexlim_gurobi", "singleyear_1999to2000_1h_flexlim_gurobi","singleyear_2000to2001_1h_flexlim_gurobi",
+        "singleyear_2001to2002_1h_flexlim_gurobi", "singleyear_2002to2003_1h_flexlim_gurobi","singleyear_2003to2004_1h_flexlim_gurobi",
+        "singleyear_2004to2005_1h_flexlim_gurobi", "singleyear_2005to2006_1h_flexlim_gurobi","singleyear_2006to2007_1h_flexlim_gurobi",
+        "singleyear_2007to2008_1h_flexlim_gurobi", "singleyear_2008to2009_1h_flexlim_gurobi","singleyear_2009to2010_1h_flexlim_gurobi",
+        "singleyear_2010to2011_1h_flexlim_gurobi", "singleyear_2011to2012_1h_flexlim_gurobi","singleyear_2012to2013_1h_flexlim_gurobi",
+        "singleyear_1h_2012",
+        "singleyear_2013to2014_1h_flexlim_gurobi", "singleyear_2014to2015_1h_flexlim_gurobi","singleyear_2015to2016_1h_flexlim_gurobi",
+        "singleyear_2016to2017_1h_flexlim_gurobi", "singleyear_2017to2018_1h_flexlim_gurobi","singleyear_2018to2019_1h_flexlim_gurobi",
+    ]
     #cases = cases1
     # instead of setting cases manually, prompt the user to select a set of cases
     print("Select a set of cases to run:")
@@ -142,8 +159,9 @@ if __name__ == "__main__":
     print("3: alt (2HP_alt + single years + allyears)")
     print('4: test ("2HP_1opt_2012start", "2HP_1opt")')
     print("5: manyyears (many single years+ allyears)")
+    print("6: allyears (all years + allyears)")
     cases = []
-    while cases not in [cases1, cases2, cases3, cases_test, cases_manyyears]:
+    while cases not in [cases1, cases2, cases3, cases_test, cases_manyyears, cases_allyears]:
         cases = input("Enter a number: ")
         if cases == "1":
             cases = cases1
@@ -160,6 +178,9 @@ if __name__ == "__main__":
         elif cases == "5":
             cases = cases_manyyears
             suffix = "_manyyears"
+        elif cases == "6":
+            cases = cases_allyears
+            suffix = "_allyears"
         else:
             print("Invalid input")
     cases = list(set(cases))  # remove duplicates

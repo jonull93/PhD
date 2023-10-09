@@ -406,7 +406,7 @@ def get_sheet_name():
     print_cyan("Getting sheet name from input\\cap_ref.xlsx")
     sheets = pd.ExcelFile("input\\cap_ref.xlsx").sheet_names
     # make sheet_name the name of the sheet that starts with "ref" and has the highest number after it
-    sheet_name = "ref" + str(max([int(i[3:]) for i in sheets if i.startswith("ref")]))
+    sheet_name = "ref" + str(max([int(i[3:6]) for i in sheets if i.startswith("ref") and i[3:6].isdigit()]))
     #sheet_name = "ref16"
     return sheet_name
 
@@ -634,7 +634,8 @@ def get_demand_as_df(year, regions, reseamed=False):
 
 def separate_years(years, VRE_tech, VRE_tech_name_dict, filenames, profile_keys, capacity_keys, fig_path, regions,
                    VRE_groups, sites, non_traditional_load, electrified_heat_demand, pickle_path,
-                   add_nontraditional_load=True, make_profiles=False, make_figure=False, window_size_days=3,threshold=False):
+                   add_nontraditional_load=True, make_profiles=False, make_figure=False, window_size_days=3,threshold=False,
+                   longest_period=False):
     print_cyan(f"Starting the 'separate_years()' script")
     if type(years) == type(1980): years = [years]
     for year in years:
@@ -693,18 +694,21 @@ def separate_years(years, VRE_tech, VRE_tech_name_dict, filenames, profile_keys,
             print_cyan("Making figure..",replace_this_line=True)
             plt.plot(prepped_tot_demand, color="gray", linestyle="-", label="Total load")
             plt.plot(prepped_tot_demand-heat_demand_to_add, color="darkviolet", linestyle=":",
-                     label="Load (excl. new heat)", linewidth=0.5)
+                     label="Trad. load + new ind. + transp.", linewidth=0.5)
             plt.plot(demand.sum(axis=1), color="hotpink", linestyle=":",
                      label="Traditional load", linewidth=0.5)
             plt.axhline(y=mean(net_load), color="black", linestyle="-.", label="Average net load")
             plt.plot(fast_rolling_average(net_load, 24 * window_size_days), label="Net load (roll. mean, 3d)")
             if threshold: plt.axhline(y=threshold_to_beat, color="red", label=f"{threshold*100:.0f}% of peak load")
-            plt.axvline(x=max_val_start, color="red", label="Start of longest period")
+            if longest_period: plt.axvline(x=max_val_start, color="red", label="Start of longest period")
             plt.xticks(range(0, 8760, 730),
                        labels=["Jan.", "Feb.", "Mar.", "Apr.", "May", "Jun.", "Jul.", "Aug.",
                                "Sep.", "Oct.", "Nov.", "Dec."])
-            plt.title(
-                f"Longest event in Year {year} is: {round(max(high_netload_durations) / 24)} days and starts day {round(max_val_start / 24)}")
+            if longest_period:
+                plt.title(
+                    f"Longest event in Year {year} is: {round(max(high_netload_durations) / 24)} days and starts day {round(max_val_start / 24)}")
+            else:
+                plt.title(f"Year {year}")
             plt.ylabel("Load [GW]")
             plt.xlabel("Date")
             plt.legend()
@@ -722,7 +726,7 @@ def separate_years(years, VRE_tech, VRE_tech_name_dict, filenames, profile_keys,
     return net_load
 
 
-def plot_reseamed_years(years, threshold=False, window_size_days=3, skip_netload=False):
+def plot_reseamed_years(years, threshold=False, window_size_days=3, skip_netload=False, longest_period=False):
     print_cyan(f"Starting the 'plot_reseamed_years()' script")
     # make a plot, similar to separate_years, but with the reseamed data found in netload_components_YEAR1-YEAR2.pickle
     # build a list of year combinations, e.g. "1980-1981", "1981-1982", "1982-1983", etc.
@@ -779,7 +783,8 @@ def plot_reseamed_years(years, threshold=False, window_size_days=3, skip_netload
             plt.plot(fast_rolling_average(net_load, 24 * window_size_days), label=f"Net load (roll. mean, {window_size_days}d)")
             if threshold:
                 plt.axhline(y=threshold_to_beat, color="red", label=f"{threshold * 100:.0f}% of peak load")
-            plt.axvline(x=max_val_start, color="red", label="Start of longest period")
+            if longest_period:
+                plt.axvline(x=max_val_start, color="red", label="Start of longest period")
         else:
             # set ymin to 0
             plt.ylim(bottom=0)
@@ -896,12 +901,13 @@ def combined_years(years, VRE_tech, VRE_tech_name_dict, filenames, profile_keys,
 if __name__ == "__main__":
     all_cap, VRE_groups, VRE_tech, VRE_tech_dict, VRE_tech_name_dict, years, reseamed_years, sites, region_name, regions, \
         non_traditional_load, filenames, profile_keys, capacity_keys, fig_path, pickle_path, electrified_heat_demand \
-        = initiate_parameters("ref23")
+        = initiate_parameters("ref7")
     #separate_years(2012, make_figure=True, make_output=True)
     #make_heat_profiles()
     #make_hydro_profiles()
-    #separate_years(years, VRE_tech_name_dict, filenames, profile_keys, capacity_keys, fig_path, regions, VRE_groups,
-    #               sites, non_traditional_load, electrified_heat_demand, pickle_path, make_profiles=False, make_figure=True)
+    separate_years(years, VRE_tech, VRE_tech_name_dict, filenames, profile_keys, capacity_keys,
+                                    fig_path, regions, VRE_groups, sites, non_traditional_load, electrified_heat_demand,
+                                    pickle_path, make_profiles=False, make_figure=True)
     #combined_years(years, VRE_tech, VRE_tech_name_dict, filenames, profile_keys, regions,
     #               VRE_groups, sites, non_traditional_load, electrified_heat_demand, pickle_path,)
     #combined_years(range(1980,1982))
