@@ -901,13 +901,15 @@ def combined_years(years, VRE_tech, VRE_tech_name_dict, filenames, profile_keys,
 if __name__ == "__main__":
     all_cap, VRE_groups, VRE_tech, VRE_tech_dict, VRE_tech_name_dict, years, reseamed_years, sites, region_name, regions, \
         non_traditional_load, filenames, profile_keys, capacity_keys, fig_path, pickle_path, electrified_heat_demand \
-        = initiate_parameters("ref7")
+        = initiate_parameters("ref334_out")
     #separate_years(2012, make_figure=True, make_output=True)
     #make_heat_profiles()
     #make_hydro_profiles()
     separate_years(years, VRE_tech, VRE_tech_name_dict, filenames, profile_keys, capacity_keys,
                                     fig_path, regions, VRE_groups, sites, non_traditional_load, electrified_heat_demand,
                                     pickle_path, make_profiles=False, make_figure=True)
+    combined_years(years, VRE_tech, VRE_tech_name_dict, filenames, profile_keys, regions,
+                VRE_groups, sites, non_traditional_load, electrified_heat_demand, pickle_path,)
     #combined_years(years, VRE_tech, VRE_tech_name_dict, filenames, profile_keys, regions,
     #               VRE_groups, sites, non_traditional_load, electrified_heat_demand, pickle_path,)
     #combined_years(range(1980,1982))

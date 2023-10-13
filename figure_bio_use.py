@@ -60,10 +60,12 @@ if __name__ == "__main__":
     # each tech has a different efficiency which we must divide that generation by: CHP=0.492604, peak=0.420606, WG=0.610606
     efficiency = {"WG": 0.610606, "WG_peak": 0.420606, "WG_CHP": 0.492604}
     time_resolution_modifier = data[model_run]["TT"]
+    print_magenta(f"  Time resolution modifier: {time_resolution_modifier}")
     # the biomass use is calculated as generation divided by efficiency
     df = data[model_run]["gen"].loc[["WG", "WG_peak", "WG_CHP"]]
+    #print(df)
     #sum over regions and filter out the correct years
-    dfs_per_year = {y: df.xs(y, level="stochastic_scenarios").groupby(level="tech").sum().div(efficiency,axis=0).mul(time_resolution_modifier) for y in years}
+    dfs_per_year = {y: df.xs(y, level="stochastic_scenarios").fillna(0).groupby(level="tech").sum().div(efficiency,axis=0).mul(time_resolution_modifier) for y in years}
     #print(yearly_dfs[years[0]].sum().sum())
     hourly_bio_use = {y: dfs_per_year[y].sum() for y in years}
     def plot_bio_use():
@@ -112,28 +114,34 @@ if __name__ == "__main__":
         # make a new series with the hourly bio use for all years in consecutive order
         bio_use_allyears = pd.Series(dtype=float)
         bio_use_allyears = pd.concat([hourly_bio_use[y]/1000 for y in hourly_bio_use.keys()])
-        bio_use_allyears.index = pd.MultiIndex.from_product([years, hourly_bio_use[years[0]].index])
+        bio_use_allyears.index = pd.MultiIndex.from_product([years, hourly_bio_use[years[0]].index]) # 2920 timesteps, but correct total yearly value
         #make a new series representing a storage level, starting at 0 and being filled each hour by the total hourly bio use divided by total number of hours
         storage_level = pd.Series(dtype=float, index=bio_use_allyears.index)
-        total_bio_use = bio_use_allyears.sum()
-        hourly_bio_refill = total_bio_use / len(bio_use_allyears)
+        total_bio_use = bio_use_allyears.sum() # this one is correct
+        print_red(f"Total bio use: {total_bio_use:.1f} TWh")
+        hourly_bio_refill = total_bio_use / len(years) / 8760 # this one is the correct hourly value, but may need to be adjusted to make the storage level work
+        print_red(f"Yearly bio refill: {hourly_bio_refill*8760:.1f} TWh")
         #storage_level[0] = 0
         #for i in range(1,len(bio_use_allyears)):
         #    storage_level[i] = storage_level[i-1] - bio_use_allyears[i-1] + hourly_bio_refill
         #vectorize the above
-        storage_level = (hourly_bio_refill - bio_use_allyears).cumsum()
-        print_red(storage_level[:5])
+        storage_level = (hourly_bio_refill*time_resolution_modifier - bio_use_allyears).cumsum()
+        #print_red(storage_level[:5])
         storage_level = storage_level.shift(1).fillna(0)
-        print_red(storage_level[:5])
+        #print_red(storage_level[:5])
         #adjust the storage series so that no values are below 0
         storage_level -= storage_level.min()
-        print_red(storage_level[:5])
+        #print_red(storage_level[:5])
         #plot the storage_level
         print(f"Max storage level: {storage_level.max():.1f} TWh")
         print(f"Biogas refilled per year: {hourly_bio_refill*8760:.0f} TWh")
+        #identify the year with the lowest and highest consumption
+        min_year = bio_use_allyears.groupby(level=0).sum().idxmin()
+        max_year = bio_use_allyears.groupby(level=0).sum().idxmax()
         # for each year, print the min and max storage level
         for y in years:
-            print(f"{y}: min={storage_level.loc[y].min():.0f} TWh, max={storage_level.loc[y].max():.0f} TWh, consumed={bio_use_allyears.loc[y].sum()*time_resolution_modifier:.1f} TWh")
+            print(f"{y}: min={storage_level.loc[y].min():.0f} TWh, max={storage_level.loc[y].max():.0f} TWh, consumed={bio_use_allyears.loc[y].sum():.1f} TWh")
+        print(f"Min year: {min_year}, max year: {max_year}")
         # plot the allyears data
         fig, ax = plt.subplots()
         #ax.plot(bio_use_allyears, label="Biogas use")
