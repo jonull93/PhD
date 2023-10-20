@@ -113,14 +113,18 @@ while true
         global years_to_optimize = years_to_add + simultaneous_extreme_years*optimize_all
         global optimize_all = years_to_optimize == years_per_combination
         printstyled("Using all extreme years at once \n"; color=:green)
-    elseif tryparse(Float32,input) != nothing || (input[end]=='s' && tryparse(Float32,input[1:end-1]) != nothing) || input == "auto"
+    elseif tryparse(Float32,input) != nothing || (input[end]=='s' && tryparse(Float32,input[1:end-1]) != nothing) || input == "full" || input == "brief"
         if input[end] == 's'
             global maxtime = parse(Float32,input[1:end-1])
             global autotime = false
             printstyled("Max time set to $(maxtime) seconds \n"; color=:green)
-        elseif input == "auto"
+        elseif input == "full"
             global maxtime = years_per_combination+1
             global autotime = true
+            printstyled("Max time set to $(maxtime/60) minutes \n"; color=:green)
+        elseif input == "brief"
+            global maxtime = 0.2
+            global autotime = false
             printstyled("Max time set to $(maxtime/60) minutes \n"; color=:green)
         else
             global maxtime = parse(Float32,input)*60
@@ -621,6 +625,7 @@ Threads.@threads for thread = 1:threads_to_start
         local maxtime_manual = 10 # seconds
         local midpoint_factor_for_skipping = 2.6 # from testing, it seems like 25% is about as much as the error can get improved (for abs_sum), though this decreases as the number of years increases
         # for sse, the improvement seems like it can be a lot higher!
+        requested_sum_func != "sse" && (midpoint_factor_for_skipping = 1.7)
         if maxtime < maxtime_manual
             if thread == 1 && global_best > 1e9
                 lock(print_lock) do
@@ -703,7 +708,7 @@ Threads.@threads for thread = 1:threads_to_start
                 local res
                 try
                     res = bboptimize(opt_func, initial_guesses; method=alg, NumDimensions=years_to_optimize,
-                                        SearchRange=bounds, MaxTime=maxtime, TraceInterval=60, TraceMode=:compact) #TargetFitness=88355.583298,FitnessTolerance=0.0001
+                                        SearchRange=bounds, MaxTime=maxtime, TraceInterval=60, TraceMode=:silent) #TargetFitness=88355.583298,FitnessTolerance=0.0001
                 catch e
                     println("$case, $alg failed with error: \n$e")
                     println("retrying..")
