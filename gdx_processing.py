@@ -151,6 +151,16 @@ if __name__ == "__main__":
         "singleyear_2013to2014_1h_flexlim_gurobi", "singleyear_2014to2015_1h_flexlim_gurobi","singleyear_2015to2016_1h_flexlim_gurobi",
         "singleyear_2016to2017_1h_flexlim_gurobi", "singleyear_2017to2018_1h_flexlim_gurobi","singleyear_2018to2019_1h_flexlim_gurobi",
     ]
+    cases_truerefmixed = [
+        "2HP_1opt_trueref", "2HP_2opt_trueref", "2HP_3opt_trueref", "2HP_4opt_trueref",
+        "singleyear_1996to1997_1h_trueref", "singleyear_2002to2003_1h_trueref", "singleyear_1h_2012_trueref", "singleyear_2016to2017_1h_trueref",
+        "allyears",
+    ]
+    cases_truerefall = [
+        "2HP_1opt_trueref", "2HP_2opt_trueref", "2HP_3opt_trueref", "2HP_4opt_trueref",
+        "2opt_trueref", "3opt_trueref", "4opt_trueref", "5opt_trueref",
+        "allyears",
+    ]
     #cases = cases1
     # instead of setting cases manually, prompt the user to select a set of cases
     print("Select a set of cases to run:")
@@ -160,8 +170,10 @@ if __name__ == "__main__":
     print('4: test ("2HP_1opt_2012start", "2HP_1opt")')
     print("5: manyyears (many single years+ allyears)")
     print("6: allyears (all years + allyears)")
+    print("7: trueref_main (2HP_trueref + single years + allyears)")
+    print("8: trueref_all (2HP_trueref + allopt_trueref + allyears)")
     cases = []
-    while cases not in [cases1, cases2, cases3, cases_test, cases_manyyears, cases_allyears]:
+    while cases not in [cases1, cases2, cases3, cases_test, cases_manyyears, cases_allyears, cases_truerefmixed, cases_truerefall]:
         cases = input("Enter a number: ")
         if cases == "1":
             cases = cases1
@@ -181,6 +193,12 @@ if __name__ == "__main__":
         elif cases == "6":
             cases = cases_allyears
             suffix = "_allyears"
+        elif cases == "7":
+            cases = cases_truerefmixed
+            suffix = "_trueref_main"
+        elif cases == "8":
+            cases = cases_truerefall
+            suffix = "_trueref_all"
         else:
             print("Invalid input")
     cases = list(set(cases))  # remove duplicates
