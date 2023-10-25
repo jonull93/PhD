@@ -7,7 +7,7 @@ function optimize_jump(cfd_data, combos, params)
     cfd_mat = hcat((@view cfd_data[y][:] for y in years_list)...)
     ref_vect = @view ref_mat[:]
 
-    jumpmodel = Model(Gurobi.Optimizer)
+    jumpmodel = Model(Gurobi.Optimizer) # alternatively, you could install Pkg.add("Clp") and use Clp.Optimizer
 
     @variables jumpmodel begin
         0.0 <= Weight[1:nyears] <= 1.0
