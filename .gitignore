@@ -4,6 +4,7 @@ till_*
 *_old*
 
 !results/FP*
+!fingerprintmatching_includefiles/*
 !*.mat
 $*
 ~*
