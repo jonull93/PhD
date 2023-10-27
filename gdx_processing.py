@@ -152,13 +152,13 @@ if __name__ == "__main__":
         "singleyear_2016to2017_1h_flexlim_gurobi", "singleyear_2017to2018_1h_flexlim_gurobi","singleyear_2018to2019_1h_flexlim_gurobi",
     ]
     cases_truerefmixed = [
-        "2HP_1opt_trueref", "2HP_2opt_trueref", "2HP_3opt_trueref", "2HP_4opt_trueref",
+        "2HP_1opt_trueref", "2HP_2opt_trueref", "2HP_3opt_trueref", "2HP_4opt_trueref", "2HP_5opt_trueref", "2HP_6opt_trueref", "2HP_10opt_trueref",
         "singleyear_1996to1997_1h_trueref", "singleyear_2002to2003_1h_trueref", "singleyear_1h_2012_trueref", "singleyear_2016to2017_1h_trueref",
         "allyears",
     ]
     cases_truerefall = [
-        "2HP_1opt_trueref", "2HP_2opt_trueref", "2HP_3opt_trueref", "2HP_4opt_trueref",
-        "2opt_trueref", "3opt_trueref", "4opt_trueref", "5opt_trueref",
+        "2HP_1opt_trueref", "2HP_2opt_trueref", "2HP_3opt_trueref", "2HP_4opt_trueref", "2HP_5opt_trueref",
+        "allopt2_trueref", "allopt3_trueref", "allopt4_trueref", "allopt5_trueref",
         "allyears",
     ]
     #cases = cases1

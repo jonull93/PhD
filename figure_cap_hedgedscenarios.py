@@ -144,8 +144,10 @@ def load_data(pickle_file, use_defaults=False):
             print_yellow("Invalid input. Keeping all scenarios")
     if has_altscenarios and use_defaults:
         print_yellow("There are alternative scenarios in the data.")
-    # reorder the keys in alphabetical order, but with scenarios starting with set1.. first
-    sorted_keys = [s for s in selected_data.keys() if "set1" in s] + [s for s in selected_data.keys() if "set1" not in s]
+    # reorder the keys in alphabetical order
+    sorted_keys = {k: selected_data[k] for k in sorted(selected_data.keys())}
+    # movescenarios including "opt" first
+    sorted_keys = [s for s in sorted_keys.keys() if "opt" in s] + [s for s in sorted_keys.keys() if "opt" not in s]
     selected_data = {s: selected_data[s] for s in sorted_keys}
     selected_scenarios_to_print = "\n".join(selected_data.keys())
     print_blue(f"Selected scenarios: \n{selected_scenarios_to_print}")
@@ -199,6 +201,7 @@ def prettify_scenario_name(name):
         parts = name.split("_")
         opt = parts[1][0]
         extra = f" ({parts[-1]})" if len(parts) == 3 and parts[-1]!="mean" else "" 
+        if "trueref" in extra: extra = " *"
         if "2012" in extra:
             return f"{name[0]} HP + {opt} opt. (2012)" 
         elif "evenweights" in extra:
@@ -209,12 +212,15 @@ def prettify_scenario_name(name):
     if "allopt" in name:
         # turn allopt2_final into All opt. (2 yr), and allopt2_final_a into All opt. (2 yr) a
         nr = name.split("_")[0].replace("allopt", "")
-        if len(name.split("_")) == 3:
-            abc = name.split("_")[2]
-            abc = f" ({abc})"
-        else:
-            abc = ""
-        return f"{nr} opt.{abc}"
+        extra = f" ({name.split('_')[-1]})" if len(name.split('_'))>1 else ""
+        if "trueref" in extra: extra = " *"
+        #if len(name.split("_")) == 3:
+        #    abc = name.split("_")[2]
+        #    abc = f" ({abc})"
+        #else:
+        #    abc = ""
+        
+        return f"{nr} opt.{extra}"
     if "iter2_3" in name:
         return "Set (1 opt.)"
     elif "iter3_16start" in name:

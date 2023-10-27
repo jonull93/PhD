@@ -2,7 +2,7 @@
 # algs_size = "adaptive" # "small" or "large" or "single" or "adaptive"
 # sum_func = "sse" # "abs_sum" or "sqrt_sum" or "log_sum" or "sse"
 function getparameters(; maxtime=1, algs_size="single", years_per_set=3, import_sets=0, sum_func="sse",
-                        nr_extreme_yrs=2, outputfolder="./output")
+                        nr_extreme_yrs=2, outputfolder="./output", ref_folder=false,extreme_years=["2002-2003", "1996-1997"])
     start_time = Dates.now()
     print_lock = ReentrantLock()
 
@@ -11,12 +11,12 @@ function getparameters(; maxtime=1, algs_size="single", years_per_set=3, import_
     window = 12
     years = 1980:2018 # cannot include 2019
 
-    extreme_years = ["2002-2003", "1996-1997"]#["1986-1987","1989-1990"]["2002-2003", "1996-1997"]["1989-1990","2005-2006"]#["1984-1985", "1995-1996"]#["2010-2011","2002-2003",]
+    #extreme_years = ["2002-2003", "1996-1997"]#["1986-1987","1989-1990"]["2002-2003", "1996-1997"]["1989-1990","2005-2006"]#["1984-1985", "1995-1996"]#["2010-2011","2002-2003",]
     #extreme_years = ["1986-1987","1989-1990"]
     #extreme_years = ["1985-1986", "1996-1997"]
     #extreme_years = ["1995-1996", "1996-1997"]
 
-    ref_folder = find_max_ref_folder(outputfolder)
+    ref_folder == false && (ref_folder = find_max_ref_folder(outputfolder))
 
     years_to_add = years_per_set - nr_extreme_yrs # number of years to add to the extreme years for each combination
     years_to_optimize = years_to_add

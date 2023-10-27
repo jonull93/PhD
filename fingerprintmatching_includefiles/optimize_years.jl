@@ -222,7 +222,8 @@ function optimize_manual(cfd_data, combos, params)
                         end
                         global_midpoint_tracker *= best_guess[2]/global_best
                         global_best = best_guess[2]
-                        printstyled("-> New global best: $(round(best_guess[2])) for $case (midpoint was $midpoint_error_string of old best)\n"; color=:red)
+                        printstyled("-> New global best: $(round(Int,best_guess[2])) at $(Dates.format(now(), "HH:MM:SS")) for $case\n"; color=:red)
+                        printstyled("  Midpoint error was $midpoint_error_string of the best, and average time per case is now $(mean(time_to_solve_array))\n"; color=:yellow)
                     end
                 else
                     #printstyled("\n"; color=:white)

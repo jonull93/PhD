@@ -10,23 +10,21 @@ import Combinatorics: combinations
 import Statistics: mean
 using MAT, Optim, BlackBoxOptim, DataStructures, Dates, Printf, LinearAlgebra, Plots, JSON, XLSX, JuMP, Gurobi
 
-
 #=
 This script is currently set up to run with one or multiple heuristic optimization algorithms for a certain amount of time, then stop.
-To circumvent the issue of spending up to an hour per year-combination for up to 5e5 (5 out of 39 years) combinations, the script can
-be run for a very short time initially and then rerun for the 100 best combinations (after running figure_CFD.py inbetween).
+To circumvent the issue of spending minutes per year-combination for up to 5e5 (5 out of 39 years) combinations, the script can
+be run for a very short time (maxtime="brief") initially and then rerun for the 5/25/50 best combinations.
 
-A better solution would be to manually test all of the starting points (would probably take <1 second per combination) and then run the
-optimization algorithm for some longer duration for the best 5-10% of solutions. This would make the script more automatic and could
-ensure that the aborted optimization algorithm doesn't return a solution worse than the starting points (happens sometimes but is
-counteracted by long optimization times and multiple algorithms).
+A better solution would be to manually test all of the starting points (would probably take <1 second per combination) and then automatically 
+run the longer optimization (3-6 min) for the best solutions. This would make the script more automatic .
 =#
 
 #make it clear in the command prompt that the code is running
 timestamp = Dates.format(now(), "u_dd_HH.MM.SS")
-printstyled("\n ############# -- Loading fingerprintmatching.jl at $(timestamp) -- ############# \n"; color=:yellow)
-printstyled("To run the optimization, call the fpmatch() function possibly using the following optional arguments:\n", color=:white)
+printstyled("\n ############# -- Loaded fingerprintmatching.jl at $(timestamp) -- ############# \n"; color=:yellow)
+printstyled("To run the optimization, call the fpmatch() function\n", color=:white, bold=true)
 println("  use_jump=false, maxtime=Int/\"full\"/\"brief\", years_per_set=3, import_sets=0, sum_func=\"sse\"/\"abs_sum\", nr_extreme_yrs=2\n")
+println(" ex: fpmatch(use_jump=true,years_per_set=4,ref_folder=\"ref999\",extreme_years=[\"1996-1997\",\"2002-2003\"])")
 
 include("fingerprintmatching_includefiles/parameters.jl")
 include("fingerprintmatching_includefiles/year_combinations.jl")

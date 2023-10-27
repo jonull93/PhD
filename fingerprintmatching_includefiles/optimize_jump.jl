@@ -1,5 +1,5 @@
 function optimize_jump(cfd_data, combos, params)
-    (; years_to_optimize, extreme_years, nr_extreme_yrs) = params
+    (; years_to_optimize, extreme_years, nr_extreme_yrs, ref_folder) = params
     (; years_list, ref_mat) = combos
 
     nyears = length(years_list)
@@ -26,7 +26,7 @@ function optimize_jump(cfd_data, combos, params)
             sum(Weight) == 1.0
         
         Fix_number_of_active_years,
-            sum(Active_weight) == years_to_optimize + length(extreme_years[1:nr_extreme_yrs])
+            sum(Active_weight) == years_to_optimize + nr_extreme_yrs
     end
 
     @time @expression(jumpmodel, diff, cfd_mat * Weight - ref_vect/40)
@@ -39,7 +39,19 @@ function optimize_jump(cfd_data, combos, params)
     println("Objective: ", objective_value(jumpmodel) * 1e3)
 
     years = (value.(Active_weight) .== 1)
-    weights = value.(Weight[years])
+    weights = round.(value.(Weight[years]), digits=4)
     @show years_list[years]
     @show weights
+
+    println("Making folder and files..")
+    foldername = "results\\$ref_folder\\JuMP\\"
+    #make the folder and subfolders if they don't exist
+    mkpath(foldername)
+    #save the years and weights to a .txt file
+    open(foldername * "optimal set for $(years_to_optimize+nr_extreme_yrs)yrs $(nr_extreme_yrs)eyrs ($(round(Int,objective_value(jumpmodel)*1e3))).txt", "w") do io
+        for i in 1:length(years_list[years])
+            println(io, "$(years_list[years][i]): $(weights[i])")
+        end
+    end
+    
 end
