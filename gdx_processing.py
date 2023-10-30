@@ -43,7 +43,8 @@ if __name__ == "__main__":
                 'bat',
                 'bat_cap',
                 'H2store',
-    #              'EB', 'HP',
+                'EB', 'HP',
+                'FC',
                 ]
 
     scenario_prefix = "ref_cap" # prefix of scenario names in gdx files
@@ -150,10 +151,18 @@ if __name__ == "__main__":
         "singleyear_1h_2012",
         "singleyear_2013to2014_1h_flexlim_gurobi", "singleyear_2014to2015_1h_flexlim_gurobi","singleyear_2015to2016_1h_flexlim_gurobi",
         "singleyear_2016to2017_1h_flexlim_gurobi", "singleyear_2017to2018_1h_flexlim_gurobi","singleyear_2018to2019_1h_flexlim_gurobi",
+    ]    
+    cases_manyyears = [
+        "allyears",
+        #1992-1993, 2000-2001, 1989-1990, 1991-1992, 2015-2016, 1994-1995, 2008-2009, 2015-2016, 1996-1997, 2002-2003, 2012, 2016-2017
+        "singleyear_1992to1993_1h_flexlim_gurobi", "singleyear_2000to2001_1h_flexlim_gurobi", "singleyear_1989to1990_1h_flexlim_gurobi",
+        "singleyear_1991to1992_1h_flexlim_gurobi", "singleyear_2015to2016_1h_flexlim_gurobi", "singleyear_1994to1995_1h_flexlim_gurobi",
+        "singleyear_2008to2009_1h_flexlim_gurobi", "singleyear_2015to2016_1h_flexlim_gurobi", "singleyear_1996to1997_1h_flexlim_gurobi",
+        "singleyear_2002to2003_1h_flexlim_gurobi", "singleyear_2012_1h_flexlim_gurobi", "singleyear_2016to2017_1h_flexlim_gurobi",
     ]
     cases_truerefmixed = [
         "2HP_1opt_trueref", "2HP_2opt_trueref", "2HP_3opt_trueref", "2HP_4opt_trueref", "2HP_5opt_trueref", "2HP_6opt_trueref", "2HP_10opt_trueref",
-        "singleyear_1996to1997_1h_trueref", "singleyear_2002to2003_1h_trueref", "singleyear_1h_2012_trueref", "singleyear_2016to2017_1h_trueref",
+        "singleyear_1996to1997_1h_flexlim_gurobi", "singleyear_2002to2003_1h_flexlim_gurobi", "singleyear_2001to2002_1h_flexlim_gurobi", "singleyear_2012_1h_flexlim_gurobi", "singleyear_2016to2017_1h_flexlim_gurobi",
         "allyears",
     ]
     cases_truerefall = [

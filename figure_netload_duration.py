@@ -79,3 +79,37 @@ peak_per_year = peak_per_year.sort_values(by='net_load', ascending=False)
 print("The 5 years with the highest net load are:")
 for year in peak_per_year.index[:5]:
     print(f"{year}: {peak_per_year.loc[year].max():.2f} GW")
+
+#repeat the peak part, but reseam the years to e.g. 1980-1981 where the july-dec of 1980 is the first half and the jan-june of 1981 is the second half
+# step 1. restructure the netload_allyears dataframe have reseamed years
+years_list = [netload_allyears.index.levels[0][i] for i in range(len(netload_allyears.index.levels[0]))]
+reseamed_years = [f"{years_list[i]}-{years_list[i+1]}" for i in range(0,len(years_list)-1)]
+#netload_allyears_reseamed = netload_allyears.copy()
+
+#print(netload_allyears)
+reseamed_df = pd.DataFrame()
+
+# Iterate over unique years except the last one
+unique_years = netload_allyears.index.get_level_values(0).unique()
+for year in unique_years[:-1]:
+    # July-December of current year
+    first_half = netload_allyears.loc[year].iloc[4344:]
+    # January-June of next year
+    second_half = netload_allyears.loc[year+1].iloc[:4344]
+    
+    # Concatenate and add to the final DataFrame
+    combined_data = pd.concat([first_half, second_half])
+    combined_data.index = pd.MultiIndex.from_product([[f"{year}-{year+1}"], combined_data.index])
+    reseamed_df = pd.concat([reseamed_df, combined_data])
+
+# Display or save reseamed_df as needed
+#print(reseamed_df)
+
+# identify the 5 years with the highest net load
+peak_per_year = reseamed_df.groupby(level=0).max()
+# sort the years by the peak net load
+peak_per_year = peak_per_year.sort_values(by='net_load', ascending=False)
+# print the 5 years with the highest net load
+print("The 10 reseamed years with the highest net load are:")
+for year in peak_per_year.index[:10]:
+    print(f"{year}: {peak_per_year.loc[year].max():.2f} GW")

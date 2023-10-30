@@ -123,9 +123,7 @@ def load_data(pickle_file, use_defaults=False):
     # Remove "ref_cap" from scenario names 
     selected_data = {s.replace("ref_cap_", ""): selected_data[s] for s in selected_data.keys()}
     #selected_data = {s.replace("singleyear_", ""): selected_data[s] for s in selected_data.keys()}
-    selected_data = {s.replace("to", "-"): selected_data[s] for s in selected_data.keys()}
-    selected_data = {s.replace("_1h", ""): selected_data[s] for s in selected_data.keys()}
-    selected_data = {s.replace("_tight", ""): selected_data[s] for s in selected_data.keys()}
+    selected_data = {s.replace("to", "-").replace("_1h", "").replace("_tight", "").replace("_flexlim", "").replace("_gurobi", ""): selected_data[s] for s in selected_data.keys()}
 
     # has_altscenarios should be True if there are any scenarios with "v2" in the name
     has_altscenarios = any("v2" in s or "_5_" in s for s in selected_data.keys())
@@ -144,15 +142,33 @@ def load_data(pickle_file, use_defaults=False):
             print_yellow("Invalid input. Keeping all scenarios")
     if has_altscenarios and use_defaults:
         print_yellow("There are alternative scenarios in the data.")
-    # reorder the keys in alphabetical order
-    sorted_keys = {k: selected_data[k] for k in sorted(selected_data.keys())}
+    # reorder the keys in alphabetical order, but in a way where "10" comes after "9"
+    sorted_keys = sorted(selected_data.keys(), key=custom_sort)
     # movescenarios including "opt" first
-    sorted_keys = [s for s in sorted_keys.keys() if "opt" in s] + [s for s in sorted_keys.keys() if "opt" not in s]
+    #sorted_keys = [s for s in sorted_keys.keys() if "opt" in s] + [s for s in sorted_keys.keys() if "opt" not in s]
     selected_data = {s: selected_data[s] for s in sorted_keys}
     selected_scenarios_to_print = "\n".join(selected_data.keys())
     print_blue(f"Selected scenarios: \n{selected_scenarios_to_print}")
     return selected_data
 
+def custom_sort(item):
+    # "allyears" goes last
+    if "allyears" in item:
+        return (2, item)
+    
+    # "2HP.."
+    if "2HP" in item:
+        if "opt" in item:
+            opt_num = int(item.split("opt")[0].split("_")[-1])  # Extract the number before "opt"
+            return (0, opt_num, item)
+        return (0, 0, item)
+    
+    # "singleyear.."
+    if "singleyear" in item:
+        return (1, item)
+    
+    # Default: alphabetical order
+    return (0, 0, item)
 
 def group_technologies(data):
     # Create a dictionary of Series to hold the grouped data
@@ -199,7 +215,7 @@ def prettify_scenario_name(name):
         return f"2 HP + {nr}{alt} opt." + even # 2 opt., 2 HP
     if "HP" in name and "opt" in name:
         parts = name.split("_")
-        opt = parts[1][0]
+        opt = parts[1].replace("opt", "")
         extra = f" ({parts[-1]})" if len(parts) == 3 and parts[-1]!="mean" else "" 
         if "trueref" in extra: extra = " *"
         if "2012" in extra:
@@ -430,10 +446,12 @@ def create_figure_separated_techs(grouped_data, pickle_timestamp, use_defaults):
                 #if in the Battery or Hydrogen group, make the label text white
                 if group_name in ['Battery', 'Hydrogen']:
                     textcolor = 'white'
+                    textsize = 5+1*(len(group_data.columns)<11)
                 else:
                     textcolor = 'black'
+                    textsize = 6
                 label = conditional_label(bar, 10)
-                ax.text(bar.get_x() + bar.get_width() / 2, bar.get_y() + bar.get_height()-max_y*0.04, label, ha='center', va='center', fontsize=6, color=textcolor)
+                ax.text(bar.get_x() + bar.get_width() / 2, bar.get_y() + bar.get_height()-max_y*0.04, label, ha='center', va='center', fontsize=textsize, color=textcolor)
 
     # Add overall title, labels, legend etc. to your liking
     # Change the x-labels to be right-aligned
