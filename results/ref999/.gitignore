@@ -1,10 +1,9 @@
 # Ignore everything in this directory
-*
+#*
 # Except this file
 !.gitignore
-
-!**/
-
+!ref999/*
+!JuMP/*
 !*padded.mat
 !*small*
 !*compressed*
