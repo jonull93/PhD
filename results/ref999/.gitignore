@@ -3,7 +3,7 @@
 # Except this file
 !.gitignore
 !ref999/*
-!JuMP/*
+!JuMP/**
 !*padded.mat
 !*small*
 !*compressed*
