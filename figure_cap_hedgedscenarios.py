@@ -516,27 +516,23 @@ def create_whisker_plots(grouped_data, pickle_timestamp, techs_to_plot=None):
     # Extract the reference levels for 'allyears'
     reference_levels = grouped_data.get("allyears", pd.Series())
 
+    # Normalize the data such that the reference levels become 1
+    normalized_grouped_data = {key: data.div(reference_levels, axis=0).filter(items=techs_to_plot, axis=0) for key, data in grouped_data.items() if key != "allyears"}
+    reference_levels = reference_levels.filter(items=techs_to_plot, axis=0).div(reference_levels, axis=0)  # Should be all ones now
+
     # Create a directory for the whisker plots if it doesn't already exist
     if not os.path.exists('figures/whisker_plots'):
         os.makedirs('figures/whisker_plots')
 
-    # Prepare the data for whisker plots
-    individual_years_data = {}
-    sets_of_years_data = {}
-
-    # Split the data into individual years and sets of years
-    for key, data in grouped_data.items():
-        if 'singleyear' in key:
-            individual_years_data[key] = data
-        elif key != "allyears":  # Exclude 'allyears' from sets_of_years_data
-            sets_of_years_data[key] = data
+    # Split the normalized data into individual years and sets of years
+    individual_years_data = {key: data for key, data in normalized_grouped_data.items() if 'singleyear' in key}
+    sets_of_years_data = {key: data for key, data in normalized_grouped_data.items() if 'singleyear' not in key and "HP" in key}
 
     # Filter for selected technologies
-    individual_years_df = pd.DataFrame(individual_years_data).filter(items=techs_to_plot, axis=0)
-    sets_of_years_df = pd.DataFrame(sets_of_years_data).filter(items=techs_to_plot, axis=0)
-    reference_levels = reference_levels.filter(items=techs_to_plot, axis=0)
+    individual_years_df = pd.DataFrame(individual_years_data)
+    sets_of_years_df = pd.DataFrame(sets_of_years_data)
 
-    #print the dfs
+    # Print the dataframes
     print(f"{grouped_data.items()=}")
     print_yellow(f"Individual years data: \n{individual_years_df}")
     print_yellow(f"Sets of years data: \n{sets_of_years_df}")
@@ -545,29 +541,30 @@ def create_whisker_plots(grouped_data, pickle_timestamp, techs_to_plot=None):
     # Create a figure for the whisker plots
     fig, axs = plt.subplots(nrows=2, ncols=1, figsize=(8, 6))
 
-    # Generate whisker plots for individual years
-    axs[0].boxplot(individual_years_df.T, labels=techs_to_plot, vert=True, patch_artist=True)
-    axs[0].set_title('Individual Years')
-    axs[0].set_ylabel('Generation Capacity')
+    # Whisker settings
+    whisker_props = dict(whis=1.5, showfliers=True, sym="o")  # adjust as needed
 
-    # Mark reference levels for individual years
-    for idx, tech in enumerate(techs_to_plot):
-        if tech in reference_levels:
-            axs[0].plot([idx + 1], [reference_levels[tech]], 'ro')  # 'ro' is red circle marker
+    # Generate whisker plots for individual years
+    axs[0].boxplot(individual_years_df.T, labels=techs_to_plot, vert=True, patch_artist=True, **whisker_props)
+    axs[0].set_title('Individual weather-years')
+    axs[0].set_ylabel('Normalized installed')
+    axs[0].axhline(y=1, color='black', linestyle='-', linewidth=1)  # thin horizontal line
 
     # Generate whisker plots for sets of years
-    axs[1].boxplot(sets_of_years_df.T, labels=techs_to_plot, vert=True, patch_artist=True)
-    axs[1].set_title('Sets of Years')
-    axs[1].set_ylabel('Generation Capacity')
+    axs[1].boxplot(sets_of_years_df.T, labels=techs_to_plot, vert=True, patch_artist=True, **whisker_props)
+    axs[1].set_title('Sets of weather-years')
+    axs[1].set_ylabel('Normalized capacity')
+    axs[1].axhline(y=1, color='black', linestyle='-', linewidth=1)  # thin horizontal line
 
-    # Mark reference levels for sets of years
-    for idx, tech in enumerate(techs_to_plot):
-        if tech in reference_levels:
-            axs[1].plot([idx + 1], [reference_levels[tech]], 'ro')  # 'ro' is red circle marker
+    # Set the same y-limits for both axes
+    y_lims = [min(ax.get_ylim()[0] for ax in axs), max(ax.get_ylim()[1] for ax in axs)]
+    axs[0].set_ylim(y_lims)
+    axs[1].set_ylim(y_lims)
 
     # Add overall title and adjust layout
-    fig.suptitle('Whisker Plots of Power Generation Data')
-    fig.tight_layout(rect=[0, 0.03, 1, 0.95])
+    #fig.suptitle('Box plots of installed capacity (normalized to All years)')
+    #fig.tight_layout(rect=[0, 0.03, 1, 0.95])
+    fig.tight_layout()
 
     # Save the figure
     fig_name_base = f"figures/whisker_plots/{pickle_timestamp}"
@@ -579,7 +576,7 @@ def create_whisker_plots(grouped_data, pickle_timestamp, techs_to_plot=None):
     plt.close(fig)
 
     # Log the success message
-    print(f"Whisker plots saved as '{fig_name_base}_{fig_num}.png'.")
+    print(f"Normalized whisker plots saved as '{fig_name_base}_{fig_num}.png'.")
 
 def main():
     print_blue(f"Script started at: {datetime.now()}")
