@@ -402,12 +402,11 @@ def crawler(queue_years,thread_nr,amp_length,rolling_hours,area_mode_in_cfd,writ
         #queue_years.task_done()
     return None
 
-def initiate(ref_folder):
+def initiate(ref_folder,rolling_window=12):
     print_magenta(f"ref_folder: {ref_folder}")
     os.makedirs(f"figures\\CFD plots\\{ref_folder}", exist_ok=True)
 
     amp_length = 1
-    rolling_hours = 12
     test_mode = False
     write_pickle = not test_mode
     area_mode_in_cfd = True
@@ -419,7 +418,7 @@ def initiate(ref_folder):
     long_period = f"1980-2019"
 
     xmax= 0
-    xmin, xmax, ymin, ymax = main(long_period, ref_folder, amp_length=amp_length, rolling_hours=rolling_hours, area_mode_in_cfd=area_mode_in_cfd,
+    xmin, xmax, ymin, ymax = main(long_period, ref_folder, amp_length=amp_length, rolling_hours=rolling_window, area_mode_in_cfd=area_mode_in_cfd,
                                   write_files=True, read_pickle=True, debugging=debugging)
     print("Xmin =", xmin, "Xmax =", xmax, "Ymin =", ymin, "Ymax =", round(ymax, 1))
     queue_years = Queue(maxsize=0)
@@ -541,7 +540,7 @@ def initiate(ref_folder):
         #if errors is not defined, make it None
         if "errors" not in locals():
             errors = None
-        workers.append(Process(target=crawler, args=(queue_years,i,amp_length,rolling_hours,area_mode_in_cfd,write_pickle,read_pickle,xmin,xmax,ymin,ymax,sum_func,errors,ref_folder)))
+        workers.append(Process(target=crawler, args=(queue_years,i,amp_length,rolling_window,area_mode_in_cfd,write_pickle,read_pickle,xmin,xmax,ymin,ymax,sum_func,errors,ref_folder)))
         # setting threads as "daemon" allows main program to exit eventually even if these dont finish correctly
         workers[-1].start()
         tm.sleep(0.05)
@@ -552,4 +551,4 @@ def initiate(ref_folder):
 if __name__ == "__main__":
     ref_folder = get_ref_folder()
     #ref_folder = "ref23"
-    initiate(ref_folder)
+    initiate(ref_folder, rolling_window=48)

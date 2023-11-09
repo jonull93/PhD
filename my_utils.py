@@ -527,6 +527,7 @@ def select_pickle(use_defaults=False, pickle_folder="PickleJar\\"):
     print_yellow("2. Largest file")
     print_yellow("3. Pick among the 10 most recent files")
     print_yellow("4. Enter the filename manually")
+    print_yellow("5. A combination of the most recent allyears and allopt pickle files")
 
     user_input = input("Please enter the option number: ")
     if user_input == '1':
@@ -559,6 +560,11 @@ def select_pickle(use_defaults=False, pickle_folder="PickleJar\\"):
         else:
             print_red("The file was not found in the directory. Falling back to the most recent file.")
             return pickle_files[0]
+    elif user_input == '5':
+        # A combination of the most recent allyears and allopt pickle files
+        allyears_pickle = max([f for f in pickle_files if "allyears" in f], key=os.path.getmtime)
+        allopt_pickle = max([f for f in pickle_files if "allopt" in f], key=os.path.getmtime)
+        return [allyears_pickle, allopt_pickle]
 
 
 def shorten_year(scenario):

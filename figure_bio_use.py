@@ -134,11 +134,12 @@ if __name__ == "__main__":
         #print_red(storage_level[:5])
         #plot the storage_level
         print(f"Max storage level: {storage_level.max():.1f} TWh")
-        print(f"Biogas refilled per year: {hourly_bio_refill*8760:.0f} TWh")
+        print(f"Biogas refilled per year: {hourly_bio_refill*8760:.1f} TWh")
         #identify the year with the lowest and highest consumption
         min_year = bio_use_allyears.groupby(level=0).sum().idxmin()
         max_year = bio_use_allyears.groupby(level=0).sum().idxmax()
         # for each year, print the min and max storage level
+        print("Consumption per year in AllYears:")
         for y in years:
             print(f"{y}: min={storage_level.loc[y].min():.0f} TWh, max={storage_level.loc[y].max():.0f} TWh, consumed={bio_use_allyears.loc[y].sum():.1f} TWh")
         print(f"Min year: {min_year}, max year: {max_year}")
@@ -172,5 +173,27 @@ if __name__ == "__main__":
         plt.savefig(f"{figure_path}/biogas_storage_level_{i}.png", dpi=400)
         plt.savefig(f"{figure_path}/biogas_storage_level_{i}.svg")
         #plt.show()
+
+        print("All individual years: ")
+        biogas_individual_years = []
+        sorted_keys = sorted(data.keys())
+        for year in sorted_keys:
+            if "singleyear" not in year: continue # skip allyears and sets
+            #print the biogas use for each year
+            if "WG_CHP" in data[year]["gen"].index.get_level_values("tech").unique():
+                df = data[year]["gen"].loc[["WG", "WG_peak", "WG_CHP"]]
+                efficiency = {"WG": 0.610606, "WG_peak": 0.420606, "WG_CHP": 0.492604}
+            else:
+                df = data[year]["gen"].loc[["WG", "WG_peak"]]
+                efficiency = {"WG": 0.610606, "WG_peak": 0.420606}
+            df = df.fillna(0).groupby(level="tech").sum()
+            df = df.div(efficiency, axis="index").sum(axis=1)
+            year = year.replace("singleyear_", "").replace("1h_", "").replace("flexlim","").replace("_gurobi","").replace("to", "-")
+            print(f"{year}: {df.sum()/1000:.1f} TWh \t {(df.sum()/10/68.2-100):.0f}")
+            biogas_individual_years.append(df.sum())
+            #df = df.div(efficiency, axis="index")
+            #print(df)
+        print(f"Average biogas use: {sum(biogas_individual_years)/len(biogas_individual_years)/1000:.1f} TWh")
+
     else:
         plot_bio_use()
