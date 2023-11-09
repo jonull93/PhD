@@ -1,5 +1,5 @@
 function print_results(optresults, combos, params)
-    (; start_time, ref_folder, maxtime, years, years_to_optimize, years_per_set, sum_func, BBO_algs, extreme_years) = params
+    (; start_time, ref_folder, maxtime, years, years_to_optimize, years_per_set, sum_func, BBO_algs, extreme_years, nr_extreme_yrs) = params
     (; all_combinations) = combos
     (; global_best, global_midpoint_tracker, best_errors, best_weights, best_alg, opt_func_str, average_time_to_solve_per_thread) = optresults
 
@@ -55,7 +55,7 @@ function print_results(optresults, combos, params)
     end
     # Save the results as a .json file
     timestamp = Dates.format(start_time, "udd HH.MM.SS")
-    folder_name = "results\\$ref_folder/FP $sum_func $timestamp $(years_per_set)yr $(length(extreme_years))eyrs"
+    folder_name = "results\\$ref_folder/FP $sum_func $timestamp $(years_per_set)yr $(nr_extreme_yrs)eyrs"
     mkpath(folder_name)
 
     results = Dict("combinations" => all_combinations, "best_weights" => best_weights,
