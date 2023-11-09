@@ -46,7 +46,13 @@ def shorten_year(scenario):
 
 def load_data(pickle_file, use_defaults=False):
     # Load the pickle file
-    data = pd.read_pickle(pickle_file)
+    #aggregate the dictionaries if pickle_file is a list
+    if isinstance(pickle_file, list):
+        data = {}
+        for p in pickle_file:
+            data.update(pd.read_pickle(p))
+    else:
+        data = pd.read_pickle(pickle_file)
     
     # Handle scenario selection
     all_scenarios = list(data.keys())
@@ -503,6 +509,77 @@ def create_figure_separated_techs(grouped_data, pickle_timestamp, use_defaults):
     plt.close(fig)
 
 
+def create_whisker_plots(grouped_data, pickle_timestamp, techs_to_plot=None):
+    if techs_to_plot is None:
+        techs_to_plot = ["PV", "Wind", "U", "WG", "Peak", "H2store", "bat"]  # Default technologies
+    
+    # Extract the reference levels for 'allyears'
+    reference_levels = grouped_data.get("allyears", pd.Series())
+
+    # Create a directory for the whisker plots if it doesn't already exist
+    if not os.path.exists('figures/whisker_plots'):
+        os.makedirs('figures/whisker_plots')
+
+    # Prepare the data for whisker plots
+    individual_years_data = {}
+    sets_of_years_data = {}
+
+    # Split the data into individual years and sets of years
+    for key, data in grouped_data.items():
+        if 'singleyear' in key:
+            individual_years_data[key] = data
+        elif key != "allyears":  # Exclude 'allyears' from sets_of_years_data
+            sets_of_years_data[key] = data
+
+    # Filter for selected technologies
+    individual_years_df = pd.DataFrame(individual_years_data).filter(items=techs_to_plot, axis=0)
+    sets_of_years_df = pd.DataFrame(sets_of_years_data).filter(items=techs_to_plot, axis=0)
+    reference_levels = reference_levels.filter(items=techs_to_plot, axis=0)
+
+    #print the dfs
+    print(f"{grouped_data.items()=}")
+    print_yellow(f"Individual years data: \n{individual_years_df}")
+    print_yellow(f"Sets of years data: \n{sets_of_years_df}")
+    print_yellow(f"Reference levels: \n{reference_levels}")
+
+    # Create a figure for the whisker plots
+    fig, axs = plt.subplots(nrows=2, ncols=1, figsize=(8, 6))
+
+    # Generate whisker plots for individual years
+    axs[0].boxplot(individual_years_df.T, labels=techs_to_plot, vert=True, patch_artist=True)
+    axs[0].set_title('Individual Years')
+    axs[0].set_ylabel('Generation Capacity')
+
+    # Mark reference levels for individual years
+    for idx, tech in enumerate(techs_to_plot):
+        if tech in reference_levels:
+            axs[0].plot([idx + 1], [reference_levels[tech]], 'ro')  # 'ro' is red circle marker
+
+    # Generate whisker plots for sets of years
+    axs[1].boxplot(sets_of_years_df.T, labels=techs_to_plot, vert=True, patch_artist=True)
+    axs[1].set_title('Sets of Years')
+    axs[1].set_ylabel('Generation Capacity')
+
+    # Mark reference levels for sets of years
+    for idx, tech in enumerate(techs_to_plot):
+        if tech in reference_levels:
+            axs[1].plot([idx + 1], [reference_levels[tech]], 'ro')  # 'ro' is red circle marker
+
+    # Add overall title and adjust layout
+    fig.suptitle('Whisker Plots of Power Generation Data')
+    fig.tight_layout(rect=[0, 0.03, 1, 0.95])
+
+    # Save the figure
+    fig_name_base = f"figures/whisker_plots/{pickle_timestamp}"
+    fig_num = 1
+    while os.path.exists(f"{fig_name_base}_{fig_num}.png"):
+        fig_num += 1
+    fig.savefig(f"{fig_name_base}_{fig_num}.png", dpi=300)
+    fig.savefig(f"{fig_name_base}_{fig_num}.svg")  # or .eps for EPS format
+    plt.close(fig)
+
+    # Log the success message
+    print(f"Whisker plots saved as '{fig_name_base}_{fig_num}.png'.")
 
 def main():
     print_blue(f"Script started at: {datetime.now()}")
@@ -512,7 +589,12 @@ def main():
 
     print_blue(f"Script started at: {datetime.now()}")
     pickle_file = select_pickle(use_defaults)
-    pickle_timestamp = pickle_filename = os.path.basename(pickle_file).replace(".pickle", "").replace("data_results_", "")
+    if isinstance(pickle_file, list):
+        # use the most recently modified pickle file to determine the timestamp
+        pickle_file_for_timestamp = sorted(pickle_file, key=os.path.getmtime)[-1]
+        pickle_timestamp = "agg"+os.path.basename(pickle_file_for_timestamp).replace(".pickle", "").replace("data_results_", "")
+    else:
+        pickle_timestamp = os.path.basename(pickle_file).replace(".pickle", "").replace("data_results_", "")
     print_cyan(f"Selected pickle file: {pickle_file}")
     
     data = load_data(pickle_file, use_defaults)
@@ -520,7 +602,8 @@ def main():
     grouped_data = group_technologies(data)
     print_green(f"Technologies grouped successfully")
     #print_yellow(f"Grouped data: \n{grouped_data}")
-    create_figure_separated_techs(grouped_data, pickle_timestamp, use_defaults)
+    #create_figure_separated_techs(grouped_data, pickle_timestamp, use_defaults)
+    create_whisker_plots(grouped_data, pickle_timestamp)
     print_magenta(f"Figures created and saved in {figures_folder}")
     
     print_red(f"Script finished at: {datetime.now()}")
