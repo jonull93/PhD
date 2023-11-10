@@ -20,8 +20,8 @@ run the longer optimization (3-6 min) for the best solutions. This would make th
 =#
 
 #make it clear in the command prompt that the code is running
-timestamp = Dates.format(now(), "u_dd_HH.MM.SS")
-printstyled("\n ############# -- Loaded fingerprintmatching.jl at $(timestamp) -- ############# \n"; color=:yellow)
+timestamp = Dates.format(now(), "u_dd HH.MM.SS")
+printstyled("\n ------ Loaded fingerprintmatching.jl at $(timestamp) ------  \n"; color=:yellow)
 printstyled("To run the optimization, call the fpmatch() function\n", color=:white, bold=true)
 println("  use_jump=false, maxtime=Int/\"full\"/\"brief\", years_per_set=3, import_sets=0, sum_func=\"sse\"/\"abs_sum\", nr_extreme_yrs=2\n")
 println(" ex: fpmatch(use_jump=true,years_per_set=4,ref_folder=\"ref999\",extreme_years=[\"1996-1997\",\"2002-2003\"])")
@@ -38,6 +38,7 @@ function fpmatch(; use_jump=false, options...)
     params = getparameters(; options...)
     combos = makecombinations(use_jump, params)
     cfd_data = read_inputdata(combos, params)
+    printstyled("\n ------ Starting optimization at $(Dates.format(now(), "u_dd HH.MM.SS")) ------  \n"; color=:yellow)
     if use_jump
         @time results = optimize_jump(cfd_data, combos, params)
     else
