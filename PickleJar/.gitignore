@@ -4,7 +4,7 @@
 !.gitignore
 !/*/
 !/ref999/
-!*netload_df*
+#!*netload_df*
 #!*small*
-!netload_components_small_1980-2019*
+!netload_components_small_1980-2019*.blosc
 !*CFD_netload_df*.blosc

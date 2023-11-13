@@ -2,6 +2,7 @@
 !input/*
 till_*
 *_old*
+test*
 
 !results/FP*
 !fingerprintmatching_includefiles/*
