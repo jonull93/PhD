@@ -124,9 +124,9 @@ def run_case(scen_name, gdxpath, indicators, FC=False, print_FR_summary=False):
         for reg in new_cap.index.unique(1):
             if reg not in I_reg:
                 new_cap.drop(reg, level="I_reg", inplace=True)
-        for index, vals in new_cap.iterrows():
-            if (0 < vals.upper == vals.level) and index[0] not in VRE:
-                print_magenta(f" !! Found capped investment ({vals.level}) at {index} for {scen_name}")
+        for _index, vals in new_cap.iterrows():
+            if (0 < vals.upper == vals.level) and _index[0] not in VRE:
+                print_magenta(f" !! Found capped investment ({vals.level}) at {_index} for {scen_name}")
         gen = gdx(f, "o_generation")
         gen_per_eltech = gdx(f, "o_generation_el")
         el_price = gdx(f, "o_el_price")
@@ -179,6 +179,7 @@ def run_case(scen_name, gdxpath, indicators, FC=False, print_FR_summary=False):
         discharge = gdx(f, "v_discharge")
         charge = gdx(f, "v_charge")
         demand = gdx(f, "o_load")
+        yearly_elec_trade = gdx(f, "o_net_export").sum(axis=1).rename_axis(index=["exporter", "importer", "stochastic_scenarios"])
         inv_cost = gdx(f, "inv_cost")
         tech_revenue = gdx(f, "o_tech_revenue")
         tech_revenue_el = gdx(f, "o_tech_revenue_el")
