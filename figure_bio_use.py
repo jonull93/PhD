@@ -5,6 +5,18 @@ import time
 import pandas as pd
 import matplotlib.pyplot as plt
 
+def get_yearly_biogas_use(data,model_run):
+    efficiency = {"WG": 0.610606, "WG_peak": 0.420606, "WG_CHP": 0.492604}
+    time_resolution_modifier = data[model_run]["TT"]
+    print_magenta(f"  Time resolution modifier: {time_resolution_modifier}")
+    # the biomass use is calculated as generation divided by efficiency
+    df = data[model_run]["gen"].loc[["WG", "WG_peak", "WG_CHP"]]
+    years = list(df.index.get_level_values("stochastic_scenarios").unique())
+    #print(df)
+    #sum over regions and filter out the correct years
+    dfs_per_year = {y: df.xs(y, level="stochastic_scenarios").fillna(0).groupby(level="tech").sum().div(efficiency,axis=0).mul(time_resolution_modifier) for y in years}
+    return dfs_per_year
+    
 if __name__ == "__main__":
     print_magenta(f"Started {__file__} at {time.strftime('%H:%M:%S', time.localtime())}")
     print_magenta(f"Step 1: Select the pickle file to load biomass use from")
@@ -58,14 +70,7 @@ if __name__ == "__main__":
     # the I_regs should be combined
     # the "stochastic_scenarios" is the year
     # each tech has a different efficiency which we must divide that generation by: CHP=0.492604, peak=0.420606, WG=0.610606
-    efficiency = {"WG": 0.610606, "WG_peak": 0.420606, "WG_CHP": 0.492604}
-    time_resolution_modifier = data[model_run]["TT"]
-    print_magenta(f"  Time resolution modifier: {time_resolution_modifier}")
-    # the biomass use is calculated as generation divided by efficiency
-    df = data[model_run]["gen"].loc[["WG", "WG_peak", "WG_CHP"]]
-    #print(df)
-    #sum over regions and filter out the correct years
-    dfs_per_year = {y: df.xs(y, level="stochastic_scenarios").fillna(0).groupby(level="tech").sum().div(efficiency,axis=0).mul(time_resolution_modifier) for y in years}
+    dfs_per_year = get_yearly_biogas_use(data,model_run)
     #print(yearly_dfs[years[0]].sum().sum())
     hourly_bio_use = {y: dfs_per_year[y].sum() for y in years}
     def plot_bio_use():

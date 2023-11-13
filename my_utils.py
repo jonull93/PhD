@@ -506,30 +506,36 @@ def completion_sound():
         Beep(note, duration)
 
 
-def select_pickle(use_defaults=False, pickle_folder="PickleJar\\"):
+def select_pickle(predetermined_choice=False, pickle_folder="PickleJar\\"):
     import glob
     pickle_files = glob.glob(os.path.join(pickle_folder, "data_results_*.pickle"))
     if not pickle_files:
         print_red("No data_results_*.pickle file found in PickleJar folder.")
         return None
 
+    if predetermined_choice==True:
+        predetermined_choice = 1
     pickle_files.sort(key=os.path.getmtime, reverse=True)
     print_blue(f"Found {len(pickle_files)} data_results_*.pickle files.")
     print_blue(f"Most recent file: {pickle_files[0]}")
 
-    if use_defaults or len(pickle_files) == 1:
+    if predetermined_choice == 1 or len(pickle_files) == 1 or predetermined_choice == "most_recent":
         # Either use defaults or no appropriate pickle files were found, so just use the most recent file
         # most_recent_file = max(pickle_files, key=lambda x: os.path.getctime(pickle_folder + x))
         return pickle_files[0]
+    elif type(predetermined_choice) == int:
+        user_input = str(predetermined_choice)
+    elif predetermined_choice == "combine":
+        user_input = '5'
+    else:
+        print_yellow("Select the pickle file to load:")
+        print_yellow("1. Most recent file")
+        print_yellow("2. Largest file")
+        print_yellow("3. Pick among the 10 most recent files")
+        print_yellow("4. Enter the filename manually")
+        print_yellow("5. A combination of the most recent allyears and allopt pickle files")
+        user_input = input("Please enter the option number: ")
 
-    print_yellow("Select the pickle file to load:")
-    print_yellow("1. Most recent file")
-    print_yellow("2. Largest file")
-    print_yellow("3. Pick among the 10 most recent files")
-    print_yellow("4. Enter the filename manually")
-    print_yellow("5. A combination of the most recent allyears and allopt pickle files")
-
-    user_input = input("Please enter the option number: ")
     if user_input == '1':
         # Most recent file
         return pickle_files[0]  # The list is already sorted by modification time
