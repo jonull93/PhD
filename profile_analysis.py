@@ -7,7 +7,7 @@ import pandas as pd
 import numpy as np
 import os
 from statistics import mean
-from my_utils import fast_rolling_average, write_inc_from_df_columns, write_inc, print_red, print_green, print_cyan, print_yellow, print_magenta, print_blue
+from my_utils import fast_rolling_average, write_inc_from_df_columns, write_inc, print_red, print_green, print_cyan, print_yellow, print_magenta, print_blue, save_to_file, load_from_file
 from datetime import datetime
 
 print_cyan(f"Starting profile_analysis.py at {datetime.now().strftime('%d-%m-%Y, %H:%M:%S')}")
@@ -60,7 +60,7 @@ def make_heat_profiles(years="1980-2019"):
     df = df.reindex(columns=["region", "year", "hour", "heat_demand"])
     #sort df by region
     df = df.sort_values(by=["region", "year", "hour"])
-    pickle.dump(df, open("PickleJar\\heat_demand.pickle", 'wb'))
+    save_to_file(df, "PickleJar\\heat_demand")
     #split df into separate dataframes for each year
     dfs = {year: df.loc[df["year"] == year] for year in df["year"].unique()}
     #split df into separate dataframes starting at hour 4344 and ending at hour 4343 next year
@@ -113,7 +113,7 @@ def make_hydro_profiles(years="1980-2019"):
     #pad the hour column with an h and then zeros to make it 4 digits long
     df["hour"] = df["hour"].apply(lambda x: "h" + str(x).zfill(4))
     #remove the index and hour_of_day columns
-    pickle.dump(df, open("PickleJar\\hydro_inflow.pickle", 'wb'))
+    save_to_file(df, "PickleJar\\hydro_inflow")
     df = df.reset_index()
     df = df.drop(columns=["index", "hour_of_day"])
     #drop all rows where the year is less than 1980
@@ -175,13 +175,13 @@ def make_pickles(year, VRE_profiles, cap, load, yearly_nontraditional_load, hour
     #print(net_load.values.mean())
     print(f"Making pickle files for {year}, where net_load.mean() = {net_load.values.mean():.2f} GW and the constructed mean is {constructed_netload.mean():.2f} GW")
     small = {"VRE_gen": VRE_gen, "total_hourly_load": total_hourly_load, "net_load": net_load}
-    small_name = f"netload_components_small_{year}.pickle"
-    pickle.dump(small, open(pickle_path + small_name, 'wb'))
+    small_name = f"netload_components_small_{year}"
+    save_to_file(small, pickle_path + small_name)
     large = {"VRE_profiles": VRE_profiles, "cap": cap, "yearly_nontraditional_load": yearly_nontraditional_load,
              "hourly_nontraditional_load": hourly_nontraditional_load, "traditional_load": load,
              "total_hourly_load": total_hourly_load_regional, "net_load": net_load}
-    large_name = f"netload_components_large_{year}.pickle"
-    pickle.dump(large, open(pickle_path + large_name, 'wb'))
+    large_name = f"netload_components_large_{year}"
+    save_to_file(large, pickle_path + large_name)
 
 
 def create_new_tuple(t, year):
@@ -504,7 +504,7 @@ def make_heat_demand_dataframe(regions):
     electrified_heat_demand = pd.DataFrame(index=mi, columns=heat_demand_regions.columns, data=0)
     for region in heat_demand_regions.columns:
         electrified_heat_demand.loc[:, region] = heat_demand_regions.loc[:, region] * heatshare_to_electrify.loc[region, 1]
-    pickle.dump(electrified_heat_demand, open("PickleJar\\electrified_heat_demand_dataframe.pickle", "wb"))
+    save_to_file(electrified_heat_demand, "PickleJar\\electrified_heat_demand_dataframe")
 
 
 def initiate_parameters(sheet_name):
@@ -560,7 +560,7 @@ def initiate_parameters(sheet_name):
         print_cyan("Making heat demand dataframe...")
         make_heat_demand_dataframe()
         print_cyan("Done making heat demand dataframe!")
-    electrified_heat_demand = pickle.load(open("PickleJar\\electrified_heat_demand_dataframe.pickle", "rb"))
+    electrified_heat_demand = load_from_file("PickleJar\\electrified_heat_demand_dataframe")
     return all_cap, VRE_groups, VRE_tech, VRE_tech_dict, VRE_tech_name_dict, years, reseamed_years, sites, region_name,\
         regions, non_traditional_load, filenames, profile_keys, capacity_keys, fig_path, pickle_path, electrified_heat_demand
 
@@ -571,7 +571,7 @@ def remake_profile_seam(pickle_path, electrified_heat_demand, non_traditional_lo
     net_load_dict = {}
     for i_y, year in enumerate(years):
         #print(f"Year {year}")
-        netload_components = pickle.load(open(f"{pickle_path}netload_components_large_{year}.pickle", "rb"))
+        netload_components = load_from_file(f"{pickle_path}netload_components_large_{year}")
         VRE_profile_dict[year] = netload_components["VRE_profiles"]  # type: pd.DataFrame
         load_dict[year] = netload_components["traditional_load"]  # type: pd.DataFrame
         net_load_dict[year] = netload_components["net_load"]  # type: pd.DataFrame
@@ -662,10 +662,10 @@ def separate_years(years, VRE_tech, VRE_tech_name_dict, filenames, profile_keys,
                         pot_cap[region][tech_name] = capacities[i_r, site - 1]
                 FLHs[VRE] = get_FLH(profiles[:, :, :])
             os.makedirs("PickleJar/VRE_mat_data", exist_ok=True)
-            pickle.dump({"FLHs": FLHs, "pot_cap": pot_cap, "VRE_profiles": VRE_profiles}, open(f"PickleJar/VRE_mat_data/VRE_mat_data_{year}.pickle", "wb"))
+            save_to_file({"FLHs": FLHs, "pot_cap": pot_cap, "VRE_profiles": VRE_profiles}, f"PickleJar/VRE_mat_data/VRE_mat_data_{year}")
         else:
             print_cyan(f"Loading data from PickleJar/VRE_mat_data/VRE_mat_data_{year}.pickle")
-            VRE_data = pickle.load(open(f"PickleJar/VRE_mat_data/VRE_mat_data_{year}.pickle", "rb"))
+            VRE_data = load_from_file(f"PickleJar/VRE_mat_data/VRE_mat_data_{year}")
             #FLHs = VRE_data["FLHs"]
             pot_cap = VRE_data["pot_cap"]
             VRE_profiles = VRE_data["VRE_profiles"]
@@ -738,7 +738,7 @@ def plot_reseamed_years(years, threshold=False, window_size_days=3, skip_netload
     for year_combination in year_combinations:
         print_cyan(f"Plotting {year_combination}")
         # Load the reseamed data from netload_components_YEAR1-YEAR2.pickle
-        netload_components = pickle.load(open(f"{pickle_path}netload_components_large_{year_combination}.pickle", "rb"))
+        netload_components = load_from_file(f"{pickle_path}netload_components_large_{year_combination}")
         VRE_profiles = netload_components["VRE_profiles"]
         if len(VRE_profiles) > 8760: VRE_profiles = VRE_profiles.iloc[:8760]
         demand = netload_components["traditional_load"]
@@ -837,7 +837,7 @@ def combined_years(years, VRE_tech, VRE_tech_name_dict, filenames, profile_keys,
                 # FLHs[VRE] = get_FLH(profiles[:, :, :])"""
         else:
             print(f"Loading VRE_mat_data_{year}.pickle")
-            VRE_mat_data = pickle.load(open(f"PickleJar/VRE_mat_data/VRE_mat_data_{year}.pickle", "rb"))
+            VRE_mat_data = load_from_file(f"PickleJar/VRE_mat_data/VRE_mat_data_{year}")
             VRE_profile_dict[year] = VRE_mat_data["VRE_profiles"]
             VRE_profile_dict[year].index = pd.MultiIndex.from_product([[year], [f"h{h:04}" for h in range(1, len(VRE_profile_dict[year]) + 1)]],
                                                        names=["year", "timestep"])
@@ -921,7 +921,7 @@ if __name__ == "__main__":
             df = pd.DataFrame(index=pd.MultiIndex.from_tuples([(tech, reg) for tech in VRE_tech_name_dict for reg in regions]),
                                     columns=["pot_cap"] + [str(year) for year in years_to_summarize])
             for year in years_to_summarize:
-                data = pickle.load(open(rf"PickleJar\ref14\netload_components_large_{year}.pickle", "rb"))
+                data = load_from_file(rf"PickleJar\ref14\netload_components_large_{year}")
                 pot_cap = data["cap"]  # pd.Series with tech and reg as the index
                 VRE_profiles = data["VRE_profiles"]  # pd.DataFrame with hour as index and (tech, reg) as columns
                 # make a dataframe with tech and reg as the index, 

@@ -10,7 +10,7 @@ import threading
 import time as tm
 import datetime as dt
 from timeit import default_timer as timer
-from my_utils import print_red, print_cyan, print_green, fast_rolling_average, print_magenta, print_blue, print_yellow
+from my_utils import print_red, print_cyan, print_green, fast_rolling_average, print_magenta, print_blue, print_yellow, load_from_file, save_to_file
 import scipy.io
 import h5py
 import json
@@ -170,7 +170,7 @@ def fast_cfd(df_netload, xmin, xmax, amp_length=0.1, area_method=False, thread=F
 
 def create_df_out_tot(year, xmin, xmax, ref_folder, rolling_hours=12, amp_length=1, area_mode_in_cfd=True, debugging=False, thread=False):
     print_cyan(f"create_df_out_tot({year}, {xmin}, {xmax}, {rolling_hours}, {amp_length}, {area_mode_in_cfd})")
-    data = pickle.load(open(f"PickleJar\\{ref_folder}\\netload_components_small_{year}.pickle", "rb"))
+    data = load_from_file(f"PickleJar\\{ref_folder}\\netload_components_small_{year}")
     #VRE_profiles = data["VRE_profiles"]
     #load = data["total_hourly_load"]
     #cap = data["cap"]
@@ -231,13 +231,13 @@ def main(year, ref_folder, amp_length=1, rolling_hours=12, area_mode_in_cfd=True
         thread_nr = "MAIN"
     if type(year) != list and type(year) != tuple:
         print_cyan(f"\nStarting loop for year -- {year} --")
-        pickle_read_name = rf"PickleJar\{ref_folder}\{year}_CFD_netload_df_amp{amp_length}_window{rolling_hours}{'_area'*area_mode_in_cfd}.pickle"
-        pickle_dump_name = rf"PickleJar\{ref_folder}\{year}_CFD_netload_df_amp{amp_length}_window{rolling_hours}{'_area'*area_mode_in_cfd}.pickle"
+        pickle_read_name = rf"PickleJar\{ref_folder}\{year}_CFD_netload_df_amp{amp_length}_window{rolling_hours}{'_area'*area_mode_in_cfd}"
+        pickle_dump_name = rf"PickleJar\{ref_folder}\{year}_CFD_netload_df_amp{amp_length}_window{rolling_hours}{'_area'*area_mode_in_cfd}"
         # df_netload = df_netload.reset_index()[["net load", "count1", "count2"]]
         try:
             if not read_pickle: raise ImportError
             print_yellow(f" Attempting to read pickle")#{pickle_read_name}")
-            df_out_tot = pickle.load(open(pickle_read_name, "rb"))
+            df_out_tot = load_from_file(pickle_read_name)
         except Exception as e:
             if read_pickle: print_red(f"Failed due to {type(e)} .. creating a new one instead")
             start_time = timer()
@@ -247,7 +247,7 @@ def main(year, ref_folder, amp_length=1, rolling_hours=12, area_mode_in_cfd=True
             print(f"elapsed time to build CFD in thread {thread_nr} = {round(end_time - start_time, 1)}")
             if write_files: 
                 print_yellow(f"Writing {pickle_dump_name}")
-                pickle.dump(df_out_tot, open(pickle_dump_name, 'wb'))
+                save_to_file(df_out_tot, pickle_dump_name)
             else:
                 print_yellow(f"NOT writing {pickle_dump_name}")
         df_reset = df_out_tot.reset_index()

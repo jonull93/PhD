@@ -2,10 +2,10 @@ import os
 import pandas as pd
 import matplotlib.pyplot as plt
 import re
-from my_utils import color_dict, tech_names, print_red, print_cyan, print_green, print_magenta, print_blue, print_yellow, select_pickle
+from my_utils import color_dict, tech_names, print_red, print_cyan, print_green, print_magenta, print_blue, print_yellow, select_pickle, load_from_file, save_to_file
 from order_cap import wind, PV, baseload, peak, CCS, CHP, midload, hydro, PtH, order_cap, order_cap2, order_cap3
 from datetime import datetime
-from figure_bio_use import get_yearly_biogas_use
+from figure_bio_use import get_biogas_use
 
 # Path to the pickle files and figures
 pickle_folder = 'PickleJar/'
@@ -51,9 +51,9 @@ def load_data(pickle_file, use_defaults=False, data_key='tot_cap'):
     if isinstance(pickle_file, list):
         data = {}
         for p in pickle_file:
-            data.update(pd.read_pickle(p))
+            data.update(load_from_file(p))
     else:
-        data = pd.read_pickle(pickle_file)
+        data = load_from_file(pickle_file)
     
     # Handle scenario selection
     all_scenarios = list(data.keys())
@@ -128,7 +128,16 @@ def load_data(pickle_file, use_defaults=False, data_key='tot_cap'):
                
     # Extract 'tot_cap' data for the selected scenarios and replace NaNs with 0
     if data_key == 'biogas':
-        selected_data = get_yearly_biogas_use(data, selected_scenarios)
+        selected_data = {}
+        for scenario in selected_scenarios:
+            weights = data[scenario]['stochastic_probability'] # a Series of float(s)
+            hourly_use = get_biogas_use(data, scenario) #returns a dictionary of time-series for each year
+            total_use = 0
+            for year, df in hourly_use.items():
+                total_use += df.sum().sum()*weights[year]
+            selected_data[scenario] = pd.Series(total_use, index=['biogas'])
+        
+        #print_yellow(f"Selected data: \n{selected_data}")
         # probability needs to be considered, then years combined for each scenario and then repeated for all selected_scenarios
     else:
         selected_data = {scenario: data[scenario][data_key].fillna(0) for scenario in selected_scenarios}

@@ -13,7 +13,9 @@ def create_whisker_plots(grouped_data, pickle_timestamp, techs_to_plot=None):
     if techs_to_plot is None:
         techs_to_plot = ["PV", "Wind", "U", "WG", "Peak", "H2store", "bat"]  # Default technologies
     tech_labels = [tech_names.get(tech, tech) for tech in techs_to_plot]
+    grouped_data_df = pd.DataFrame(grouped_data)
     
+    contains_biogas = "biogas" in grouped_data_df.index
     contains_HP_sets = any("HP" in s.split("_")[0] for s in grouped_data)
     contains_nonHP_sets = any("opt" in s.split("_")[0] for s in grouped_data)
     
@@ -21,7 +23,7 @@ def create_whisker_plots(grouped_data, pickle_timestamp, techs_to_plot=None):
     reference_levels = grouped_data.get("allyears", pd.Series(dtype=float))
 
     # Normalize the data such that the reference levels become 1
-    normalized_grouped_data = {key: data.div(reference_levels, axis=0).filter(items=techs_to_plot, axis=0) for key, data in grouped_data.items() if key != "allyears"}
+    normalized_grouped_data = grouped_data_df.div(reference_levels, axis=0)
     reference_levels = reference_levels.filter(items=techs_to_plot, axis=0).div(reference_levels, axis=0)  # Should be all ones now
 
     # Create a directory for the whisker plots if it doesn't already exist
@@ -29,9 +31,12 @@ def create_whisker_plots(grouped_data, pickle_timestamp, techs_to_plot=None):
         os.makedirs('figures/whisker_plots')
 
     # Split the normalized data into individual years and sets of years
-    individual_years_data = {key: data for key, data in normalized_grouped_data.items() if 'singleyear' in key}
-    HPsets_of_years_data = {key: data for key, data in normalized_grouped_data.items() if 'singleyear' not in key and "HP" in key.split("_")[0]}
-    nonHPsets_of_years_data = {key: data for key, data in normalized_grouped_data.items() if 'singleyear' not in key and "opt" in key.split("_")[0]}
+    individual_years_data = normalized_grouped_data.filter(items=[s for s in normalized_grouped_data.columns if 'singleyear' in s], axis=1)
+    #{key: data for key, data in normalized_grouped_data.items() if 'singleyear' in key}
+    HPsets_of_years_data = normalized_grouped_data.filter(items=[s for s in normalized_grouped_data.columns if 'singleyear' not in s and "HP" in s.split("_")[0]], axis=1)
+    #{key: data for key, data in normalized_grouped_data.items() if 'singleyear' not in key and "HP" in key.split("_")[0]}
+    nonHPsets_of_years_data = normalized_grouped_data.filter(items=[s for s in normalized_grouped_data.columns if 'singleyear' not in s and "opt" in s.split("_")[0]], axis=1)
+    #{key: data for key, data in normalized_grouped_data.items() if 'singleyear' not in key and "opt" in key.split("_")[0]}
 
     # Filter for selected technologies
     individual_years_df = pd.DataFrame(individual_years_data)
@@ -39,7 +44,7 @@ def create_whisker_plots(grouped_data, pickle_timestamp, techs_to_plot=None):
     nonHPsets_of_years_df = pd.DataFrame(nonHPsets_of_years_data)
 
     # Extract the values for the scenario 'singleyear_1989-1990'
-    scenario_1989_1990_values = individual_years_df['singleyear_1989-1990']
+    #scenario_1989_1990_values = individual_years_df['singleyear_1989-1990']
 
     # Print the dataframes
     #print(f"{grouped_data.items()=}")
@@ -48,39 +53,66 @@ def create_whisker_plots(grouped_data, pickle_timestamp, techs_to_plot=None):
     #print_yellow(f"Reference levels: \n{reference_levels}")
 
     # Create a figure for the whisker plots
-    nr_of_plots = 1+contains_HP_sets+contains_nonHP_sets
-    fig, axs = plt.subplots(nrows=nr_of_plots, ncols=1, figsize=(8, 2+2*nr_of_plots))
-
+    nr_of_rows = 1+contains_HP_sets+contains_nonHP_sets
+    nr_of_cols = 1+contains_biogas
+    gridspec = {'width_ratios': [4, 1]} if contains_biogas else {'width_ratios': [1]}
+    fig, axs = plt.subplots(nrows=nr_of_rows, ncols=nr_of_cols, figsize=(8, 2+2*nr_of_rows), gridspec_kw=gridspec)
+    # if contains_biogas, make the rightmost column 1/4 of the width
+    if contains_biogas:
+        fig.subplots_adjust(right=0.75)
+    axs = axs.flatten()  # Convert the 2D array of axes to a 1D array
     # Whisker settings
     whisker_props = dict(whis=1.5, showfliers=True, sym="o")  # adjust as needed
 
     plot_idx = 0
     # Generate whisker plots for individual years
-    axs[0].boxplot(individual_years_df.T, labels=tech_labels, vert=True, patch_artist=True, **whisker_props)
+    axs[0].boxplot(individual_years_df.loc[techs_to_plot].T, labels=tech_labels, vert=True, patch_artist=True, **whisker_props) #upper (left) axes
     axs[0].set_title(f'{len(individual_years_df.columns)} individual weather-years')
     axs[0].set_ylabel('Normalized capacity')
     axs[0].axhline(y=1, color='black', linestyle='-', linewidth=0.7)  # thin horizontal line
     plot_idx += 1
 
+    if contains_biogas: #plot on upper right axes
+        axs[plot_idx].boxplot(individual_years_df.loc["biogas"], labels=["biogas"], vert=True, patch_artist=True, **whisker_props)
+        #axs[plot_idx].set_title(f'{len(individual_years_df.columns)} individual weather-years')
+        axs[plot_idx].set_ylabel('Normalized energy')
+        axs[plot_idx].axhline(y=1, color='black', linestyle='-', linewidth=0.7)  # thin horizontal line
+        plot_idx += 1
+
     # Generate whisker plots for sets of years
     if contains_HP_sets:
-        axs[plot_idx].boxplot(HPsets_of_years_df.T, labels=tech_labels, vert=True, patch_artist=True, **whisker_props)
+        axs[plot_idx].boxplot(HPsets_of_years_df.loc[techs_to_plot].T, labels=tech_labels, vert=True, patch_artist=True, **whisker_props)
         axs[plot_idx].set_title(f'{len(HPsets_of_years_df.columns)} weather-year sets (with hand-picking)')
         axs[plot_idx].set_ylabel('Normalized capacity')
         axs[plot_idx].axhline(y=1, color='black', linestyle='-', linewidth=0.7)  # thin horizontal line
         plot_idx += 1
+        if contains_biogas: #plot on upper right axes
+            axs[plot_idx].boxplot(HPsets_of_years_df.loc["biogas"], labels=["biogas"], vert=True, patch_artist=True, **whisker_props)
+            #axs[plot_idx].set_title(f'{len(individual_years_df.columns)} individual weather-years')
+            axs[plot_idx].set_ylabel('Normalized energy')
+            axs[plot_idx].axhline(y=1, color='black', linestyle='-', linewidth=0.7)  # thin horizontal line
+            plot_idx += 1
+
     if contains_nonHP_sets:
-        axs[plot_idx].boxplot(nonHPsets_of_years_df.T, labels=tech_labels, vert=True, patch_artist=True, **whisker_props)
+        axs[plot_idx].boxplot(nonHPsets_of_years_df.loc[techs_to_plot].T, labels=tech_labels, vert=True, patch_artist=True, **whisker_props)
         axs[plot_idx].set_title(f'{len(nonHPsets_of_years_df.columns)} weather-year sets (without hand-picking)')
         axs[plot_idx].set_ylabel('Normalized capacity')
-        axs[plot_idx].axhline(y=1, color='black', linestyle='-', linewidth=0.7)
+        axs[plot_idx].axhline(y=1, color='black', linestyle='-', linewidth=0.7)       
+        plot_idx += 1
+        if contains_biogas: #plot on upper right axes
+            axs[plot_idx].boxplot(nonHPsets_of_years_df.loc["biogas"], labels=["biogas"], vert=True, patch_artist=True, **whisker_props)
+            #axs[plot_idx].set_title(f'{len(individual_years_df.columns)} individual weather-years')
+            axs[plot_idx].set_ylabel('Normalized energy')
+            axs[plot_idx].axhline(y=1, color='black', linestyle='-', linewidth=0.7)  # thin horizontal line
+            plot_idx += 1
+
 
     # Plot red 'X' markers for 'singleyear_1989-1990'
-    for idx, tech in enumerate(techs_to_plot):
-        if tech in scenario_1989_1990_values:
+    #for idx, tech in enumerate(techs_to_plot):
+    #    if tech in scenario_1989_1990_values:
             #axs[0].plot(idx + 1, scenario_1989_1990_values[tech], 'rx')  # 'rx' is red 'X' marker
             #axs[1].plot(idx + 1, scenario_1989_1990_values[tech], 'rx')  # 'rx' is red 'X' marker
-            None
+    #        None
 
     # Set the same y-limits for both axes
     y_lims = [min(ax.get_ylim()[0] for ax in axs), max(ax.get_ylim()[1] for ax in axs)]
@@ -123,11 +155,14 @@ def main():
     print_cyan(f"Selected pickle file: {pickle_file}")
     
     cap_data = load_data(pickle_file, use_defaults="skip")
-    bio_data = load_data(pickle_file, use_defaults="skip", data_key=)
+    bio_data = load_data(pickle_file, use_defaults="skip", data_key="biogas")
     print_yellow(f"Data loaded from pickle file")
-    grouped_data = group_technologies(data)
+    grouped_data = group_technologies(cap_data)
+    for scenario, series in grouped_data.items():
+        grouped_data[scenario] = pd.concat([series, bio_data[scenario]])
+
     print_green(f"Technologies grouped successfully")
-    print_yellow(f"Grouped data: \n{grouped_data}")
+    print_yellow(f"Grouped data: \n{pd.DataFrame(grouped_data)}")
     create_whisker_plots(grouped_data, pickle_timestamp)
     #print_magenta(f"Figures created and saved in {figures_folder}")
     

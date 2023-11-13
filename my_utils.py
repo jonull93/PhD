@@ -508,15 +508,15 @@ def completion_sound():
 
 def select_pickle(predetermined_choice=False, pickle_folder="PickleJar\\"):
     import glob
-    pickle_files = glob.glob(os.path.join(pickle_folder, "data_results_*.pickle"))
+    pickle_files = glob.glob(os.path.join(pickle_folder, "data_results_*"))
     if not pickle_files:
-        print_red("No data_results_*.pickle file found in PickleJar folder.")
+        print_red("No data_results_* files found in PickleJar folder.")
         return None
 
     if predetermined_choice==True:
         predetermined_choice = 1
     pickle_files.sort(key=os.path.getmtime, reverse=True)
-    print_blue(f"Found {len(pickle_files)} data_results_*.pickle files.")
+    print_blue(f"Found {len(pickle_files)} data_results_* files.")
     print_blue(f"Most recent file: {pickle_files[0]}")
 
     if predetermined_choice == 1 or len(pickle_files) == 1 or predetermined_choice == "most_recent":
@@ -557,9 +557,7 @@ def select_pickle(predetermined_choice=False, pickle_folder="PickleJar\\"):
     elif user_input == '4':
         # Enter the filename manually
         user_input = input("Please enter the filename: ")
-        if user_input in pickle_files or "PickleJar\\" + user_input in pickle_files or "PickleJar\\" + user_input + ".pickle" in pickle_files:
-            if ".pickle" not in user_input:
-                user_input = user_input + ".pickle"
+        if user_input in pickle_files or "PickleJar\\" + user_input in pickle_files or "PickleJar\\" + user_input + ".pickle" in pickle_files or "PickleJar\\" + user_input + ".blosc" in pickle_files:
             if "PickleJar\\" not in user_input:
                 user_input = "PickleJar\\" + user_input
             return user_input
@@ -629,3 +627,57 @@ def prettify_scenario_name(name,return_single_as_year=False):
         return f'6 yr, eq. weights'
     # join the parts with appropriate labels
     return f'Set ({parts[0]} opt.)'
+
+def load_from_file(filepath):
+    # if the file is a pickle file, load it as a pickle file
+    expected_filetypes = [".pickle", ".csv", ".blosc"]
+    if not any([filepath.endswith(ft) for ft in expected_filetypes]):
+        filepath += ".blosc"
+    #if the file is not found, look for a .pickle file instead
+    if not os.path.isfile(filepath):
+        filepath = filepath.replace(".blosc", ".pickle")
+    if filepath.endswith(".pickle"):
+        import pickle
+        with open(filepath, "rb") as f:
+            return pickle.load(f)
+    elif filepath.endswith(".csv"):
+        import pandas as pd
+        return pd.read_csv(filepath)
+    elif filepath.endswith(".blosc"):
+        import blosc2 as blosc
+        import pickle
+        blosc.set_nthreads(4)
+        with open(filepath, "rb") as f:
+            data = blosc.decompress(f.read())
+        return pickle.loads(data)
+    
+def save_to_file(data, filepath, clever=5, nthreads=4, max_compression=False, **kwargs):
+    # if the file is a pickle file, save it as a pickle file
+    expected_filetypes = [".pickle", ".csv", ".blosc"]
+    if not any([filepath.endswith(ft) for ft in expected_filetypes]):
+        filepath += ".blosc"
+    if filepath.endswith(".pickle"):
+        import pickle
+        with open(filepath, "wb") as f:
+            pickle.dump(data, f, protocol=pickle.HIGHEST_PROTOCOL)
+        if max_compression:
+            print_red("Max compression not supported for pickle files. Save as .blosc instead.")
+    elif filepath.endswith(".csv"):
+        import pandas as pd
+        data.to_csv(filepath)
+    elif filepath.endswith(".blosc"):
+        import blosc2 as blosc
+        import pickle
+        blosc.set_nthreads(nthreads)
+        if not max_compression:
+            codec = blosc.Codec.LZ4
+        else:
+            codec = blosc.Codec.ZSTD
+        bytes_data = pickle.dumps(data, protocol=pickle.HIGHEST_PROTOCOL)
+        with open(filepath, "wb") as f:
+            f.write(blosc.compress(bytes_data, codec=codec, clevel=5, filter=blosc.Filter.SHUFFLE, **kwargs))
+    else:
+        print_red(f"File extension not recognized: {filepath}")
+        return None
+    #print_green(f"Data saved to {filepath}")
+    return None
