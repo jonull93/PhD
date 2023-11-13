@@ -7,3 +7,4 @@
 !*netload_df*
 #!*small*
 !netload_components_small_1980-2019*
+!*CFD_netload_df*.blosc

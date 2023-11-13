@@ -342,6 +342,7 @@ def main(year, ref_folder, amp_length=1, rolling_hours=12, area_mode_in_cfd=True
             if not read_pickle: raise ImportError
             #print_yellow(f" Attempting to read pickle")#{pickle_read_name}")
             df_out_tot = load_from_file(pickle_read_name)
+            save_to_file(df_out_tot, pickle_dump_name)
         except Exception as e:
             #if read_pickle: print_red(f"Failed due to {type(e)} .. creating a new one instead")
             start_time = timer()
@@ -528,7 +529,7 @@ def initiate(ref_folder,rolling_window=12):
     queue_years = Queue(maxsize=0)
     sum_func = ""
     make_fingerprinted_figures = os.path.exists(f"results\\{ref_folder}/most_recent_results.txt")
-    if make_fingerprinted_figures: # Load results from most recent fingerprinting run
+    if make_fingerprinted_figures and False: # Load results from most recent fingerprinting run
         with open(f"results\\{ref_folder}/most_recent_results.txt", "r") as f:
             results_folder_name = f.read().strip()
 #            results_folder_name = r"results\ref14\FP sse Jun_06_16.52.18".strip()
