@@ -551,4 +551,4 @@ def initiate(ref_folder,rolling_window=12):
 if __name__ == "__main__":
     ref_folder = get_ref_folder()
     #ref_folder = "ref23"
-    initiate(ref_folder, rolling_window=48)
+    initiate(ref_folder, rolling_window=12)
