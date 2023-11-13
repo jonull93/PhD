@@ -2,6 +2,8 @@
 *
 # Except this file
 !.gitignore
+!/*/
 !/ref999/
 !*netload_df*
-!*small*
+#!*small*
+!netload_components_small_1980-2019*
