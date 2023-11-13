@@ -426,7 +426,7 @@ def read_capacities(sheet_name):
 # heat demand
 # load heat demand from SyntheticHeatDemand_1980-2019.csv with the columns localtime,AT,BE,BG,CZ,DE,DK,EE,ES,FI,FR,GB,GR,HR,HU,IE,IT,LT,LU,LV,NL,PL,PT,RO,SE,SI,SK
 # and rows 1980-01-01T00:00:00.0, 1980-01-01T01:00:00.0 etc, i.e. one row per hour
-def make_heat_demand_dataframe(regions):
+def make_heat_demand_dataframe(regions=["SE_NO_N", "SE_S", "NO_S", "FI", "DE_N", "DE_S"]):
     print_cyan("Making heat demand dataframe..", replace_this_line=True)
     heat_demand = pd.read_csv("input\\SyntheticHeatDemand_1980-2019.csv", header=0, index_col=0, parse_dates=True)
     #convert the country codes to country names
@@ -556,7 +556,7 @@ def initiate_parameters(sheet_name):
             os.mkdir(path)
         except FileExistsError:
             None
-    if not os.path.exists("PickleJar\\electrified_heat_demand_dataframe.pickle"):
+    if not (os.path.exists("PickleJar\\electrified_heat_demand_dataframe.pickle") or os.path.exists("PickleJar\\electrified_heat_demand_dataframe.blosc")):
         print_cyan("Making heat demand dataframe...")
         make_heat_demand_dataframe()
         print_cyan("Done making heat demand dataframe!")
@@ -627,8 +627,8 @@ def get_demand_as_df(year, regions, reseamed=False):
         demand = mat_demand["demand"] # in MW
         demand_df = pd.DataFrame(demand/1000, columns=regions, index=range(1, len(demand)+1))
     else:
-        demand_filename = f'netload_components_large_{year}.pickle'
-        demand_df = pd.read_pickle(pickle_path+demand_filename)["traditional_load"]
+        demand_filename = f'netload_components_large_{year}'
+        demand_df = load_from_file(pickle_path+demand_filename)["traditional_load"]
     return demand_df
 
 
@@ -820,7 +820,7 @@ def combined_years(years, VRE_tech, VRE_tech_name_dict, filenames, profile_keys,
                                    columns=pd.MultiIndex.from_product([VRE_tech, regions], names=["tech", "I_reg"]))
         # regions = ["SE_NO_N", "SE_S", "NO_S", "FI", "DE_N", "DE_S"]
         # FLHs = {}
-        if not os.path.exists(f"PickleJar/VRE_mat_data/VRE_mat_data_{year}.pickle"):
+        if not (os.path.exists(f"PickleJar/VRE_mat_data/VRE_mat_data_{year}.pickle") or os.path.exists(f"PickleJar/VRE_mat_data/VRE_mat_data_{year}.blosc")):
             #print(f"Making new VRE_mat_data_{year}.pickle")
             raise Exception("No pickle files found, run separate_years() first")
             """for VRE in VRE_groups:  # ["WON", "WOFF", "solar", "solar_rooftop"]
@@ -899,7 +899,7 @@ def combined_years(years, VRE_tech, VRE_tech_name_dict, filenames, profile_keys,
 
 
 if __name__ == "__main__":
-    RA_window = 48
+    RA_window = 12
     all_cap, VRE_groups, VRE_tech, VRE_tech_dict, VRE_tech_name_dict, years, reseamed_years, sites, region_name, regions, \
         non_traditional_load, filenames, profile_keys, capacity_keys, fig_path, pickle_path, electrified_heat_demand \
         = initiate_parameters("ref334_out")

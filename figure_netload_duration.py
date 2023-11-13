@@ -2,6 +2,7 @@ import pickle
 import os
 import pandas as pd
 import matplotlib.pyplot as plt
+from my_utils import load_from_file
 # Gather the net load profiles of all years
 # Sort them to get the net load duration curves
 # Create an average net load duration curve
@@ -11,7 +12,7 @@ import matplotlib.pyplot as plt
 #there is also a file called PickleJar/ref999/netload_components_small_1980-2019.pickle that holds all of the net loads as a multiindexed (year,timestep) dataframe
 
 # First, load the 1980-2019 net load profile
-netload_allyears = pickle.load(open("PickleJar/ref999/netload_components_small_1980-2019.pickle", "rb"))["net_load"]
+netload_allyears = load_from_file("PickleJar/ref999/netload_components_small_1980-2019.pickle")["net_load"]
 # calculate the net load duration curve by sorting the net load profile for each year in descending order
 netload_duration_allyears = netload_allyears.groupby(level=0, group_keys=False).apply(lambda x: x.sort_values(by='net_load',ascending=False))
 #calculate the average net load duration curve

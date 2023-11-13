@@ -629,6 +629,7 @@ def prettify_scenario_name(name,return_single_as_year=False):
     return f'Set ({parts[0]} opt.)'
 
 def load_from_file(filepath):
+    import os
     # if the file is a pickle file, load it as a pickle file
     expected_filetypes = [".pickle", ".csv", ".blosc"]
     if not any([filepath.endswith(ft) for ft in expected_filetypes]):
@@ -651,7 +652,7 @@ def load_from_file(filepath):
             data = blosc.decompress(f.read())
         return pickle.loads(data)
     
-def save_to_file(data, filepath, clever=5, nthreads=4, max_compression=False, **kwargs):
+def save_to_file(data, filepath, clever=5, nthreads=4, max_compression=True, **kwargs):
     # if the file is a pickle file, save it as a pickle file
     expected_filetypes = [".pickle", ".csv", ".blosc"]
     if not any([filepath.endswith(ft) for ft in expected_filetypes]):
