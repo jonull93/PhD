@@ -10,6 +10,36 @@ import pandas
 from order_cap import order_cap
 from order_gen import order_gen
 
+"""
+Functions and other utilities available in my_utils.py:
+TECH:           Enum class containing all technologies (having a wrapper for techs is useful for when tech names change, and enables autocompletion)
+tech_names:     dictionary mapping the techs to their pretty names
+scen_names:     dictionary mapping the scenarios to their pretty names
+color_dict:     dictionary mapping the techs to their colors
+EPODreg_to_country: dictionary mapping the EPODreg to the country name
+country_to_reg: function that takes a dictionary with reg keys (e.g. VRE_pot), and a country label, then uses EPODreg_to_country to return a dictionary with only the keys that correspond to that country
+label_axes:     function that walks through subplots and labels each of them with a letter
+write_inc:      function that takes a dictionary and writes it to a .inc file
+write_inc_from_df_columns: function that takes a dataframe and writes it to a .inc file
+append_to_file: function that adds 'to_add' to a new line at the bottom of originalfile
+add_in_dict:    function that adds a value to a dictionary, and sums it if the key already exists
+crawl_resource_usage: function that prints memory and CPU usage every 5 minutes
+print_red:      function that prints in red
+print_green:    function that prints in green
+print_cyan:     function that prints in cyan
+print_yellow:   function that prints in yellow
+print_blue:     function that prints in blue
+print_magenta:  function that prints in magenta
+fast_rolling_average: function that takes a list or dataframe and returns a rolling average of it
+completion_sound: function that plays a sound (e.g. when the script is done)
+select_pickle:  function that lets the user select a pickle file to load
+shorten_year:   function that shortens the year in a scenario name (e.g. 2015 -> '15)
+prettify_scenario_name: function that prettifies a scenario name (e.g. set1_4opt -> Set 1 (4 opt.))
+load_from_file: Read the data from the specified filepath. Supports both compressed and uncompressed files.
+save_to_file:   Save the data to the specified filepath. Supports both compressed and uncompressed files.
+
+"""
+
 os.system('color')
 
 class TECH(str, Enum):
@@ -183,7 +213,7 @@ def country_to_reg(dictionary, country):
 
     Returns
     -------
-    takes a dictionary with reg keys, and a country key, then uses EPODreg_to_country to return a dictionary with only
+    takes a dictionary with reg keys (e.g. VRE_pot), and a country label, then uses EPODreg_to_country to return a dictionary with only
     the keys that correspond to that country
     """
     return {reg: dictionary[reg] for reg in dictionary if country in EPODreg_to_country[reg]}
