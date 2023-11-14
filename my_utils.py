@@ -111,7 +111,8 @@ tech_names = {'RO': 'Hydro', 'RR': 'Run-of-river', 'U': 'Nuclear', "b": "Lignite
               'Load': 'Load', 'bat_PS': "Battery (PS)", 'bat_cap_PS': "Battery cap (PS)", 'bat_cap': "Bat. power",
               "electrolyser": "Electrolyser", "H": "Coal ST", "W": "Biomass ST",
               "G": "N. Gas CCGT", "G_peak": "N. Gas GT", "PV": "Solar PV", "FC": "Fuel cell",
-              "H2store": "H2 storage", "PtH":"Power-to-Heat", "thermals":"Thermal power", "Hydro":"Hydro power"
+              "H2store": "H2 storage", "PtH":"Power-to-Heat", "thermals":"Thermal power", "Hydro":"Hydro power",
+              "biogas": "Biogas", "Export south": "Exp. south", "Export north": "Exp. north",
               }
 scen_names = {"_pre": "Base case", "_leanOR": "Lean OR", "_OR": "OR", "_OR_fixed": "OR", "_OR_inertia": "OR + Inertia",
               "_OR+inertia_fixed": "OR + Inertia", "_inertia": "Inertia", "_inertia_2x": "2x Inertia",
@@ -629,6 +630,10 @@ def prettify_scenario_name(name,return_single_as_year=False):
     return f'Set ({parts[0]} opt.)'
 
 def load_from_file(filepath):
+    """
+    Read the data from the specified filepath. The following file formats are supported: .pickle, .csv, .blosc.
+    If no file extension is specified, the function will first look for a .blosc file, then a .pickle file. This is recommended as it lends more flexibility to the function.
+    """
     import os
     # if the file is a pickle file, load it as a pickle file
     expected_filetypes = [".pickle", ".csv", ".blosc"]
@@ -653,14 +658,35 @@ def load_from_file(filepath):
         return pickle.loads(data)
     
 def save_to_file(data, filepath, clever=5, nthreads=4, max_compression=True, **kwargs):
+    """
+    Save the data to the specified filepath. The following file formats are supported:
+    1 .pickle (NOT RECOMMENDED): A standard, uncompressed way of storing python objects in binary files. Fast to save and load, but takes up a lot of space. If you want to prioritize speed, consider using .blosc with max_compression=False instead.
+    2 .csv: Available only to pandas objects with a .to_csv() method.
+    3 .blosc (default): A compressed binary file format. Might take another second to load/save a ~1GB file, but instead it takes up only a fraction of the space of a pickle file.
+    If no file extension is specified, it defaults to .blosc. This is recommended as it lends more flexibility to the function.
+
+    Parameters:
+    -----------
+    data: the data to be saved
+    filepath: the path to the file to be saved. If no file extension is specified, it defaults to .blosc
+    clever: the compression level to use. 0 is fastest, 9 is slowest. 5 is the default and recommended value as no big gains are made by going higher.
+    nthreads: the number of threads to use for compression. Large diminishing returns after 4 threads.
+    max_compression: if False, use LZ4 compression instead of ZSTD. LZ4 is a lot faster, but ZSTD is a lot more efficient.
+    **kwargs: additional arguments to be passed to blosc.compress2()
+
+    Notes on speed:
+    ---------------
+    With max_compression=False, about 90% of the time to save a file is spent on serializing the data which must be regardless of compression or not.
+    With max_compression=True, the time spent compressing the data can become a significant portion of the total time to save a file. Still, the time spent is not enough to make you bored.
+    """
     # if the file is a pickle file, save it as a pickle file
-    expected_filetypes = [".pickle", ".csv", ".blosc"]
-    if not any([filepath.endswith(ft) for ft in expected_filetypes]):
-        filepath += ".blosc"
+    supported_filetypes = [".pickle", ".csv", ".blosc"]
+    if not any([filepath.endswith(ft) for ft in supported_filetypes]):
+        filepath += ".blosc" #default to blosc
     if filepath.endswith(".pickle"):
         import pickle
         with open(filepath, "wb") as f:
-            pickle.dump(data, f, protocol=pickle.HIGHEST_PROTOCOL)
+            pickle.dump(data, f, protocol=pickle.DEFAULT_PROTOCOL) # HIGHEST_PROTOCOL is faster but only available in Python 3.8+
         if max_compression:
             print_red("Max compression not supported for pickle files. Save as .blosc instead.")
     elif filepath.endswith(".csv"):
@@ -671,12 +697,12 @@ def save_to_file(data, filepath, clever=5, nthreads=4, max_compression=True, **k
         import pickle
         blosc.set_nthreads(nthreads)
         if not max_compression:
-            codec = blosc.Codec.LZ4
+            codec_to_use = blosc.Codec.LZ4
         else:
-            codec = blosc.Codec.ZSTD
-        bytes_data = pickle.dumps(data, protocol=pickle.HIGHEST_PROTOCOL)
+            codec_to_use = blosc.Codec.ZSTD
+        bytes_data = pickle.dumps(data, protocol=pickle.DEFAULT_PROTOCOL)
         with open(filepath, "wb") as f:
-            f.write(blosc.compress(bytes_data, codec=codec, clevel=5, filter=blosc.Filter.SHUFFLE, **kwargs))
+            f.write(blosc.compress2(bytes_data, codec=codec_to_use, clevel=clever, filter=blosc.Filter.SHUFFLE, **kwargs))
     else:
         print_red(f"File extension not recognized: {filepath}")
         return None

@@ -139,6 +139,28 @@ def load_data(pickle_file, use_defaults=False, data_key='tot_cap'):
         
         #print_yellow(f"Selected data: \n{selected_data}")
         # probability needs to be considered, then years combined for each scenario and then repeated for all selected_scenarios
+    elif data_key == 'grossexport':
+        def weighted_average(group, weights):
+            return (group * weights).sum() / weights.sum()
+
+        selected_data = {}
+        for scenario in selected_scenarios:
+            weights = data[scenario]['stochastic_probability'] # a Series of float(s)
+            time_resolution_modifier = data[scenario]["TT"] #float
+            yearly_export = data[scenario]['yearly_elec_grossexport']*time_resolution_modifier
+            # Assuming 'yearly_export' has a MultiIndex with levels ['exporter', 'importer', 'stochastic_scenarios']
+            # and 'weights' is aligned with 'stochastic_scenarios'
+            weighted_grossexport = yearly_export.groupby(level=['exporter', 'importer']).apply(weighted_average, weights=weights)
+            # now find the gross export to and from continental Europe (DE_N)
+            northern_regions = ['NO_S', 'SE_S', 'FI']
+            southern_regions = ['DE_N','DE_S']
+            southwards = weighted_grossexport.loc[northern_regions, southern_regions].sum()
+            northwards = weighted_grossexport.loc[southern_regions, northern_regions].sum()
+            # Create a new series
+            gross_transfer = pd.Series([southwards, northwards], index=['Export south', 'Export north'])
+            selected_data[scenario] = gross_transfer
+
+
     else:
         selected_data = {scenario: data[scenario][data_key].fillna(0) for scenario in selected_scenarios}
 

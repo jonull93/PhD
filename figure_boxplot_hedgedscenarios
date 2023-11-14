@@ -15,7 +15,9 @@ def create_whisker_plots(grouped_data, pickle_timestamp, techs_to_plot=None):
     tech_labels = [tech_names.get(tech, tech) for tech in techs_to_plot]
     grouped_data_df = pd.DataFrame(grouped_data)
     
-    contains_biogas = "biogas" in grouped_data_df.index
+    extras = [i for i in grouped_data_df.index if i in ["biogas", 'Export south', 'Export north']]
+    extra_labels = [tech_names.get(tech, tech) for tech in extras]
+    contains_extras = len(extras) > 0
     contains_HP_sets = any("HP" in s.split("_")[0] for s in grouped_data)
     contains_nonHP_sets = any("opt" in s.split("_")[0] for s in grouped_data)
     
@@ -52,61 +54,64 @@ def create_whisker_plots(grouped_data, pickle_timestamp, techs_to_plot=None):
     print_yellow(f"Sets of years data: \n{HPsets_of_years_df}")
     #print_yellow(f"Reference levels: \n{reference_levels}")
 
-    # Create a figure for the whisker plots
-    nr_of_rows = 1+contains_HP_sets+contains_nonHP_sets
-    nr_of_cols = 1+contains_biogas
-    gridspec = {'width_ratios': [4, 1]} if contains_biogas else {'width_ratios': [1]}
-    fig, axs = plt.subplots(nrows=nr_of_rows, ncols=nr_of_cols, figsize=(8, 2+2*nr_of_rows), gridspec_kw=gridspec)
-    # if contains_biogas, make the rightmost column 1/4 of the width
-    if contains_biogas:
-        fig.subplots_adjust(right=0.75)
-    axs = axs.flatten()  # Convert the 2D array of axes to a 1D array
-    # Whisker settings
-    whisker_props = dict(whis=1.5, showfliers=True, sym="o")  # adjust as needed
+    secondary_axes = []
+    def plot_boxplot(ax, data, labels, ylabel, yside, whisker_props, width=0.5):
+        if yside.lower() in ['right', 'r']:
+            ax2 = ax.twinx()  # Create a new y-axis that shares the same x-axis
+            secondary_axes.append(ax2)
+        else:
+            ax2 = ax
+        ax2.boxplot(data.T, widths=width, labels=labels, vert=True, patch_artist=True, **whisker_props, )
+        ax.set_xticklabels(labels, rotation=15, ha='right', rotation_mode="anchor") #must be applied to the original axis, not the twin
+        ax2.set_ylabel(ylabel, color='black')
+        ax2.axhline(y=1, color='black', linestyle='-', linewidth=0.7)
 
+    def center_title(ax_left, ax_right, title, y_position=1.06):
+        if ax_right:  # If the right axis exists
+            # Calculate the center x-position between the left and right axes
+            left_pos = ax_left.get_position()
+            right_pos = ax_right.get_position()
+            center_x = (left_pos.x0 + right_pos.x1) / 2
+        else:
+            # Center over the left axis only
+            left_pos = ax_left.get_position()
+            center_x = (left_pos.x0 + left_pos.x1) / 2
+        y_pos = ax_left.get_position().y0 + y_position * (ax_left.get_position().y1 - ax_left.get_position().y0)
+        fig.text(center_x, y_pos, title, ha='center', va='center', fontsize=13)
+      
+    # Figure and Axes setup
+    nr_of_rows = 1 + contains_HP_sets + contains_nonHP_sets
+    nr_of_cols = 1 + contains_extras
+    gridspec = {'width_ratios': [7, len(extras)] if contains_extras else [1], }
+    fig, axs = plt.subplots(nrows=nr_of_rows, ncols=nr_of_cols, figsize=(8, 2 + 2 * nr_of_rows), gridspec_kw=gridspec)
+    axs = axs.flatten()
+
+    # Whisker settings
+    whisker_props = dict(whis=1.5, showfliers=True, sym="o")
+
+    # Plotting
     plot_idx = 0
-    # Generate whisker plots for individual years
-    axs[0].boxplot(individual_years_df.loc[techs_to_plot].T, labels=tech_labels, vert=True, patch_artist=True, **whisker_props) #upper (left) axes
-    axs[0].set_title(f'{len(individual_years_df.columns)} individual weather-years')
-    axs[0].set_ylabel('Normalized capacity')
-    axs[0].axhline(y=1, color='black', linestyle='-', linewidth=0.7)  # thin horizontal line
+    plot_boxplot(axs[plot_idx], individual_years_df.loc[techs_to_plot], tech_labels, 
+                'Normalized capacity', 'left', whisker_props)
     plot_idx += 1
 
-    if contains_biogas: #plot on upper right axes
-        axs[plot_idx].boxplot(individual_years_df.loc["biogas"], labels=["biogas"], vert=True, patch_artist=True, **whisker_props)
-        #axs[plot_idx].set_title(f'{len(individual_years_df.columns)} individual weather-years')
-        axs[plot_idx].set_ylabel('Normalized energy')
-        axs[plot_idx].axhline(y=1, color='black', linestyle='-', linewidth=0.7)  # thin horizontal line
+    if contains_extras:
+        plot_boxplot(axs[plot_idx], individual_years_df.loc[extras], extra_labels, 
+                    'Normalized energy', 'right', whisker_props)
         plot_idx += 1
 
-    # Generate whisker plots for sets of years
-    if contains_HP_sets:
-        axs[plot_idx].boxplot(HPsets_of_years_df.loc[techs_to_plot].T, labels=tech_labels, vert=True, patch_artist=True, **whisker_props)
-        axs[plot_idx].set_title(f'{len(HPsets_of_years_df.columns)} weather-year sets (with hand-picking)')
-        axs[plot_idx].set_ylabel('Normalized capacity')
-        axs[plot_idx].axhline(y=1, color='black', linestyle='-', linewidth=0.7)  # thin horizontal line
-        plot_idx += 1
-        if contains_biogas: #plot on upper right axes
-            axs[plot_idx].boxplot(HPsets_of_years_df.loc["biogas"], labels=["biogas"], vert=True, patch_artist=True, **whisker_props)
-            #axs[plot_idx].set_title(f'{len(individual_years_df.columns)} individual weather-years')
-            axs[plot_idx].set_ylabel('Normalized energy')
-            axs[plot_idx].axhline(y=1, color='black', linestyle='-', linewidth=0.7)  # thin horizontal line
+    datasets = [(contains_HP_sets, HPsets_of_years_df),
+                (contains_nonHP_sets, nonHPsets_of_years_df)]
+
+    for contains_set, df in datasets:
+        if contains_set:
+            plot_boxplot(axs[plot_idx], df.loc[techs_to_plot], tech_labels, 
+                        'Normalized capacity', 'left', whisker_props)
             plot_idx += 1
-
-    if contains_nonHP_sets:
-        axs[plot_idx].boxplot(nonHPsets_of_years_df.loc[techs_to_plot].T, labels=tech_labels, vert=True, patch_artist=True, **whisker_props)
-        axs[plot_idx].set_title(f'{len(nonHPsets_of_years_df.columns)} weather-year sets (without hand-picking)')
-        axs[plot_idx].set_ylabel('Normalized capacity')
-        axs[plot_idx].axhline(y=1, color='black', linestyle='-', linewidth=0.7)       
-        plot_idx += 1
-        if contains_biogas: #plot on upper right axes
-            axs[plot_idx].boxplot(nonHPsets_of_years_df.loc["biogas"], labels=["biogas"], vert=True, patch_artist=True, **whisker_props)
-            #axs[plot_idx].set_title(f'{len(individual_years_df.columns)} individual weather-years')
-            axs[plot_idx].set_ylabel('Normalized energy')
-            axs[plot_idx].axhline(y=1, color='black', linestyle='-', linewidth=0.7)  # thin horizontal line
-            plot_idx += 1
-
-
+            if contains_extras:
+                plot_boxplot(axs[plot_idx], df.loc[extras], extra_labels, 
+                            'Normalized energy', 'right', whisker_props)
+                plot_idx += 1
     # Plot red 'X' markers for 'singleyear_1989-1990'
     #for idx, tech in enumerate(techs_to_plot):
     #    if tech in scenario_1989_1990_values:
@@ -115,14 +120,31 @@ def create_whisker_plots(grouped_data, pickle_timestamp, techs_to_plot=None):
     #        None
 
     # Set the same y-limits for both axes
-    y_lims = [min(ax.get_ylim()[0] for ax in axs), max(ax.get_ylim()[1] for ax in axs)]
-    for ax in axs:
-        ax.set_ylim(y_lims)
+    all_axes = list(axs)+secondary_axes
+    y_lims = [min(ax.get_ylim()[0] for ax in all_axes), max(ax.get_ylim()[1] for ax in all_axes)]
+    #only apply if has children
+    def is_axis_empty(ax):
+        return not (ax.lines or ax.patches or ax.texts)
+    for ax in all_axes:
+        if not is_axis_empty(ax):
+            ax.set_ylim(y_lims)
+        else: #remove the yticks
+            ax.set_yticks([])
 
     # Add overall title and adjust layout
     #fig.suptitle('Box plots of installed capacity (normalized to All years)')
     #fig.tight_layout(rect=[0, 0.03, 1, 0.95])
     fig.tight_layout()
+    fig.subplots_adjust(hspace=0.43, top=0.96, wspace=0.04)
+    if contains_extras:
+        center_title(axs[0], axs[1], f'{len(individual_years_df.columns)} individual weather-years')
+        center_title(axs[2], axs[3], f'{len(HPsets_of_years_df.columns)} weather-year sets (with hand-picking)')
+        center_title(axs[4], axs[5], f'{len(nonHPsets_of_years_df.columns)} weather-year sets (without hand-picking)')
+    else:
+        center_title(axs[0], None, f'{len(individual_years_df.columns)} individual weather-years')
+        center_title(axs[1], None, f'{len(HPsets_of_years_df.columns)} weather-year sets (with hand-picking)')
+        center_title(axs[2], None, f'{len(nonHPsets_of_years_df.columns)} weather-year sets (without hand-picking)')
+
 
     # Save the figure
     fig_name_base = f"figures/capacity/boxplots/{pickle_timestamp}"
@@ -149,17 +171,19 @@ def main():
     if isinstance(pickle_file, list):
         # use the most recently modified pickle file to determine the timestamp
         pickle_file_for_timestamp = sorted(pickle_file, key=os.path.getmtime)[-1]
-        pickle_timestamp = "agg"+os.path.basename(pickle_file_for_timestamp).replace(".pickle", "").replace("data_results_", "")
+        pickle_timestamp = "agg"+os.path.basename(pickle_file_for_timestamp).replace(".pickle", "").replace(".blosc", "").replace("data_results_", "")
     else:
-        pickle_timestamp = os.path.basename(pickle_file).replace(".pickle", "").replace("data_results_", "")
+        pickle_timestamp = os.path.basename(pickle_file).replace(".pickle", "").replace(".blosc", "").replace("data_results_", "")
     print_cyan(f"Selected pickle file: {pickle_file}")
     
     cap_data = load_data(pickle_file, use_defaults="skip")
     bio_data = load_data(pickle_file, use_defaults="skip", data_key="biogas")
+    export_data = load_data(pickle_file, use_defaults="skip", data_key="grossexport")
+
     print_yellow(f"Data loaded from pickle file")
     grouped_data = group_technologies(cap_data)
     for scenario, series in grouped_data.items():
-        grouped_data[scenario] = pd.concat([series, bio_data[scenario]])
+        grouped_data[scenario] = pd.concat([series, bio_data[scenario], export_data[scenario]])
 
     print_green(f"Technologies grouped successfully")
     print_yellow(f"Grouped data: \n{pd.DataFrame(grouped_data)}")

@@ -167,7 +167,7 @@ if __name__ == "__main__":
     ]
     cases_truerefall = [
         "2HP_1opt_trueref", "2HP_2opt_trueref", "2HP_3opt_trueref", "2HP_4opt_trueref", "2HP_5opt_trueref", "2HP_6opt_trueref", "2HP_10opt_trueref",
-        "allopt2_trueref", "allopt3_trueref", "allopt4_trueref", "allopt5_trueref",
+        "allopt2_trueref", "allopt3_trueref", "allopt4_trueref", "allopt5_trueref", "allopt6_trueref",
         "allyears",
     ]
     #cases = cases1
