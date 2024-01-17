@@ -138,6 +138,7 @@ if __name__ == "__main__":
         #identify the year with the lowest and highest consumption
         min_year = bio_use_allyears.groupby(level=0).sum().idxmin()
         max_year = bio_use_allyears.groupby(level=0).sum().idxmax()
+        yearly_bio_use = bio_use_allyears.groupby(level=0).sum().round(1)
         # for each year, print the min and max storage level
         print("Consumption per year in AllYears:")
         for y in years:
@@ -174,6 +175,21 @@ if __name__ == "__main__":
         plt.savefig(f"{figure_path}/biogas_storage_level_{i}.svg")
         #plt.show()
 
+        #plot the distribution of values in yearly_bio_use
+        fig, ax = plt.subplots()
+        ax.hist(yearly_bio_use, bins=20)
+        ax.set_xlabel("Yearly bio use [TWh]")
+        ax.set_ylabel("Frequency")
+        ax.set_title("Distribution of yearly bio use")
+        plt.tight_layout()
+        #if there already is a figure, save it with a number at the end
+        i = 1
+        while os.path.exists(f"{figure_path}/biogas_yearly_distribution_{i}.png"):
+            i += 1
+        plt.savefig(f"{figure_path}/biogas_yearly_distribution_{i}.png", dpi=400)
+        plt.savefig(f"{figure_path}/biogas_yearly_distribution_{i}.svg")
+
+
         print("All individual years: ")
         biogas_individual_years = []
         sorted_keys = sorted(data.keys())
@@ -193,7 +209,9 @@ if __name__ == "__main__":
             biogas_individual_years.append(df.sum())
             #df = df.div(efficiency, axis="index")
             #print(df)
-        print(f"Average biogas use: {sum(biogas_individual_years)/len(biogas_individual_years)/1000:.1f} TWh")
+        if len(biogas_individual_years) > 0:
+            print(f"Total biogas use: {sum(biogas_individual_years)/1000:.1f} TWh")
+            print(f"Average biogas use: {sum(biogas_individual_years)/len(biogas_individual_years)/1000:.1f} TWh")
 
     else:
         plot_bio_use()
