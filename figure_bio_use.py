@@ -1,16 +1,33 @@
-from my_utils import completion_sound, print_magenta, print_cyan, print_yellow, print_red, print_green, print_blue, select_pickle, shorten_year
+from my_utils import completion_sound, print_magenta, print_cyan, print_yellow, print_red, print_green, print_blue, select_pickle, shorten_year, load_from_file
 import pickle
 import os
 import time
 import pandas as pd
 import matplotlib.pyplot as plt
 
+def get_biogas_use(data,model_run):
+    efficiency = {"WG": 0.610606, "WG_peak": 0.420606}
+    time_resolution_modifier = data[model_run]["TT"]
+    #print_magenta(f"  Time resolution modifier: {time_resolution_modifier}")
+    # the biomass use is calculated as generation divided by efficiency
+    _df = data[model_run]["gen"]
+    if "WG_CHP" in _df.index.get_level_values("tech").unique():
+        df = _df.loc[["WG", "WG_peak", "WG_CHP"]]
+        efficiency["WG_CHP"] = 0.492604
+    else:
+        df = _df.loc[["WG", "WG_peak"]]
+    years = list(df.index.get_level_values("stochastic_scenarios").unique())
+    #print(df)
+    #sum over regions and filter out the correct years
+    dfs_per_year = {y: df.xs(y, level="stochastic_scenarios").fillna(0).groupby(level="tech").sum().div(efficiency,axis=0).mul(time_resolution_modifier) for y in years}
+    return dfs_per_year
+    
 if __name__ == "__main__":
     print_magenta(f"Started {__file__} at {time.strftime('%H:%M:%S', time.localtime())}")
     print_magenta(f"Step 1: Select the pickle file to load biomass use from")
     pickle_file = select_pickle()
     # step 2: select model_run/scenario
-    data = pickle.load(open(pickle_file, "rb"))
+    data = load_from_file(pickle_file)
     if "allyears" in data.keys():
         print_yellow(f"  allyears is available, selecting that one")
         model_run = "allyears"
@@ -58,14 +75,7 @@ if __name__ == "__main__":
     # the I_regs should be combined
     # the "stochastic_scenarios" is the year
     # each tech has a different efficiency which we must divide that generation by: CHP=0.492604, peak=0.420606, WG=0.610606
-    efficiency = {"WG": 0.610606, "WG_peak": 0.420606, "WG_CHP": 0.492604}
-    time_resolution_modifier = data[model_run]["TT"]
-    print_magenta(f"  Time resolution modifier: {time_resolution_modifier}")
-    # the biomass use is calculated as generation divided by efficiency
-    df = data[model_run]["gen"].loc[["WG", "WG_peak", "WG_CHP"]]
-    #print(df)
-    #sum over regions and filter out the correct years
-    dfs_per_year = {y: df.xs(y, level="stochastic_scenarios").fillna(0).groupby(level="tech").sum().div(efficiency,axis=0).mul(time_resolution_modifier) for y in years}
+    dfs_per_year = get_biogas_use(data,model_run)
     #print(yearly_dfs[years[0]].sum().sum())
     hourly_bio_use = {y: dfs_per_year[y].sum() for y in years}
     def plot_bio_use():

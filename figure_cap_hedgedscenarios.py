@@ -2,9 +2,10 @@ import os
 import pandas as pd
 import matplotlib.pyplot as plt
 import re
-from my_utils import color_dict, tech_names, print_red, print_cyan, print_green, print_magenta, print_blue, print_yellow, select_pickle
+from my_utils import color_dict, tech_names, print_red, print_cyan, print_green, print_magenta, print_blue, print_yellow, select_pickle, load_from_file, save_to_file
 from order_cap import wind, PV, baseload, peak, CCS, CHP, midload, hydro, PtH, order_cap, order_cap2, order_cap3
 from datetime import datetime
+from figure_bio_use import get_biogas_use
 
 # Path to the pickle files and figures
 pickle_folder = 'PickleJar/'
@@ -44,22 +45,22 @@ def shorten_year(scenario):
     return re.sub(r'(19|20)\d{2}', replacer, scenario).removeprefix("singleyear_")
 
 
-def load_data(pickle_file, use_defaults=False):
+def load_data(pickle_file, use_defaults=False, data_key='tot_cap'):
     # Load the pickle file
     #aggregate the dictionaries if pickle_file is a list
     if isinstance(pickle_file, list):
         data = {}
         for p in pickle_file:
-            data.update(pd.read_pickle(p))
+            data.update(load_from_file(p))
     else:
-        data = pd.read_pickle(pickle_file)
+        data = load_from_file(pickle_file)
     
     # Handle scenario selection
     all_scenarios = list(data.keys())
     print_cyan(f"All scenarios: {all_scenarios}")
     
     selected_scenarios = []
-    if use_defaults:
+    if use_defaults==True:
         # Use all scenarios, but if there's a scenarioname with "1h", skip the one with "3h" if there is one
         selected_scenarios = [i for i in all_scenarios if "singleyear" not in i]
         print_magenta(f"Included sets: {selected_scenarios}")
@@ -77,7 +78,9 @@ def load_data(pickle_file, use_defaults=False):
                 break
     else:
         # Let the user exclude some scenarios
-        excluded = input("Please enter the scenarios you want to exclude, separated by commas (or H for the hardcoded list): ").split(',')
+        excluded = []
+        if use_defaults==False: 
+            excluded = input("Please enter the scenarios you want to exclude, separated by commas (or H for the hardcoded list): ").split(',')
         if excluded == ['H'] or excluded == ['h']:
             # Use the hardcoded list
             selected_scenarios = [
@@ -124,7 +127,42 @@ def load_data(pickle_file, use_defaults=False):
                 print_red(f"No alternative scenarios found for {s}. Skipping that one...")
                
     # Extract 'tot_cap' data for the selected scenarios and replace NaNs with 0
-    selected_data = {scenario: data[scenario]['tot_cap'].fillna(0) for scenario in selected_scenarios}
+    if data_key == 'biogas':
+        selected_data = {}
+        for scenario in selected_scenarios:
+            weights = data[scenario]['stochastic_probability'] # a Series of float(s)
+            hourly_use = get_biogas_use(data, scenario) #returns a dictionary of time-series for each year
+            total_use = 0
+            for year, df in hourly_use.items():
+                total_use += df.sum().sum()*weights[year]
+            selected_data[scenario] = pd.Series(total_use, index=['biogas'])
+        
+        #print_yellow(f"Selected data: \n{selected_data}")
+        # probability needs to be considered, then years combined for each scenario and then repeated for all selected_scenarios
+    elif data_key == 'grossexport':
+        def weighted_average(group, weights):
+            return (group * weights).sum() / weights.sum()
+
+        selected_data = {}
+        for scenario in selected_scenarios:
+            weights = data[scenario]['stochastic_probability'] # a Series of float(s)
+            time_resolution_modifier = data[scenario]["TT"] #float
+            yearly_export = data[scenario]['yearly_elec_grossexport']*time_resolution_modifier
+            # Assuming 'yearly_export' has a MultiIndex with levels ['exporter', 'importer', 'stochastic_scenarios']
+            # and 'weights' is aligned with 'stochastic_scenarios'
+            weighted_grossexport = yearly_export.groupby(level=['exporter', 'importer']).apply(weighted_average, weights=weights)
+            # now find the gross export to and from continental Europe (DE_N)
+            northern_regions = ['NO_S', 'SE_S', 'FI']
+            southern_regions = ['DE_N','DE_S']
+            southwards = weighted_grossexport.loc[northern_regions, southern_regions].sum()
+            northwards = weighted_grossexport.loc[southern_regions, northern_regions].sum()
+            # Create a new series
+            gross_transfer = pd.Series([southwards, northwards], index=['Export south', 'Export north'])
+            selected_data[scenario] = gross_transfer
+
+
+    else:
+        selected_data = {scenario: data[scenario][data_key].fillna(0) for scenario in selected_scenarios}
 
     # Remove "ref_cap" from scenario names 
     selected_data = {s.replace("ref_cap_", ""): selected_data[s] for s in selected_data.keys()}
@@ -508,86 +546,6 @@ def create_figure_separated_techs(grouped_data, pickle_timestamp, use_defaults):
     # Close the figure to free memory
     plt.close(fig)
 
-
-def create_whisker_plots(grouped_data, pickle_timestamp, techs_to_plot=None):
-    if techs_to_plot is None:
-        techs_to_plot = ["PV", "Wind", "U", "WG", "Peak", "H2store", "bat"]  # Default technologies
-    tech_labels = [tech_names.get(tech, tech) for tech in techs_to_plot]
-    
-    # Extract the reference levels for 'allyears'
-    reference_levels = grouped_data.get("allyears", pd.Series())
-
-    # Normalize the data such that the reference levels become 1
-    normalized_grouped_data = {key: data.div(reference_levels, axis=0).filter(items=techs_to_plot, axis=0) for key, data in grouped_data.items() if key != "allyears"}
-    reference_levels = reference_levels.filter(items=techs_to_plot, axis=0).div(reference_levels, axis=0)  # Should be all ones now
-
-    # Create a directory for the whisker plots if it doesn't already exist
-    if not os.path.exists('figures/whisker_plots'):
-        os.makedirs('figures/whisker_plots')
-
-    # Split the normalized data into individual years and sets of years
-    individual_years_data = {key: data for key, data in normalized_grouped_data.items() if 'singleyear' in key}
-    sets_of_years_data = {key: data for key, data in normalized_grouped_data.items() if 'singleyear' not in key and "HP" in key}
-
-    # Filter for selected technologies
-    individual_years_df = pd.DataFrame(individual_years_data)
-    sets_of_years_df = pd.DataFrame(sets_of_years_data)
-
-    # Extract the values for the scenario 'singleyear_1989-1990'
-    scenario_1989_1990_values = individual_years_df['singleyear_1989-1990']
-
-    # Print the dataframes
-    #print(f"{grouped_data.items()=}")
-    print_yellow(f"Individual years data: \n{individual_years_df}")
-    print_yellow(f"Sets of years data: \n{sets_of_years_df}")
-    #print_yellow(f"Reference levels: \n{reference_levels}")
-
-    # Create a figure for the whisker plots
-    fig, axs = plt.subplots(nrows=2, ncols=1, figsize=(8, 6))
-
-    # Whisker settings
-    whisker_props = dict(whis=1.5e5, showfliers=True, sym="o")  # adjust as needed
-
-    # Generate whisker plots for individual years
-    axs[0].boxplot(individual_years_df.T, labels=tech_labels, vert=True, patch_artist=True, **whisker_props)
-    axs[0].set_title(f'Individual weather-years ({len(individual_years_df.columns)} years)')
-    axs[0].set_ylabel('Normalized capacity')
-    axs[0].axhline(y=1, color='black', linestyle='-', linewidth=0.7)  # thin horizontal line
-
-    # Generate whisker plots for sets of years
-    axs[1].boxplot(sets_of_years_df.T, labels=tech_labels, vert=True, patch_artist=True, **whisker_props)
-    axs[1].set_title(f'Sets of weather-years ({len(sets_of_years_df.columns)} sets)')
-    axs[1].set_ylabel('Normalized capacity')
-    axs[1].axhline(y=1, color='black', linestyle='-', linewidth=0.7)  # thin horizontal line
-
-    # Plot red 'X' markers for 'singleyear_1989-1990'
-    for idx, tech in enumerate(techs_to_plot):
-        if tech in scenario_1989_1990_values:
-            #axs[0].plot(idx + 1, scenario_1989_1990_values[tech], 'rx')  # 'rx' is red 'X' marker
-            #axs[1].plot(idx + 1, scenario_1989_1990_values[tech], 'rx')  # 'rx' is red 'X' marker
-
-    # Set the same y-limits for both axes
-    y_lims = [min(ax.get_ylim()[0] for ax in axs), max(ax.get_ylim()[1] for ax in axs)]
-    axs[0].set_ylim(y_lims)
-    axs[1].set_ylim(y_lims)
-
-    # Add overall title and adjust layout
-    #fig.suptitle('Box plots of installed capacity (normalized to All years)')
-    #fig.tight_layout(rect=[0, 0.03, 1, 0.95])
-    fig.tight_layout()
-
-    # Save the figure
-    fig_name_base = f"figures/whisker_plots/{pickle_timestamp}"
-    fig_num = 1
-    while os.path.exists(f"{fig_name_base}_{fig_num}.png"):
-        fig_num += 1
-    fig.savefig(f"{fig_name_base}_{fig_num}.png", dpi=300)
-    fig.savefig(f"{fig_name_base}_{fig_num}.svg")  # or .eps for EPS format
-    plt.close(fig)
-
-    # Log the success message
-    print(f"Normalized whisker plots saved as '{fig_name_base}_{fig_num}.png'.")
-
 def main():
     print_blue(f"Script started at: {datetime.now()}")
     
@@ -608,7 +566,7 @@ def main():
     print_yellow(f"Data loaded from pickle file")
     grouped_data = group_technologies(data)
     print_green(f"Technologies grouped successfully")
-    #print_yellow(f"Grouped data: \n{grouped_data}")
+    print_yellow(f"Grouped data: \n{grouped_data}")
     #create_figure_separated_techs(grouped_data, pickle_timestamp, use_defaults)
     create_whisker_plots(grouped_data, pickle_timestamp)
     print_magenta(f"Figures created and saved in {figures_folder}")

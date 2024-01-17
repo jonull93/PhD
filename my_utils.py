@@ -10,6 +10,36 @@ import pandas
 from order_cap import order_cap
 from order_gen import order_gen
 
+"""
+Functions and other utilities available in my_utils.py:
+TECH:           Enum class containing all technologies (having a wrapper for techs is useful for when tech names change, and enables autocompletion)
+tech_names:     dictionary mapping the techs to their pretty names
+scen_names:     dictionary mapping the scenarios to their pretty names
+color_dict:     dictionary mapping the techs to their colors
+EPODreg_to_country: dictionary mapping the EPODreg to the country name
+country_to_reg: function that takes a dictionary with reg keys (e.g. VRE_pot), and a country label, then uses EPODreg_to_country to return a dictionary with only the keys that correspond to that country
+label_axes:     function that walks through subplots and labels each of them with a letter
+write_inc:      function that takes a dictionary and writes it to a .inc file
+write_inc_from_df_columns: function that takes a dataframe and writes it to a .inc file
+append_to_file: function that adds 'to_add' to a new line at the bottom of originalfile
+add_in_dict:    function that adds a value to a dictionary, and sums it if the key already exists
+crawl_resource_usage: function that prints memory and CPU usage every 5 minutes
+print_red:      function that prints in red
+print_green:    function that prints in green
+print_cyan:     function that prints in cyan
+print_yellow:   function that prints in yellow
+print_blue:     function that prints in blue
+print_magenta:  function that prints in magenta
+fast_rolling_average: function that takes a list or dataframe and returns a rolling average of it
+completion_sound: function that plays a sound (e.g. when the script is done)
+select_pickle:  function that lets the user select a pickle file to load
+shorten_year:   function that shortens the year in a scenario name (e.g. 2015 -> '15)
+prettify_scenario_name: function that prettifies a scenario name (e.g. set1_4opt -> Set 1 (4 opt.))
+load_from_file: Read the data from the specified filepath. Supports both compressed and uncompressed files.
+save_to_file:   Save the data to the specified filepath. Supports both compressed and uncompressed files.
+
+"""
+
 os.system('color')
 
 class TECH(str, Enum):
@@ -111,7 +141,8 @@ tech_names = {'RO': 'Hydro', 'RR': 'Run-of-river', 'U': 'Nuclear', "b": "Lignite
               'Load': 'Load', 'bat_PS': "Battery (PS)", 'bat_cap_PS': "Battery cap (PS)", 'bat_cap': "Bat. power",
               "electrolyser": "Electrolyser", "H": "Coal ST", "W": "Biomass ST",
               "G": "N. Gas CCGT", "G_peak": "N. Gas GT", "PV": "Solar PV", "FC": "Fuel cell",
-              "H2store": "H2 storage", "PtH":"Power-to-Heat", "thermals":"Thermal power", "Hydro":"Hydro power"
+              "H2store": "H2 storage", "PtH":"Power-to-Heat", "thermals":"Thermal power", "Hydro":"Hydro power",
+              "biogas": "Biogas", "Export south": "Exp. south", "Export north": "Exp. north",
               }
 scen_names = {"_pre": "Base case", "_leanOR": "Lean OR", "_OR": "OR", "_OR_fixed": "OR", "_OR_inertia": "OR + Inertia",
               "_OR+inertia_fixed": "OR + Inertia", "_inertia": "Inertia", "_inertia_2x": "2x Inertia",
@@ -182,7 +213,7 @@ def country_to_reg(dictionary, country):
 
     Returns
     -------
-    takes a dictionary with reg keys, and a country key, then uses EPODreg_to_country to return a dictionary with only
+    takes a dictionary with reg keys (e.g. VRE_pot), and a country label, then uses EPODreg_to_country to return a dictionary with only
     the keys that correspond to that country
     """
     return {reg: dictionary[reg] for reg in dictionary if country in EPODreg_to_country[reg]}
@@ -506,30 +537,36 @@ def completion_sound():
         Beep(note, duration)
 
 
-def select_pickle(use_defaults=False, pickle_folder="PickleJar\\"):
+def select_pickle(predetermined_choice=False, pickle_folder="PickleJar\\"):
     import glob
-    pickle_files = glob.glob(os.path.join(pickle_folder, "data_results_*.pickle"))
+    pickle_files = glob.glob(os.path.join(pickle_folder, "data_results_*"))
     if not pickle_files:
-        print_red("No data_results_*.pickle file found in PickleJar folder.")
+        print_red("No data_results_* files found in PickleJar folder.")
         return None
 
+    if predetermined_choice==True:
+        predetermined_choice = 1
     pickle_files.sort(key=os.path.getmtime, reverse=True)
-    print_blue(f"Found {len(pickle_files)} data_results_*.pickle files.")
+    print_blue(f"Found {len(pickle_files)} data_results_* files.")
     print_blue(f"Most recent file: {pickle_files[0]}")
 
-    if use_defaults or len(pickle_files) == 1:
+    if predetermined_choice == 1 or len(pickle_files) == 1 or predetermined_choice == "most_recent":
         # Either use defaults or no appropriate pickle files were found, so just use the most recent file
         # most_recent_file = max(pickle_files, key=lambda x: os.path.getctime(pickle_folder + x))
         return pickle_files[0]
+    elif type(predetermined_choice) == int:
+        user_input = str(predetermined_choice)
+    elif predetermined_choice == "combine":
+        user_input = '5'
+    else:
+        print_yellow("Select the pickle file to load:")
+        print_yellow("1. Most recent file")
+        print_yellow("2. Largest file")
+        print_yellow("3. Pick among the 10 most recent files")
+        print_yellow("4. Enter the filename manually")
+        print_yellow("5. A combination of the most recent allyears and allopt pickle files")
+        user_input = input("Please enter the option number: ")
 
-    print_yellow("Select the pickle file to load:")
-    print_yellow("1. Most recent file")
-    print_yellow("2. Largest file")
-    print_yellow("3. Pick among the 10 most recent files")
-    print_yellow("4. Enter the filename manually")
-    print_yellow("5. A combination of the most recent allyears and allopt pickle files")
-
-    user_input = input("Please enter the option number: ")
     if user_input == '1':
         # Most recent file
         return pickle_files[0]  # The list is already sorted by modification time
@@ -551,9 +588,7 @@ def select_pickle(use_defaults=False, pickle_folder="PickleJar\\"):
     elif user_input == '4':
         # Enter the filename manually
         user_input = input("Please enter the filename: ")
-        if user_input in pickle_files or "PickleJar\\" + user_input in pickle_files or "PickleJar\\" + user_input + ".pickle" in pickle_files:
-            if ".pickle" not in user_input:
-                user_input = user_input + ".pickle"
+        if user_input in pickle_files or "PickleJar\\" + user_input in pickle_files or "PickleJar\\" + user_input + ".pickle" in pickle_files or "PickleJar\\" + user_input + ".blosc" in pickle_files:
             if "PickleJar\\" not in user_input:
                 user_input = "PickleJar\\" + user_input
             return user_input
@@ -623,3 +658,83 @@ def prettify_scenario_name(name,return_single_as_year=False):
         return f'6 yr, eq. weights'
     # join the parts with appropriate labels
     return f'Set ({parts[0]} opt.)'
+
+def load_from_file(filepath):
+    """
+    Read the data from the specified filepath. The following file formats are supported: .pickle, .csv, .blosc.
+    If no file extension is specified, the function will first look for a .blosc file, then a .pickle file. This is recommended as it lends more flexibility to the function.
+    """
+    import os
+    # if the file is a pickle file, load it as a pickle file
+    expected_filetypes = [".pickle", ".csv", ".blosc"]
+    if not any([filepath.endswith(ft) for ft in expected_filetypes]):
+        filepath += ".blosc"
+    #if the file is not found, look for a .pickle file instead
+    if not os.path.isfile(filepath):
+        filepath = filepath.replace(".blosc", ".pickle")
+    if filepath.endswith(".pickle"):
+        import pickle
+        with open(filepath, "rb") as f:
+            return pickle.load(f)
+    elif filepath.endswith(".csv"):
+        import pandas as pd
+        return pd.read_csv(filepath)
+    elif filepath.endswith(".blosc"):
+        import blosc2 as blosc
+        import pickle
+        blosc.set_nthreads(4)
+        with open(filepath, "rb") as f:
+            data = blosc.decompress(f.read())
+        return pickle.loads(data)
+    
+def save_to_file(data, filepath, clever=5, nthreads=4, max_compression=True, **kwargs):
+    """
+    Save the data to the specified filepath. The following file formats are supported:
+    1 .pickle (NOT RECOMMENDED): A standard, uncompressed way of storing python objects in binary files. Fast to save and load, but takes up a lot of space. If you want to prioritize speed, consider using .blosc with max_compression=False instead.
+    2 .csv: Available only to pandas objects with a .to_csv() method.
+    3 .blosc (default): A compressed binary file format. Might take another second to load/save a ~1GB file, but instead it takes up only a fraction of the space of a pickle file.
+    If no file extension is specified, it defaults to .blosc. This is recommended as it lends more flexibility to the function.
+
+    Parameters:
+    -----------
+    data: the data to be saved
+    filepath: the path to the file to be saved. If no file extension is specified, it defaults to .blosc
+    clever: the compression level to use. 0 is fastest, 9 is slowest. 5 is the default and recommended value as no big gains are made by going higher.
+    nthreads: the number of threads to use for compression. Large diminishing returns after 4 threads.
+    max_compression: if False, use LZ4 compression instead of ZSTD. LZ4 is a lot faster, but ZSTD is a lot more efficient.
+    **kwargs: additional arguments to be passed to blosc.compress2()
+
+    Notes on speed:
+    ---------------
+    With max_compression=False, about 90% of the time to save a file is spent on serializing the data which must be regardless of compression or not.
+    With max_compression=True, the time spent compressing the data can become a significant portion of the total time to save a file. Still, the time spent is not enough to make you bored.
+    """
+    # if the file is a pickle file, save it as a pickle file
+    supported_filetypes = [".pickle", ".csv", ".blosc"]
+    if not any([filepath.endswith(ft) for ft in supported_filetypes]):
+        filepath += ".blosc" #default to blosc
+    if filepath.endswith(".pickle"):
+        import pickle
+        with open(filepath, "wb") as f:
+            pickle.dump(data, f, protocol=pickle.DEFAULT_PROTOCOL) # HIGHEST_PROTOCOL is faster but only available in Python 3.8+
+        if max_compression:
+            print_red("Max compression not supported for pickle files. Save as .blosc instead.")
+    elif filepath.endswith(".csv"):
+        import pandas as pd
+        data.to_csv(filepath)
+    elif filepath.endswith(".blosc"):
+        import blosc2 as blosc
+        import pickle
+        blosc.set_nthreads(nthreads)
+        if not max_compression:
+            codec_to_use = blosc.Codec.LZ4
+        else:
+            codec_to_use = blosc.Codec.ZSTD
+        bytes_data = pickle.dumps(data, protocol=pickle.DEFAULT_PROTOCOL)
+        with open(filepath, "wb") as f:
+            f.write(blosc.compress2(bytes_data, codec=codec_to_use, clevel=clever, filter=blosc.Filter.SHUFFLE, **kwargs))
+    else:
+        print_red(f"File extension not recognized: {filepath}")
+        return None
+    #print_green(f"Data saved to {filepath}")
+    return None

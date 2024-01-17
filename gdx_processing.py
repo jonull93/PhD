@@ -12,7 +12,7 @@ import time
 import traceback
 from traceback import format_exc
 import gdx_processing_functions as gpf
-from my_utils import print_red, print_cyan, print_green, print_magenta
+from my_utils import print_red, print_cyan, print_green, print_magenta, save_to_file
 from termcolor import colored
 from glob import glob
 
@@ -148,7 +148,7 @@ if __name__ == "__main__":
         "singleyear_2004to2005_1h_flexlim_gurobi", "singleyear_2005to2006_1h_flexlim_gurobi","singleyear_2006to2007_1h_flexlim_gurobi",
         "singleyear_2007to2008_1h_flexlim_gurobi", "singleyear_2008to2009_1h_flexlim_gurobi","singleyear_2009to2010_1h_flexlim_gurobi",
         "singleyear_2010to2011_1h_flexlim_gurobi", "singleyear_2011to2012_1h_flexlim_gurobi","singleyear_2012to2013_1h_flexlim_gurobi",
-        "singleyear_1h_2012",
+        "singleyear_2012_1h_flexlim_gurobi",
         "singleyear_2013to2014_1h_flexlim_gurobi", "singleyear_2014to2015_1h_flexlim_gurobi","singleyear_2015to2016_1h_flexlim_gurobi",
         "singleyear_2016to2017_1h_flexlim_gurobi", "singleyear_2017to2018_1h_flexlim_gurobi","singleyear_2018to2019_1h_flexlim_gurobi",
     ]    
@@ -436,7 +436,9 @@ if __name__ == "__main__":
         except Exception as e:
             print_red("! Could not add", scen, "to the pickle jar because",str(e))
 
-    pickle.dump(old_data, open(f"PickleJar\\data_{name}{suffix}.pickle", "wb"))
+    #pickle.dump(old_data, open(f"PickleJar\\data_{name}{suffix}.pickle", "wb"))
+    save_to_file(old_data, f"PickleJar\\data_{name}{suffix}") #specifying the file extension is no longer necessary
+
     print_green("Successfully pickled")
     if opened_file: print_red(" ! REMINDER TO MAKE SURE EXCEL FILE IS CLOSED !")
     p_excel.join()

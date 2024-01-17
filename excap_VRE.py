@@ -1,4 +1,4 @@
-from my_utils import write_inc, print_red, print_cyan, print_green
+from my_utils import write_inc, print_red, print_cyan, print_green, country_to_reg
 
 # To run this file, edit the paths below and make sure you have the GIS capacity_Windonshore.inc in the inc_path
 # And to import from my_utils.py, just make sure it exists in the same folder as this script
@@ -142,22 +142,6 @@ def filler(amount, destinations, weights, limits, vocal=False):
         raise ArithmeticError
     #print(f"Finished {regs}")
     return destinations
-
-
-def country_to_reg(dictionary, country):
-    """
-
-    Parameters
-    ----------
-    dictionary
-    country
-
-    Returns
-    -------
-    takes a dictionary with reg keys, and a country key, then uses EPODreg_to_country to return a dictionary with only
-    the keys that correspond to that country
-    """
-    return {reg: dictionary[reg] for reg in dictionary if country in EPODreg_to_country[reg]}
 
 
 existingCapacity = {reg: {tech: 0 for tech in WON_techs + WOFF_techs} for reg in gdp}
