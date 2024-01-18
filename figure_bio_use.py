@@ -20,7 +20,7 @@ def get_biogas_use(data,model_run):
     #print(df)
     #sum over regions and filter out the correct years
     dfs_per_year = {y: df.xs(y, level="stochastic_scenarios").fillna(0).groupby(level="tech").sum().div(efficiency,axis=0).mul(time_resolution_modifier) for y in years}
-    return dfs_per_year
+    return dfs_per_year # a dict with years as keys and series with biomass use 
     
 if __name__ == "__main__":
     print_magenta(f"Started {__file__} at {time.strftime('%H:%M:%S', time.localtime())}")
@@ -29,7 +29,7 @@ if __name__ == "__main__":
     # step 2: select model_run/scenario
     data = load_from_file(pickle_file)
     if "allyears" in data.keys():
-        print_yellow(f"  allyears is available, selecting that one")
+        print_yellow(f"  allyears is available, selecting the data from that model-run")
         model_run = "allyears"
     else:
         print_magenta(f"Step 2: Select the model_run/scenario to load biomass use from")
@@ -65,7 +65,7 @@ if __name__ == "__main__":
     else:
         print_red(f"  Invalid choice: {choice}")
         exit()
-    print_yellow(f"  Selected {years}")
+    print_yellow(f"  Selected {years if len(years) < 10 else str(len(years))+' years'}")
     figure_path = f"figures/bio use/{model_run}"
     # make the figure_path silently
     os.makedirs(figure_path, exist_ok=True)
@@ -124,6 +124,7 @@ if __name__ == "__main__":
         # make a new series with the hourly bio use for all years in consecutive order
         bio_use_allyears = pd.Series(dtype=float)
         bio_use_allyears = pd.concat([hourly_bio_use[y]/1000 for y in hourly_bio_use.keys()])
+        print_yellow(bio_use_allyears)
         bio_use_allyears.index = pd.MultiIndex.from_product([years, hourly_bio_use[years[0]].index]) # 2920 timesteps, but correct total yearly value
         #make a new series representing a storage level, starting at 0 and being filled each hour by the total hourly bio use divided by total number of hours
         storage_level = pd.Series(dtype=float, index=bio_use_allyears.index)
@@ -135,6 +136,7 @@ if __name__ == "__main__":
         #for i in range(1,len(bio_use_allyears)):
         #    storage_level[i] = storage_level[i-1] - bio_use_allyears[i-1] + hourly_bio_refill
         #vectorize the above
+        time_resolution_modifier = data[model_run]["TT"]
         storage_level = (hourly_bio_refill*time_resolution_modifier - bio_use_allyears).cumsum()
         #print_red(storage_level[:5])
         storage_level = storage_level.shift(1).fillna(0)
@@ -155,50 +157,74 @@ if __name__ == "__main__":
             print(f"{y}: min={storage_level.loc[y].min():.0f} TWh, max={storage_level.loc[y].max():.0f} TWh, consumed={bio_use_allyears.loc[y].sum():.1f} TWh")
         print(f"Min year: {min_year}, max year: {max_year}")
         # plot the allyears data
-        fig, ax = plt.subplots()
-        #ax.plot(bio_use_allyears, label="Biogas use")
-        ax.plot(storage_level.values, label="Storage level")
-        #set the x-axis to indicate each year with a small tick, and label every tenth tick with the year
-        start_of_new_year = [i*8760/3+8760/3/2 for i in range(len(years))]
-        shortened_years = [shorten_year(y.split("-")[1]) for y in years]
-        ax.xaxis.set_major_locator(plt.FixedLocator([i*8760/3*5+8760/3/2 for i in range(len(years))]))
-        ax.xaxis.set_major_formatter(plt.FixedFormatter([shortened_years[i] for i,y in enumerate(start_of_new_year) if i%5==0]))
-        #add minor ticks to indicate each year
-        ax.xaxis.set_minor_locator(plt.FixedLocator(start_of_new_year))
-        ax.set_xlim(-1 * 8760/3, (len(years)+1) * 8760/3)
-        # add minor ticks to indicate each 10 TWh on the y-axis
-        ax.yaxis.set_minor_locator(plt.MultipleLocator(10))
-        #add a grid which includes the minor ticks (with alpha 0.2 for minor ticks and 0.5 for major ticks)
-        ax.grid(which="both", alpha=0.2)
-        ax.grid(which="major", alpha=0.67)
-        
-        ax.set_xlabel("Year")
-        ax.set_ylabel("Biogas [TWh]")
-        ax.legend()
-        ax.set_title("Biogas storage level")
-        plt.tight_layout()
-        #if there already is a figure, save it with a number at the end
-        i = 1
-        while os.path.exists(f"{figure_path}/biogas_storage_level_{i}.png"):
-            i += 1
-        plt.savefig(f"{figure_path}/biogas_storage_level_{i}.png", dpi=400)
-        plt.savefig(f"{figure_path}/biogas_storage_level_{i}.svg")
-        #plt.show()
+        #ask the user if they want to plot the storage level
+        choice = input("Do you want to plot the storage level? [y/n] ")
+        if choice.lower() in ["y", "yes"]:
+            fig, ax = plt.subplots(figsize=(5,2.5))
+            #ax.plot(bio_use_allyears, label="Biogas use")
+            ax.plot(storage_level.values, label="Storage level")
+            #set the x-axis to indicate each year with a small tick, and label every tenth tick with the year
+            start_of_new_year = [i*8760/3+8760/3/2 for i in range(len(years))]
+            shortened_years = [shorten_year(y.split("-")[1]) for y in years]
+            ax.xaxis.set_major_locator(plt.FixedLocator([i*8760/3*5+8760/3/2 for i in range(len(years))]))
+            ax.xaxis.set_major_formatter(plt.FixedFormatter([shortened_years[i] for i,y in enumerate(start_of_new_year) if i%5==0]))
+            #add minor ticks to indicate each year
+            ax.xaxis.set_minor_locator(plt.FixedLocator(start_of_new_year))
+            ax.set_xlim(-1 * 8760/3, (len(years)+1) * 8760/3)
+            # add minor ticks to indicate each 10 TWh on the y-axis
+            ax.yaxis.set_minor_locator(plt.MultipleLocator(10))
+            #add a grid which includes the minor ticks (with alpha 0.2 for minor ticks and 0.5 for major ticks)
+            ax.grid(which="both", alpha=0.2)
+            ax.grid(which="major", alpha=0.67)
+            
+            ax.set_xlabel("Year")
+            ax.set_ylabel("Biogas [TWh]")
+            ax.legend()
+            ax.set_title("Biogas storage level")
+            plt.tight_layout()
+            #if there already is a figure, save it with a number at the end
+            i = 1
+            while os.path.exists(f"{figure_path}/biogas_storage_level_{i}.png"):
+                i += 1
+            plt.savefig(f"{figure_path}/biogas_storage_level_{i}.png", dpi=400)
+            plt.savefig(f"{figure_path}/biogas_storage_level_{i}.svg")
+            #plt.show()
 
-        #plot the distribution of values in yearly_bio_use
-        fig, ax = plt.subplots()
-        ax.hist(yearly_bio_use, bins=20)
-        ax.set_xlabel("Yearly bio use [TWh]")
-        ax.set_ylabel("Frequency")
-        ax.set_title("Distribution of yearly bio use")
-        plt.tight_layout()
-        #if there already is a figure, save it with a number at the end
-        i = 1
-        while os.path.exists(f"{figure_path}/biogas_yearly_distribution_{i}.png"):
-            i += 1
-        plt.savefig(f"{figure_path}/biogas_yearly_distribution_{i}.png", dpi=400)
-        plt.savefig(f"{figure_path}/biogas_yearly_distribution_{i}.svg")
+        #ask the user if they want to plot a bio use histogram
+        choice = input("Plot a histogram of the yearly bio use? [y/n] ")
+        if choice.lower() in ["y", "yes"]:
+            #plot the distribution of values in yearly_bio_use
+            fig, ax = plt.subplots()
+            ax.hist(yearly_bio_use, bins=20)
+            ax.set_xlabel("Yearly bio use [TWh]")
+            ax.set_ylabel("Frequency")
+            ax.set_title("Distribution of yearly bio use")
+            plt.tight_layout()
+            #if there already is a figure, save it with a number at the end
+            i = 1
+            while os.path.exists(f"{figure_path}/biogas_yearly_distribution_{i}.png"):
+                i += 1
+            plt.savefig(f"{figure_path}/biogas_yearly_distribution_{i}.png", dpi=400)
+            plt.savefig(f"{figure_path}/biogas_yearly_distribution_{i}.svg")
 
+        #ask the user if they want to plot a bio use whisker plots
+        choice = input("Plot a whisker plot of the yearly bio use? [y/n] ")
+        if choice.lower() in ["y", "yes"]:
+            #plot the distribution of values in yearly_bio_use, but as a horizontal boxplot (make fig size not tall)
+            fig, ax = plt.subplots(figsize=(4,2))
+            whisker_props = dict(whis=1, showfliers=True, sym="o", patch_artist=True)
+            ax.boxplot(yearly_bio_use, widths=0.35, vert=False, **whisker_props)
+            ax.set_xlabel("Yearly biogas use [TWh]")
+            #remove y-axis ticks and labels
+            ax.set_yticks([])
+            ax.set_title("Distribution of biogas use per year")
+            plt.tight_layout()
+            #if there already is a figure, save it with a number at the end
+            i = 1
+            while os.path.exists(f"{figure_path}/biogas_yearly_whisker_{i}.png"):
+                i += 1
+            plt.savefig(f"{figure_path}/biogas_yearly_whisker_{i}.png", dpi=400)
+            plt.savefig(f"{figure_path}/biogas_yearly_whisker_{i}.svg")
 
         print("All individual years: ")
         biogas_individual_years = []
