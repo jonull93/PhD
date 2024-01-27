@@ -261,7 +261,7 @@ def prettify_scenario_name(name):
         parts = name.split("_")
         opt = parts[1].replace("opt", "")
         extra = f" ({parts[-1]})" if len(parts) == 3 and parts[-1]!="mean" else "" 
-        if "trueref" in extra: extra = " *"
+        if "trueref" in extra: extra = "" #" *"
         if "2012" in extra:
             return f"{name[0]} HP + {opt} opt. (2012)" 
         elif "evenweights" in extra:
@@ -273,7 +273,7 @@ def prettify_scenario_name(name):
         # turn allopt2_final into All opt. (2 yr), and allopt2_final_a into All opt. (2 yr) a
         nr = name.split("_")[0].replace("allopt", "")
         extra = f" ({name.split('_')[-1]})" if len(name.split('_'))>1 else ""
-        if "trueref" in extra: extra = " *"
+        if "trueref" in extra: extra = ""#" *"
         #if len(name.split("_")) == 3:
         #    abc = name.split("_")[2]
         #    abc = f" ({abc})"
@@ -567,8 +567,7 @@ def main():
     grouped_data = group_technologies(data)
     print_green(f"Technologies grouped successfully")
     print_yellow(f"Grouped data: \n{grouped_data}")
-    #create_figure_separated_techs(grouped_data, pickle_timestamp, use_defaults)
-    create_whisker_plots(grouped_data, pickle_timestamp)
+    create_figure_separated_techs(grouped_data, pickle_timestamp, use_defaults)
     print_magenta(f"Figures created and saved in {figures_folder}")
     
     print_red(f"Script finished at: {datetime.now()}")

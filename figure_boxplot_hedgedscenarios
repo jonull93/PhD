@@ -45,9 +45,6 @@ def create_whisker_plots(grouped_data, pickle_timestamp, techs_to_plot=None):
     HPsets_of_years_df = pd.DataFrame(HPsets_of_years_data)
     nonHPsets_of_years_df = pd.DataFrame(nonHPsets_of_years_data)
 
-    # Extract the values for the scenario 'singleyear_1989-1990'
-    #scenario_1989_1990_values = individual_years_df['singleyear_1989-1990']
-
     # Print the dataframes
     #print(f"{grouped_data.items()=}")
     print_yellow(f"Individual years data: \n{individual_years_df}")
@@ -112,12 +109,17 @@ def create_whisker_plots(grouped_data, pickle_timestamp, techs_to_plot=None):
                 plot_boxplot(axs[plot_idx], df.loc[extras], extra_labels, 
                             'Normalized energy', 'right', whisker_props)
                 plot_idx += 1
+    """
     # Plot red 'X' markers for 'singleyear_1989-1990'
-    #for idx, tech in enumerate(techs_to_plot):
-    #    if tech in scenario_1989_1990_values:
-            #axs[0].plot(idx + 1, scenario_1989_1990_values[tech], 'rx')  # 'rx' is red 'X' marker
-            #axs[1].plot(idx + 1, scenario_1989_1990_values[tech], 'rx')  # 'rx' is red 'X' marker
-    #        None
+    # Extract the values for the scenario 'singleyear_1989-1990'
+    scenario_1989_1990_values = individual_years_df['singleyear_1989-1990']
+    for idx, tech in enumerate(techs_to_plot):
+        if tech in scenario_1989_1990_values:
+            axs[0].plot(idx + 1, scenario_1989_1990_values[tech], 'rx')  # 'rx' is red 'X' marker
+    for idx, tech in enumerate(extras):
+        if tech in scenario_1989_1990_values:
+            axs[1].plot(idx + 1, scenario_1989_1990_values[tech], 'rx')  # 'rx' is red 'X' marker
+    """
 
     # Set the same y-limits for both axes
     all_axes = list(axs)+secondary_axes
