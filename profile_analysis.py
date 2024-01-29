@@ -85,7 +85,7 @@ def make_hydro_profiles(years="1980-2019"):
     timestamp = datetime.now().strftime("%d-%m-%Y, %H:%M:%S")
     comment = [f"Made by Jonathan Ullmark at {timestamp}"] + \
               [
-                  f"Through profile_analysis.py (personal scripts repo) with data from Energiföretagen (thanks Richard Scharff for processing it!)"]
+                  f"Through profile_analysis.py (personal scripts repo) with data based on closed-access historic measurements (approved for open-access in the processed MWh form)"]
     path = "output\\"
     input_file = r"\input\vattenkraft.xlsx"
     df = pd.read_excel(input_file)
