@@ -140,12 +140,12 @@ def create_whisker_plots(grouped_data, pickle_timestamp, techs_to_plot=None):
     fig.subplots_adjust(hspace=0.43, top=0.96, wspace=0.04)
     if contains_extras:
         center_title(axs[0], axs[1], f'{len(individual_years_df.columns)} individual weather-years')
-        center_title(axs[2], axs[3], f'{len(HPsets_of_years_df.columns)} weather-year sets (with hand-picking)')
-        center_title(axs[4], axs[5], f'{len(nonHPsets_of_years_df.columns)} weather-year sets (without hand-picking)')
+        center_title(axs[2], axs[3], f'{len(HPsets_of_years_df.columns)} sets of weather-years (with hand-picking)')
+        center_title(axs[4], axs[5], f'{len(nonHPsets_of_years_df.columns)} sets of weather-years (without hand-picking)')
     else:
         center_title(axs[0], None, f'{len(individual_years_df.columns)} individual weather-years')
-        center_title(axs[1], None, f'{len(HPsets_of_years_df.columns)} weather-year sets (with hand-picking)')
-        center_title(axs[2], None, f'{len(nonHPsets_of_years_df.columns)} weather-year sets (without hand-picking)')
+        center_title(axs[1], None, f'{len(HPsets_of_years_df.columns)} sets of weather-years (with hand-picking)')
+        center_title(axs[2], None, f'{len(nonHPsets_of_years_df.columns)} sets of weather-years (without hand-picking)')
 
 
     # Save the figure
