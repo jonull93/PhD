@@ -2,7 +2,7 @@ import time
 
 import mat73
 import matplotlib.pyplot as plt
-import pickle
+import openpyxl
 import pandas as pd
 import numpy as np
 import os
@@ -173,7 +173,8 @@ def make_pickles(year, VRE_profiles, cap, load, yearly_nontraditional_load, hour
     # df_small["net_load"] = list(net_load)
     #print(net_load)
     #print(net_load.values.mean())
-    print(f"Making pickle files for {year}, where net_load.mean() = {net_load.values.mean():.2f} GW and the constructed mean is {constructed_netload.mean():.2f} GW")
+    if f"{net_load.values.mean():.2f}" != f"{constructed_netload.mean():.2f}":
+        print_red(f"!! Making pickle files for {year}, where net_load.mean() = {net_load.values.mean():.2f} GW and the constructed mean is {constructed_netload.mean():.2f} GW")
     small = {"VRE_gen": VRE_gen, "total_hourly_load": total_hourly_load, "net_load": net_load}
     small_name = f"netload_components_small_{year}"
     save_to_file(small, pickle_path + small_name)
@@ -569,6 +570,13 @@ def remake_profile_seam(pickle_path, electrified_heat_demand, non_traditional_lo
     VRE_profile_dict = {}
     load_dict = {}
     net_load_dict = {}
+    # let xlsx_path be pickle_path.replace("PickleJar\\","results\\")
+    # if the path does not exist, make it
+    # if there is no "netload.xlsx" in xlsx_path, make it
+    xlsx_path = pickle_path.replace("PickleJar\\", "results\\")
+    if not os.path.exists(xlsx_path): os.mkdir(xlsx_path)
+    if not os.path.exists(xlsx_path + "netload.xlsx"): openpyxl.Workbook().save(xlsx_path + "netload.xlsx")
+    wb = openpyxl.load_workbook(xlsx_path + "netload.xlsx")
     for i_y, year in enumerate(years):
         #print(f"Year {year}")
         netload_components = load_from_file(f"{pickle_path}netload_components_large_{year}")
@@ -576,7 +584,8 @@ def remake_profile_seam(pickle_path, electrified_heat_demand, non_traditional_lo
         load_dict[year] = netload_components["traditional_load"]  # type: pd.DataFrame
         net_load_dict[year] = netload_components["net_load"]  # type: pd.DataFrame
         if year == years[0]: continue  # make new VRE_profiles with seam in summer
-        print_cyan(f" - Making profiles for years {years[i_y - 1]}-{year}")
+        reseamed_year = f"{years[i_y - 1]}-{year}"
+        print_cyan(f" - Making profiles for years {reseamed_year}")
         if verbose:
             print_cyan(f"Monthly mean demand for year {year}(GWh)")
             print(load_dict[year].sum(axis=1).groupby(load_dict[year].index // 730).mean())
@@ -611,12 +620,41 @@ def remake_profile_seam(pickle_path, electrified_heat_demand, non_traditional_lo
             net_load_df_fall.index = pd.RangeIndex(len(net_load_df_fall))
             net_load_df_spring.index = pd.RangeIndex(len(net_load_df_fall), new_profile_seam + len(net_load_df_fall))
             net_load_df = pd.concat([net_load_df_fall, net_load_df_spring])
-        print_green(f" Mean net load for years {years[i_y - 1]}-{year}: {net_load_df.values.mean():.2f} GW")
+        print_green(f" Mean and peak net-load: {net_load_df.values.mean():.2f} / {net_load_df.values.max():.2f} GW")
         # print_cyan(VRE_profile_dict[years[i_y - 1]], VRE_profile_dict[years[i_y]])
         # print_green(VRE_df)
         # print_cyan(load)
-        if make_profiles: make_gams_profiles(f"{years[i_y - 1]}-{year}", VRE_df, load_df, regions)
-        make_pickles(f"{years[i_y - 1]}-{year}", VRE_df, all_cap, load_df, non_traditional_load, heat_demand_to_add, net_load_df, pickle_path)
+        if make_profiles: make_gams_profiles(f"{reseamed_year}", VRE_df, load_df, regions)
+        make_pickles(f"{reseamed_year}", VRE_df, all_cap, load_df, non_traditional_load, heat_demand_to_add, net_load_df, pickle_path)
+
+        # if there is no sheet with the name of the year, make it and fill it with the net_load_df
+        # if there is a sheet called "summary", add the min, mean and max of net_load_df to the sheet, otherwise make the sheet and add the values
+        if "summary" not in wb.sheetnames:
+            #delete the default sheet "Sheet"
+            wb.remove(wb["Sheet"])
+            wb.create_sheet(title="summary")
+            ws = wb["summary"]
+            ws.cell(row=1, column=1).value = "year"
+            ws.cell(row=1, column=2).value = "min"
+            ws.cell(row=1, column=3).value = "mean"
+            ws.cell(row=1, column=4).value = "max"
+            ws.cell(row=2, column=1).value = reseamed_year
+            ws.cell(row=2, column=2).value = net_load_df.values.min()
+            ws.cell(row=2, column=3).value = net_load_df.values.mean()
+            ws.cell(row=2, column=4).value = net_load_df.values.max()
+        elif reseamed_year not in wb.sheetnames:
+            ws = wb["summary"]
+            ws.cell(row=len(ws["A"]) + 1, column=1).value = reseamed_year
+            ws.cell(row=len(ws["A"]), column=2).value = net_load_df.values.min()
+            ws.cell(row=len(ws["A"]), column=3).value = net_load_df.values.mean()
+            ws.cell(row=len(ws["A"]), column=4).value = net_load_df.values.max()
+            wb.create_sheet(title=reseamed_year)
+            ws = wb[reseamed_year]
+            for i_r, row in enumerate(net_load_df.values):
+                for i_c, cell in enumerate(row):
+                    ws.cell(row=i_r + 1, column=i_c + 1).value = cell
+    wb.save(xlsx_path + "netload.xlsx")
+
     pass
 
 
@@ -902,19 +940,21 @@ if __name__ == "__main__":
     RA_window = 12
     all_cap, VRE_groups, VRE_tech, VRE_tech_dict, VRE_tech_name_dict, years, reseamed_years, sites, region_name, regions, \
         non_traditional_load, filenames, profile_keys, capacity_keys, fig_path, pickle_path, electrified_heat_demand \
-        = initiate_parameters("ref334_out")
+        = initiate_parameters("ref999")
     #separate_years(2012, make_figure=True, make_output=True)
     #make_heat_profiles()
     #make_hydro_profiles()
+    """
     separate_years(years, VRE_tech, VRE_tech_name_dict, filenames, profile_keys, capacity_keys,
                                     fig_path, regions, VRE_groups, sites, non_traditional_load, electrified_heat_demand,
                                     pickle_path, make_profiles=False, make_figure=True)
     combined_years(years, VRE_tech, VRE_tech_name_dict, filenames, profile_keys, regions,
                 VRE_groups, sites, non_traditional_load, electrified_heat_demand, pickle_path,)
+    """
     #combined_years(years, VRE_tech, VRE_tech_name_dict, filenames, profile_keys, regions,
     #               VRE_groups, sites, non_traditional_load, electrified_heat_demand, pickle_path,)
     #combined_years(range(1980,1982))
-    #remake_profile_seam(pickle_path, make_profiles=False)
+    remake_profile_seam(pickle_path, electrified_heat_demand, non_traditional_load, verbose=False, make_profiles=False, profile_starts_in_winter=False, years=range(1980,2020))
     plot_reseamed_years(range(1980,2020),window_size_days=1, skip_netload=True)
     if False:
         for nr, years_to_summarize in enumerate([reseamed_years, years]):
