@@ -159,10 +159,12 @@ def load_data(pickle_file, use_defaults=False, data_key='tot_cap'):
             # Create a new series
             gross_transfer = pd.Series([southwards, northwards], index=['Export south', 'Export north'])
             selected_data[scenario] = gross_transfer
-
+    elif data_key in ['cost_tot','cost_tot_onlynew']:
+        selected_data = {scenario: pd.Series([data[scenario][data_key]], index=['System cost']) for scenario in selected_scenarios}
 
     else:
-        selected_data = {scenario: data[scenario][data_key].fillna(0) for scenario in selected_scenarios}
+        try: selected_data = {scenario: data[scenario][data_key].fillna(0) for scenario in selected_scenarios}
+        except AttributeError: selected_data = {scenario: data[scenario][data_key] for scenario in selected_scenarios}
 
     # Remove "ref_cap" from scenario names 
     selected_data = {s.replace("ref_cap_", ""): selected_data[s] for s in selected_data.keys()}

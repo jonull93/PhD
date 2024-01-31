@@ -15,7 +15,11 @@ def create_whisker_plots(grouped_data, pickle_timestamp, techs_to_plot=None):
     tech_labels = [tech_names.get(tech, tech) for tech in techs_to_plot]
     grouped_data_df = pd.DataFrame(grouped_data)
     
-    extras = [i for i in grouped_data_df.index if i in ["biogas", 'Export south', 'Export north']]
+    extras = [i for i in grouped_data_df.index if i in ["biogas", 'Export south', 'Export north', 'System cost']]
+    #move system cost to the end
+    if "System cost" in extras:
+        extras.remove("System cost")
+        extras.append("System cost")
     extra_labels = [tech_names.get(tech, tech) for tech in extras]
     contains_extras = len(extras) > 0
     contains_HP_sets = any("HP" in s.split("_")[0] for s in grouped_data)
@@ -88,13 +92,14 @@ def create_whisker_plots(grouped_data, pickle_timestamp, techs_to_plot=None):
 
     # Plotting
     plot_idx = 0
+    extra_ylabel = 'Normalized values' if 'System cost'  in extra_labels else 'Normalized energy'
     plot_boxplot(axs[plot_idx], individual_years_df.loc[techs_to_plot], tech_labels, 
                 'Normalized capacity', 'left', whisker_props)
     plot_idx += 1
 
     if contains_extras:
         plot_boxplot(axs[plot_idx], individual_years_df.loc[extras], extra_labels, 
-                    'Normalized energy', 'right', whisker_props)
+                    extra_ylabel, 'right', whisker_props)
         plot_idx += 1
 
     datasets = [(contains_HP_sets, HPsets_of_years_df),
@@ -107,7 +112,7 @@ def create_whisker_plots(grouped_data, pickle_timestamp, techs_to_plot=None):
             plot_idx += 1
             if contains_extras:
                 plot_boxplot(axs[plot_idx], df.loc[extras], extra_labels, 
-                            'Normalized energy', 'right', whisker_props)
+                            extra_ylabel, 'right', whisker_props)
                 plot_idx += 1
     """
     # Plot red 'X' markers for 'singleyear_1989-1990'
@@ -181,12 +186,13 @@ def main():
     cap_data = load_data(pickle_file, use_defaults="skip")
     bio_data = load_data(pickle_file, use_defaults="skip", data_key="biogas")
     export_data = load_data(pickle_file, use_defaults="skip", data_key="grossexport")
+    cost_total = load_data(pickle_file, use_defaults="skip", data_key="cost_tot_onlynew")
 
     print_yellow(f"Data loaded from pickle file")
     grouped_data = group_technologies(cap_data)
     for scenario, series in grouped_data.items():
-        grouped_data[scenario] = pd.concat([series, bio_data[scenario], export_data[scenario]])
-
+        grouped_data[scenario] = pd.concat([series, bio_data[scenario], export_data[scenario], cost_total[scenario]])
+    
     print_green(f"Technologies grouped successfully")
     print_yellow(f"Grouped data: \n{pd.DataFrame(grouped_data)}")
     create_whisker_plots(grouped_data, pickle_timestamp)
