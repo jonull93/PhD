@@ -5,7 +5,7 @@ CHP = ['WA_CHP', 'B_CHP', 'W_CHP', 'H_CHP', 'G_CHP', 'WG_CHP', "CHP"]
 midload = ['G', 'WG', 'WG_PS',]
 peak = ['G_peak', 'WG_peak', "Peak"]
 thermals = baseload + CCS + CHP + midload + ["Other thermals"] + peak + ["Fossil thermals", "Bio thermals", "Thermals"]
-nonPeak_thermals = thermals
+nonPeak_thermals = list(thermals)
 nonPeak_thermals.remove("WG_peak")
 nonPeak_thermals.remove("Peak")
 wind = ["Wind", 'WOFF', 'WON', 'wind_onshore', 'wind_offshore', ] + ["WON" + ab + str(dig) for ab in ["A", "B"] for dig

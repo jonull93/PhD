@@ -7,7 +7,8 @@ import matplotlib.gridspec as gridspec
 import os
 #os.chdir(r"C:\Users\Jonathan\Box\python")  # not needed unless running line-by-line in a console
 
-from my_utils import color_dict, order_cap, add_in_dict, tech_names, scen_names, print_cyan, print_red, print_green, year_names, regions_corrected
+from my_utils import order_cap, add_in_dict, tech_names, scen_names, print_cyan, print_red, print_green, year_names, regions_corrected
+from my_utils import color_dict_paper3 as color_dict
 
 pickleJar = ""
 h = 3
@@ -207,9 +208,10 @@ for sep_fig in separate_figures:
     #axes[2][0].text(-0.35, 0.5, "High\nFlex:", transform=axes[1][0].transAxes, ha='right', ma='center', fontsize=14)
     fig.suptitle(f"Investments, difference in system flexibility", fontsize=16)
     fig.legend(handles=handles, loc="center left", bbox_to_anchor=(0.91, 0.5), )
-    fig.show()
+    #fig.show()
     fig.savefig(f"figures/cap_{sep_fig}_{h}h.png", bbox_inches="tight", dpi=600, )
     fig.savefig(f"figures/cap_{sep_fig}_{h}h.eps", bbox_inches="tight", format='eps')
+    fig.savefig(f"figures/cap_{sep_fig}_{h}h.pdf", bbox_inches="tight")
 # plot_cap(data,first_case)
 # plt.show()
 # cap.unstack().plot(kind="bar",stacked=True)

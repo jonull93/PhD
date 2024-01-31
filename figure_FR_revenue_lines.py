@@ -146,6 +146,8 @@ fig.suptitle(f"Reserve supply revenue{' per installed capacity' if per_cap else 
 plt.tight_layout()
 fig_path = f"figures\\"
 plt.savefig(fig_path+f"FR_revenue_lines_{timestep}h{'_per_cap' if per_cap else ''}.png", dpi=400, bbox_inches="tight")
+plt.rcParams['svg.fonttype'] = 'none'
+plt.savefig(fig_path+f"FR_revenue_lines_{timestep}h{'_per_cap' if per_cap else ''}.pdf", bbox_inches="tight")
 #plt.show()
                     #inertia_rev = data[scen]["tech_revenue_inertia"]
                     #FC_inertia = FR_rev+inertia_rev
