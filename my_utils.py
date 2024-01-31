@@ -142,7 +142,7 @@ tech_names = {'RO': 'Hydro', 'RR': 'Run-of-river', 'U': 'Nuclear', "b": "Lignite
               "electrolyser": "Electrolyser", "H": "Coal ST", "W": "Biomass ST",
               "G": "N. Gas CCGT", "G_peak": "N. Gas GT", "PV": "Solar PV", "FC": "Fuel cell",
               "H2store": "H2 storage", "PtH":"Power-to-Heat", "thermals":"Thermal power", "Hydro":"Hydro power",
-              "biogas": "Biogas", "Export south": "Exp. south", "Export north": "Exp. north",
+              "biogas": "Biogas", "Export south": "Exp. south", "Export north": "Exp. north", "System cost": "System cost",
               }
 scen_names = {"_pre": "Base case", "_leanOR": "Lean OR", "_OR": "OR", "_OR_fixed": "OR", "_OR_inertia": "OR + Inertia",
               "_OR+inertia_fixed": "OR + Inertia", "_inertia": "Inertia", "_inertia_2x": "2x Inertia",
