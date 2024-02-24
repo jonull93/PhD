@@ -2,16 +2,19 @@ import pickle
 import pandas as pd
 import matplotlib.pyplot as plt
 from my_utils import print_red, print_green, print_cyan
-from order_cap import VRE
+from order_cap import VRE as VRE_tech
+import os 
 
 scen = "nordic_lowFlex_noFC_2040"
 picklefile = "data_results_1h_lowFlex.pickle"
+os.makedirs("figures/presentation", exist_ok=True)
 
 data = pickle.load(open(rf"PickleJar/{picklefile}", "rb"))
 scendata = data[scen]
-skip_week = 3
+skip_week = 10
+weeks = 1
 start_index = skip_week*168+24
-end_index = skip_week*168+168+24
+end_index = skip_week*168+168*weeks+24
 # Just the load
 fig1, ax1 = plt.subplots()
 load = scendata["demand"]
@@ -25,7 +28,7 @@ ax1.set_ylabel("Power [GWh/h]")
 ax1.legend()
 ax1.set_title("Load during a winter week in northern Europe, 2040")
 plt.tight_layout()
-plt.savefig(r"figures/presentation_load.png", dpi=300)
+plt.savefig(r"figures/presentation/presentation_load.png", dpi=300)
 
 
 # Overlayed with VRE prod
@@ -34,18 +37,21 @@ load = scendata["demand"]
 gen = scendata["gen"].sum(axis=0, level=0)
 curtailment_profile = scendata["curtailment_profile_total"].sum(axis=0).iloc[start_index:end_index]
 curtailment = scendata["curtailment_profiles"].sum(axis=0).iloc[start_index:end_index]
-VRE = gen.reindex(index=VRE).dropna().sum(axis=0)
+VRE = gen.reindex(index=VRE_tech).dropna().sum(axis=0).iloc[start_index:end_index]
+solar = gen.copy().reindex(index=["PVPA1"]).dropna().sum(axis=0).iloc[start_index:end_index]
 plt.plot(VRE+curtailment, label="VRE")
+plt.plot(solar, label="solar")
 plt.plot(twload, label="Load")
 ylim = ax2.get_ylim()
-ax2.set_ylim([min(0,ylim[0]),123])
-ax2.set_xticks(ticks=range(skip_week*168+24, skip_week*168+9*24, 24), labels=range(skip_week*7+1, skip_week*7+9))
+#ax2.set_ylim([min(0,ylim[0]),123])
+#ax2.set_xticks(ticks=range(skip_week*168+24, skip_week*168+9*24, 24), labels=range(skip_week*7+1, skip_week*7+9))
+ax2.set_xticks(ticks=range(0, 8*24, 24), labels=range(skip_week*7+1, skip_week*7+9))
 ax2.set_xlabel("Day")
 ax2.set_ylabel("Power [GWh/h]")
 ax2.legend()
 ax2.set_title("Load and VRE during a winter week in northern Europe, 2040")
 plt.tight_layout()
-plt.savefig(r"figures/presentation_load_VRE.png", dpi=300)
+plt.savefig(r"figures/presentation/presentation_load_VRE.png", dpi=300)
 
 # Net load
 fig3, ax3 = plt.subplots()
@@ -61,7 +67,7 @@ ax3.set_ylabel("Power [GWh/h]")
 ax3.legend(loc="upper right")
 ax3.set_title("Net load during a winter week in northern Europe, 2040")
 plt.tight_layout()
-plt.savefig(r"figures/presentation_netload.png", dpi=300)
+plt.savefig(r"figures/presentation/presentation_netload.png", dpi=300)
 
 # Overlayed with hydro cap
 fig4, ax4 = plt.subplots()
@@ -79,4 +85,4 @@ print(hydro_cap)
 plt.axhline(hydro_cap, color="deepskyblue", linestyle="--", label="Hydro cap.")
 ax4.legend(loc="upper right")
 plt.tight_layout()
-plt.savefig(r"figures/presentation_netload_hydrocap.png", dpi=300)
+plt.savefig(r"figures/presentation/presentation_netload_hydrocap.png", dpi=300)
