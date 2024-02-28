@@ -167,24 +167,35 @@ plt.savefig(r"figures/presentation/presentation_netload_hydrocap.png", dpi=300)
 
 
 def gen_indices_etc(skip_week, span):
-    global start_index, end_index, xtick_labels, xtick_index
+    global start_index, end_index, xtick_labels, xtick_index, xlabel
     start_index = skip_week*168+24
     end_index = start_index+span
     if span <= 48:
-        xtick_labels = [f"{i%24:02d}" for i in range(0, span, 6)]
+        xtick_labels = [f"{i%24:02d}" for i in range(0, span+1, 6)]
         xtick_index = range(0, span+1, 6)
+        xlabel = "Hour"
     elif span <= 2*168:
         xtick_labels = range(skip_week*7+1, skip_week*7+2+span//24)
         xtick_index = range(0, span+1, 24)
-    else:
+        xlabel = "Day"
+    elif span <= 6*168:
         xtick_labels = range(skip_week*7+1, skip_week*7+2+span//72)
         xtick_index = range(0, span+1, 72)
-    xtick_labels = range(skip_week*7+1, skip_week*7+2+span//24) if span > 48 else [f"{i%24:02d}" for i in range(0, span+1, 6)]
-    xtick_index = range(0, span+1, 24) if span > 48 else range(0, span+1, 6)
+        xlabel = "Day"
+    else:
+        #weeks
+        xtick_labels = range(skip_week*7+1, skip_week*7+2+span//168)
+        xtick_index = range(0, span+1, 168)
+        xlabel = "Week"
+
+
+    #xtick_labels = range(skip_week*7+1, skip_week*7+2+span//24) if span > 48 else [f"{i%24:02d}" for i in range(0, span+1, 6)]
+    #xtick_index = range(0, span+1, 24) if span > 48 else range(0, span+1, 6)
 
 #make load plots
 start_weeks = [0]
 spans = {"2d": 2*24, "3d": 3*24, "1w": 7*24, "2w": 14*24, "4w": 4*7*24, "8w": 8*7*24, "52w": 52*7*24}
+load = scendata["demand"]
 load = load.sum(axis=0)
 for start_week in start_weeks:
     for span_str, span in spans.items():
@@ -196,7 +207,7 @@ for start_week in start_weeks:
         plt.plot(twload, label="Load", color="black")
         ax.set_ylim([0,100])
         ax.set_xticks(ticks=xtick_index, labels=xtick_labels)
-        ax.set_xlabel("Day") if span > 48 else ax.set_xlabel("Hour")
+        ax.set_xlabel(xlabel)
         ax.set_ylabel("Power [GWh/h]")
         #ax.legend()
         ax.set_title(f"Load during {span_str} in northern Europe, 2040")
@@ -230,7 +241,7 @@ for start_week in start_weeks:
         plt.plot(solar, label="Solar PV", color="orange")
         ax.set_ylim([-1,108])
         ax.set_xticks(ticks=xtick_index, labels=xtick_labels)
-        ax.set_xlabel("Day")
+        ax.set_xlabel(xlabel)
         ax.set_ylabel("Power [GWh/h]")
         #ax.legend()
         ax.set_title(f"Solar PV during {span_str} in northern Europe, 2040")
@@ -263,7 +274,7 @@ for start_week in start_weeks:
         plt.plot(full_wind.iloc[start_index:end_index]+wind_curtailment.iloc[start_index:end_index], label="Wind")
         ax.set_ylim([0, 112])
         ax.set_xticks(ticks=xtick_index, labels=xtick_labels)
-        ax.set_xlabel("Day")
+        ax.set_xlabel(xlabel)
         ax.set_ylabel("Power [GWh/h]")
         #ax.legend()
         ax.set_title(f"Wind during {span_str} in northern Europe, 2040")
