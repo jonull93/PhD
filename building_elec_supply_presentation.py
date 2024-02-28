@@ -170,6 +170,15 @@ def gen_indices_etc(skip_week, span):
     global start_index, end_index, xtick_labels, xtick_index
     start_index = skip_week*168+24
     end_index = start_index+span
+    if span <= 48:
+        xtick_labels = [f"{i%24:02d}" for i in range(0, span, 6)]
+        xtick_index = range(0, span+1, 6)
+    elif span <= 2*168:
+        xtick_labels = range(skip_week*7+1, skip_week*7+2+span//24)
+        xtick_index = range(0, span+1, 24)
+    else:
+        xtick_labels = range(skip_week*7+1, skip_week*7+2+span//72)
+        xtick_index = range(0, span+1, 72)
     xtick_labels = range(skip_week*7+1, skip_week*7+2+span//24) if span > 48 else [f"{i%24:02d}" for i in range(0, span+1, 6)]
     xtick_index = range(0, span+1, 24) if span > 48 else range(0, span+1, 6)
 
@@ -187,7 +196,7 @@ for start_week in start_weeks:
         plt.plot(twload, label="Load", color="black")
         ax.set_ylim([0,100])
         ax.set_xticks(ticks=xtick_index, labels=xtick_labels)
-        ax.set_xlabel("Day")
+        ax.set_xlabel("Day") if span > 48 else ax.set_xlabel("Hour")
         ax.set_ylabel("Power [GWh/h]")
         #ax.legend()
         ax.set_title(f"Load during {span_str} in northern Europe, 2040")
