@@ -25,6 +25,7 @@ xtick_index = range(0, span+1, 24) if span > 48 else range(0, span+1, 6)
 # Just the load
 fig1, ax1 = plt.subplots()
 load = scendata["demand"]
+gen = scendata["gen"].sum(axis=0, level=0)
 twload = load.sum(axis=0).iloc[start_index:end_index]
 plt.plot(twload, label="Load", color="C1")
 ylim = ax1.get_ylim()
@@ -50,7 +51,7 @@ xtick_index = range(0, span+1, 24) if span > 48 else range(0, span+1, 6)
 # Overlayed with solar prod
 fig2, ax2 = plt.subplots(figsize=(3,3))
 twload = load.sum(axis=0).iloc[start_index:end_index]
-gen = scendata["gen"].sum(axis=0, level=0)
+#gen = scendata["gen"].sum(axis=0, level=0)
 full_solar = gen.copy().reindex(index=["PVPA1"]).dropna().sum(axis=0)
 solar = full_solar.iloc[start_index:end_index]
 solar_curtailment = scendata["curtailment_profiles"].groupby(level=0).sum().loc["PVPA1"].iloc[start_index:end_index]
@@ -86,7 +87,7 @@ xtick_index = range(0, span+1, 24) if span > 48 else range(0, span+1, 6)
 
 # Overlayed with wind prod
 fig2, ax2 = plt.subplots(figsize=(4,3))
-gen = scendata["gen"].sum(axis=0, level=0)
+#gen = scendata["gen"].sum(axis=0, level=0)
 twload = load.sum(axis=0).iloc[start_index:end_index]
 full_wind = gen.reindex(wind_tech).dropna().sum()
 wind = full_wind.iloc[start_index:end_index]
@@ -110,8 +111,8 @@ plt.savefig(r"figures/presentation/presentation_load_wind_noSpine.png",bbox_inch
 
 # Overlayed with VRE prod
 fig2, ax2 = plt.subplots()
-load = scendata["demand"]
-gen = scendata["gen"].sum(axis=0, level=0)
+#load = scendata["demand"]
+#gen = scendata["gen"].sum(axis=0, level=0)
 curtailment_profile = scendata["curtailment_profile_total"].sum(axis=0).iloc[start_index:end_index]
 curtailment = scendata["curtailment_profiles"].sum(axis=0).iloc[start_index:end_index]
 VRE = gen.reindex(index=VRE_tech).dropna().sum(axis=0).iloc[start_index:end_index]
@@ -191,7 +192,7 @@ def gen_indices_etc(skip_week, span):
 
     #xtick_labels = range(skip_week*7+1, skip_week*7+2+span//24) if span > 48 else [f"{i%24:02d}" for i in range(0, span+1, 6)]
     #xtick_index = range(0, span+1, 24) if span > 48 else range(0, span+1, 6)
-
+"""
 #make load plots
 start_weeks = [0]
 spans = {"2d": 2*24, "3d": 3*24, "1w": 7*24, "2w": 14*24, "4w": 4*7*24, "8w": 8*7*24, "52w": 52*7*24}
@@ -199,6 +200,7 @@ load = scendata["demand"]
 load = load.sum(axis=0)
 for start_week in start_weeks:
     for span_str, span in spans.items():
+        os.makedirs(rf"figures/presentation/load/noSpine", exist_ok=True)
         gen_indices_etc(start_week, span)
         if end_index > 8760:
             continue
@@ -219,40 +221,51 @@ for start_week in start_weeks:
         #plt.legend().remove()
         # remove the title
         ax.set_title("")
-        plt.savefig(rf"figures/presentation/load/presentation_load_w{start_week}_{span_str}_noSpine.png",bbox_inches="tight",pad_inches=0, transparent=True, dpi=500)
+        plt.savefig(rf"figures/presentation/load/noSpine/presentation_load_w{start_week}_{span_str}_noSpine.png",bbox_inches="tight",pad_inches=0, transparent=True, dpi=500)
         plt.close()
-
+"""
 #make PV plots
 start_weeks = range(0, 52, 4)
 spans = {"2d": 2*24, "3d": 3*24, "1w": 7*24, "2w": 14*24, "4w": 4*7*24, "8w": 8*7*24, "52w": 52*7*24}
 gen = scendata["gen"].groupby(level=0).sum()
 full_solar = gen.copy().reindex(index=["PVPA1"]).dropna().sum(axis=0)
 solar_curtailment = scendata["curtailment_profiles"].groupby(level=0).sum().loc["PVPA1"]
-for start_week in start_weeks:
-    for span_str, span in spans.items():
+for span_str, span in spans.items():
+    for start_week in start_weeks:
         #save figs in separate subfolders for each span length
         os.makedirs(rf"figures/presentation/PV/{span_str}", exist_ok=True)
         gen_indices_etc(start_week, span)
         if end_index > 8760:
             continue
-        fig, ax = plt.subplots()
+        if span <= 72:
+            fig, ax = plt.subplots(figsize=(3,3))
+        else:
+            fig, ax = plt.subplots()
         solar = full_solar.iloc[start_index:end_index]
         solar = solar + solar_curtailment.iloc[start_index:end_index]
-        plt.plot(solar, label="Solar PV", color="orange")
-        ax.set_ylim([-1,108])
-        ax.set_xticks(ticks=xtick_index, labels=xtick_labels)
-        ax.set_xlabel(xlabel)
-        ax.set_ylabel("Power [GWh/h]")
-        #ax.legend()
-        ax.set_title(f"Solar PV during {span_str} in northern Europe, 2040")
-        #plt.tight_layout()
-        plt.savefig(rf"figures/presentation/PV/{span_str}/w{start_week}_{span_str}.png", bbox_inches="tight",pad_inches=0, transparent=True, dpi=500)
-        #save without axis
+        fill = plt.fill_between(solar.index, solar, color="orange", label="Solar PV")
+        ax.set_ylim([-1, 108])
         plt.axis('off')
         ax.spines.clear()
+        plt.savefig(rf"figures/presentation/PV/{span_str}/w{start_week}_{span_str}_fill.png", bbox_inches="tight",pad_inches=0, transparent=True, dpi=500)
+        # remove the fill
+        fill.remove()
+        #plt.clf()
+        plt.plot(solar, label="Solar PV", linewidth=1.5, color="orange")       
+        ax.set_ylim([-1,108])
+        #ax.set_xticks(ticks=xtick_index, labels=xtick_labels)
+        #ax.set_xlabel(xlabel)
+        #ax.set_ylabel("Power [GWh/h]")
+        #ax.legend()
+        #ax.set_title(f"Solar PV during {span_str} in northern Europe, 2040")
+        #plt.tight_layout()
+        #plt.savefig(rf"figures/presentation/PV/{span_str}/w{start_week}_{span_str}.png", bbox_inches="tight",pad_inches=0, transparent=True, dpi=500)
+        #save without axis
+        #plt.axis('off')
+        #ax.spines.clear()
         #plt.legend().remove()
         # remove the title
-        ax.set_title("")
+        #ax.set_title("")
         plt.savefig(rf"figures/presentation/PV/{span_str}/noSpine_w{start_week}_{span_str}.png",bbox_inches="tight",pad_inches=0, transparent=True, dpi=500)
         plt.close()
 
@@ -262,8 +275,8 @@ start_weeks = range(0, 52, 4)
 spans = {"2d": 2*24, "3d": 3*24, "1w": 7*24, "2w": 14*24, "4w": 4*7*24, "8w": 8*7*24, "52w": 52*7*24}
 full_wind = gen.reindex(wind_tech).dropna().sum()
 wind_curtailment = scendata["curtailment_profiles"].groupby(level=0).sum().reindex(wind_tech).dropna().sum(axis=0)
-for start_week in start_weeks:
-    for span_str, span in spans.items():
+for span_str, span in spans.items():
+    for start_week in start_weeks:
         #save figs in separate subfolders for each span length
         os.makedirs(rf"figures/presentation/wind/{span_str}", exist_ok=True)
         gen_indices_etc(start_week, span)
@@ -271,20 +284,27 @@ for start_week in start_weeks:
             continue
         fig, ax = plt.subplots()
         #wind = wind + wind_curtailment
-        plt.plot(full_wind.iloc[start_index:end_index]+wind_curtailment.iloc[start_index:end_index], label="Wind")
-        ax.set_ylim([0, 112])
-        ax.set_xticks(ticks=xtick_index, labels=xtick_labels)
-        ax.set_xlabel(xlabel)
-        ax.set_ylabel("Power [GWh/h]")
-        #ax.legend()
-        ax.set_title(f"Wind during {span_str} in northern Europe, 2040")
-        #plt.tight_layout()
-        plt.savefig(rf"figures/presentation/wind/{span_str}/w{start_week}_{span_str}.png", bbox_inches="tight",pad_inches=0, transparent=True, dpi=500)
-        #save without axis
+        wind = full_wind.iloc[start_index:end_index]+wind_curtailment.iloc[start_index:end_index]
+        fill = plt.fill_between(wind.index, wind, color="C0", label="Wind")
+        ax.set_ylim([-1, 112])
         plt.axis('off')
         ax.spines.clear()
+        plt.savefig(rf"figures/presentation/wind/{span_str}/w{start_week}_{span_str}_fill.png", bbox_inches="tight",pad_inches=0, transparent=True, dpi=500)
+        fill.remove()
+        plt.plot(wind, label="Wind", linewidth=1.5, color="C0")
+        #ax.set_ylim([0, 112])
+        #ax.set_xticks(ticks=xtick_index, labels=xtick_labels)
+        #ax.set_xlabel(xlabel)
+        #ax.set_ylabel("Power [GWh/h]")
+        #ax.legend()
+        #ax.set_title(f"Wind during {span_str} in northern Europe, 2040")
+        #plt.tight_layout()
+        #plt.savefig(rf"figures/presentation/wind/{span_str}/w{start_week}_{span_str}.png", bbox_inches="tight",pad_inches=0, transparent=True, dpi=500)
+        #save without axis
+        #plt.axis('off')
+        #ax.spines.clear()
         #plt.legend().remove()
         # remove the title
-        ax.set_title("")
+        #ax.set_title("")
         plt.savefig(rf"figures/presentation/wind/{span_str}/noSpine_w{start_week}_{span_str}.png",bbox_inches="tight",pad_inches=0, transparent=True, dpi=500)
         plt.close()
