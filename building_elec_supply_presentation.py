@@ -122,7 +122,7 @@ curtailment = scendata["curtailment_profiles"].sum(axis=0).iloc[start_index:end_
 VRE = gen.reindex(index=VRE_tech).dropna().sum(axis=0).iloc[start_index:end_index]
 solar = gen.copy().reindex(index=["PVPA1"]).dropna().sum(axis=0).iloc[start_index:end_index]
 plt.plot(twload, label="Consumption", color="C1", zorder=1)
-plt.plot(VRE+curtailment, label="Wind + Solar PV", color="C0", zorder=0)
+plt.plot(VRE+curtailment, label="Wind + Solar", color="C0", zorder=0)
 #plt.plot(solar, label="solar")
 ylim = ax2.get_ylim()
 ax2.set_ylim([min(0,ylim[0]),123])
@@ -136,16 +136,17 @@ ax2.set_ylabel("Electricity per hour [GWh/h]")
 #ax2.set_title("Load and VRE during a winter week in northern Europe, 2040")
 plt.tight_layout()
 plt.savefig(r"figures/presentation/week_example/presentation_load_VRE.png", dpi=500)
-ax2.fill_between(twload.index, twload, VRE+curtailment, where=VRE+curtailment<twload, color="C0", alpha=0.3)
+ax2.fill_between(twload.index, twload, VRE+curtailment, where=VRE+curtailment<twload, color="C0", alpha=0.8, interpolate=True, zorder=0)
 plt.savefig(r"figures/presentation/week_example/presentation_load_VRE_fill.png", dpi=500)
 
 
 # Net load
 fig3, ax3 = plt.subplots()
 #plt.plot(VRE+curtailment, label="VRE")
-plt.axhline(color="k", linestyle="--",  linewidth="1", alpha=0.5) #linestyle=":", 
-plt.plot(twload, label="Consumption", color="C1", zorder=1)
-plt.plot(twload-VRE-curtailment, label="Net load", color="C0", zorder=0)
+ax3.axhline(color="k", linestyle="--",  linewidth="1", alpha=0.5) #linestyle=":", 
+ax3.plot(twload, label="Consumption", color="C1", zorder=1)
+ax3.plot(twload-VRE-curtailment, label="Net load", color="C0", zorder=0)
+ax3.fill_between(twload.index, twload-VRE-curtailment, where=twload-VRE-curtailment>0, color="C0", alpha=0.8, interpolate=True)
 ylim = ax3.get_ylim()
 ax3.set_ylim([min(0,ylim[0]), 113])
 ax3.set_xticks(ticks=range(12, span, 24), labels=week_days)
