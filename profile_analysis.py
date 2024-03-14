@@ -764,7 +764,7 @@ def separate_years(years, VRE_tech, VRE_tech_name_dict, filenames, profile_keys,
     return net_load
 
 
-def plot_reseamed_years(years, threshold=False, window_size_days=3, skip_netload=False, longest_period=False):
+def plot_reseamed_years(years, threshold=False, window_size_days=3, skip_netload=False, longest_period=False, presentation_figs=False):
     print_cyan(f"Starting the 'plot_reseamed_years()' script")
     # make a plot, similar to separate_years, but with the reseamed data found in netload_components_YEAR1-YEAR2.pickle
     # build a list of year combinations, e.g. "1980-1981", "1981-1982", "1982-1983", etc.
@@ -811,6 +811,25 @@ def plot_reseamed_years(years, threshold=False, window_size_days=3, skip_netload
         #threshold_to_beat = threshold * max(hourly_total_demand.values)
 
         # Plot the data
+        if presentation_figs:
+            plt.plot(hourly_total_demand, color="C1", linestyle="-", label="Consumption")    
+            RA_net_load = fast_rolling_average(net_load, 24)
+            #print(RA_net_load.values, RA_net_load[0])
+            plt.fill_between(hourly_total_demand.loc[:8759].index, RA_net_load[0], where=RA_net_load[0] > 0, color="C0", alpha=0.8, label="Net load (roll. mean)")
+            #plt.plot(fast_rolling_average(net_load, 12), label=f"Net load (roll. mean, 12h)", color="C2")
+            mean_pos_netload = sum([i for i in net_load if i > 0])/8760
+            mean_netload = mean(net_load)
+            plt.axhline(y=mean_netload, color="black", linestyle="--", label=f"Average net load ({round(mean_netload)} GW)")
+            plt.xticks(range(0, 8760, 730), labels=["Jul.", "Aug.","Sep.", "Oct.", "Nov.", "Dec.","Jan.", "Feb.", "Mar.", "Apr.", "May", "Jun.", ])
+            plt.xlabel("Month")
+            plt.ylabel("Electricity per hour [GWh/h]")
+            plt.legend(loc="upper right", fancybox=True, framealpha=0.5)
+            plt.ylim(top=500, bottom=0)
+            plt.tight_layout()
+            os.makedirs(f"{fig_path}presentation", exist_ok=True)
+            plt.savefig(f"{fig_path}presentation/{year_combination}.png", dpi=400, transparent=True)
+            plt.close()
+            continue
         plt.plot(hourly_total_demand, color="gray", linestyle="-", label="Total load")
         plt.plot(hourly_nonheat_demand, color="darkviolet", linestyle=":",
                  label="Load (excl. new heat)", linewidth=0.5)
@@ -954,8 +973,9 @@ if __name__ == "__main__":
     #combined_years(years, VRE_tech, VRE_tech_name_dict, filenames, profile_keys, regions,
     #               VRE_groups, sites, non_traditional_load, electrified_heat_demand, pickle_path,)
     #combined_years(range(1980,1982))
-    remake_profile_seam(pickle_path, electrified_heat_demand, non_traditional_load, verbose=False, make_profiles=False, profile_starts_in_winter=False, years=range(1980,2020))
-    plot_reseamed_years(range(1980,2020),window_size_days=1, skip_netload=True)
+    #remake_profile_seam(pickle_path, electrified_heat_demand, non_traditional_load, verbose=False, make_profiles=False, profile_starts_in_winter=False, years=range(1980,2020))
+    #plot_reseamed_years(range(1980,2020),window_size_days=1, skip_netload=True)
+    plot_reseamed_years(range(1980,2020),window_size_days=1, presentation_figs=True)
     if False:
         for nr, years_to_summarize in enumerate([reseamed_years, years]):
             df = pd.DataFrame(index=pd.MultiIndex.from_tuples([(tech, reg) for tech in VRE_tech_name_dict for reg in regions]),
