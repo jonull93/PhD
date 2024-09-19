@@ -296,7 +296,7 @@ if __name__ == "__main__":
     #new_data = {}
     # io_lock = threading.Lock()
     threads = {}
-    num_threads = min(max(cpu_count() - 5, 4), len(todo_gdx), 4)
+    num_threads = min(max(cpu_count() - 5, 4), len(todo_gdx), 30)
     excel_name = path + name + suffix + ".xlsx"
     #writer = pd.ExcelWriter(excel_name, engine="openpyxl")
     opened_file = False

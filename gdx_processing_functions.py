@@ -116,8 +116,8 @@ def run_case(scen_name, gdxpath, indicators, FC=False, print_FR_summary=False):
         gen_share = gdx(f, "o_share_gen").rename("Share")
         VRE_share = gdx(f, "o_VRE_share")
         #VRE_share_total = gdx(f, "o_VRE_share_total")
-        #wind_share = gdx(f, "o_VRE_share")
-        PV_share = gdx(f, "o_VRE_share")
+        wind_share = gdx(f, "o_wind_share")
+        PV_share = gdx(f, "o_PV_share")
         U_share = gen_share["U"]
         tot_cap = gdx(f, "o_capacity")
         new_cap = gdx(f, "v_newcap")

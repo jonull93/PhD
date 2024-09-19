@@ -735,7 +735,7 @@ def save_to_file(data, filepath, clever=5, nthreads=4, max_compression=True, **k
             filepath += ".blosc" #default to blosc
         except:
             print_red("Blosc2 module not found. Please install it using 'pip install blosc2' or use a different file extension.")
-            filpath += ".pickle"            
+            filepath += ".pickle"            
     if filepath.endswith(".pickle"):
         import pickle
         with open(filepath, "wb") as f:
