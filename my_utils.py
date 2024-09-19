@@ -723,13 +723,19 @@ def save_to_file(data, filepath, clever=5, nthreads=4, max_compression=True, **k
 
     Notes on speed:
     ---------------
-    With max_compression=False, about 90% of the time to save a file is spent on serializing the data which must be regardless of compression or not.
+    With max_compression=False, about 90% of the time to save a file is spent on serializing the data which must be done regardless of compression or not.
     With max_compression=True, the time spent compressing the data can become a significant portion of the total time to save a file. Still, the time spent is not enough to make you bored.
     """
     # if the file is a pickle file, save it as a pickle file
     supported_filetypes = [".pickle", ".csv", ".blosc"]
     if not any([filepath.endswith(ft) for ft in supported_filetypes]):
-        filepath += ".blosc" #default to blosc
+        # check if the blosc2 module is available
+        try:
+            import blosc2 as blosc
+            filepath += ".blosc" #default to blosc
+        except:
+            print_red("Blosc2 module not found. Please install it using 'pip install blosc2' or use a different file extension.")
+            filpath += ".pickle"            
     if filepath.endswith(".pickle"):
         import pickle
         with open(filepath, "wb") as f:

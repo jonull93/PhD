@@ -217,6 +217,7 @@ def custom_sort(item):
     return (0, 0, item)
 
 def group_technologies(data):
+    """Group technologies according to the tech_groups dictionary"""
     # Create a dictionary of Series to hold the grouped data
     grouped_data = {s:pd.Series(dtype=float) for s in data.keys()}
 
