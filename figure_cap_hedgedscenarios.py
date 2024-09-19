@@ -162,6 +162,9 @@ def load_data(pickle_file, use_defaults=False, data_key='tot_cap'):
     elif data_key in ['cost_tot','cost_tot_onlynew']:
         selected_data = {scenario: pd.Series([data[scenario][data_key]], index=['System cost']) for scenario in selected_scenarios}
 
+    elif data_key == 'number_stochastic_scenarios':
+        # An int per scenario. Can be found by counting the number of elements in  data[scenario]["VRE_share"]
+        selected_data = {scenario: len(data[scenario]["VRE_share"]) for scenario in selected_scenarios}
     else:
         try: selected_data = {scenario: data[scenario][data_key].fillna(0) for scenario in selected_scenarios}
         except AttributeError: selected_data = {scenario: data[scenario][data_key] for scenario in selected_scenarios}
