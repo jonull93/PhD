@@ -26,6 +26,7 @@ if __name__ == "__main__":
     gdxpath = os.path.join(os.path.dirname(os.path.dirname(os.path.realpath(__file__))), "multinode\\results\\")
 
     excel = True  # will only make a .pickle if excel == False
+    individual_sheets = False # if True, each scenario will be written to a separate sheet in the excel file
     run_output = "w"  # 'w' to (over)write or 'rw' to only add missing scenarios
     overwrite = []  # names of scenarios to overwrite regardless of existence in pickled data
     #overwrite = [reg+"_inertia_0.1x" for reg in ["ES3", "HU", "IE", "SE2"]]+\
@@ -190,7 +191,7 @@ if __name__ == "__main__":
     print("8: trueref_all (2HP_trueref + allopt_trueref + allyears)")
     print("9: random (all random cases)")
     cases = []
-    while cases not in [cases1, cases2, cases3, cases_test, cases_manyyears, cases_allyears, cases_truerefmixed, cases_truerefall]:
+    while cases not in [cases1, cases2, cases3, cases_test, cases_manyyears, cases_allyears, cases_truerefmixed, cases_truerefall, cases_random]:
         cases = input("Enter a number: ")
         if cases == "1":
             cases = cases1
@@ -295,7 +296,7 @@ if __name__ == "__main__":
     #new_data = {}
     # io_lock = threading.Lock()
     threads = {}
-    num_threads = min(max(cpu_count() - 5, 4), len(todo_gdx), 3)
+    num_threads = min(max(cpu_count() - 5, 4), len(todo_gdx), 4)
     excel_name = path + name + suffix + ".xlsx"
     #writer = pd.ExcelWriter(excel_name, engine="openpyxl")
     opened_file = False
@@ -330,7 +331,7 @@ def crawl_gdx(q_gdx, q_excel, old_data, gdxpath, overwrite, todo_gdx_len, new_da
             success, new_data[scen_name] = gpf.run_case(scen_name, gdxpath, indicators)
             #print_green("Finished " + scen_name.ljust(20) + " after " + str(round(tm.time() - start_time_thread,
             #                                                              1)) + f" seconds")
-            print_green(f"Finished {scen_name.ljust(20)} after {round((tm.time()-start_time_thread)/60, 1)} minutes")
+            print_green(f"Finished {scen_name.ljust(20)} after {round((tm.time()-start_time_thread)/60, 1)} minutes. {q_gdx.qsize()} gdx files left out of {todo_gdx_len}")
             if success and excel:
                 q_excel.put((scen_name, True))
                 print(f' (q_excel appended and is now : {q_excel.qsize()} items long)')
@@ -363,7 +364,7 @@ def crawl_gdx(q_gdx, q_excel, old_data, gdxpath, overwrite, todo_gdx_len, new_da
             q_gdx.task_done()  # signal to the queue that task has been processed
     return True
 
-def crawl_excel(path, old_data, q_excel, new_data, row, indicators, isgdxdone, excel_name):
+def crawl_excel(path, old_data, q_excel, new_data, row, indicators, isgdxdone, excel_name, individual_sheets):
     #print(f"starting crawl_excel('{path}')")
     writer = pd.ExcelWriter(excel_name, engine="openpyxl")
     start_time_excel = False
@@ -381,7 +382,7 @@ def crawl_excel(path, old_data, q_excel, new_data, row, indicators, isgdxdone, e
                     continue
             else:
                 data = old_data[scen_name]
-            gpf.excel(scen_name, data, row, writer, indicators)
+            gpf.excel(scen_name, data, row, writer, indicators, individual_sheets=individual_sheets)
             row.value += 1
             q_excel.task_done()
         else:
@@ -426,7 +427,7 @@ if __name__ == "__main__":
         tm.sleep(1)
         print_magenta('Starting excel thread') # crawl_excel DOES NOT SUPPORT BEING RAN IN MULTIPLE INSTANCES
         p_excel = multiprocessing.Process(target=crawl_excel, args=(path, old_data, q_excel, new_data, row, indicators, 
-                                                                    isgdxdone, excel_name))
+                                                                    isgdxdone, excel_name, individual_sheets))
         p_excel.start()
 
     for p in processes:
