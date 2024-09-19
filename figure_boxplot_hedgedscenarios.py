@@ -9,17 +9,18 @@ from datetime import datetime
 
 from figure_cap_hedgedscenarios import load_data, custom_sort, group_technologies, prettify_scenario_name
 
-def create_whisker_plots(grouped_data, pickle_timestamp, techs_to_plot=None):
+def create_whisker_plots(grouped_data, pickle_timestamp, techs_to_plot=None, separate_by_number_stochastic_years=None):
     if techs_to_plot is None:
         techs_to_plot = ["PV", "Wind", "U", "WG", "Peak", "H2store", "bat"]  # Default technologies
     tech_labels = [tech_names.get(tech, tech) for tech in techs_to_plot]
     grouped_data_df = pd.DataFrame(grouped_data)
     
     extras = [i for i in grouped_data_df.index if i in ["biogas", 'Export south', 'Export north', 'System cost']]
-    #move system cost to the end
-    if "System cost" in extras:
+    
+    if "System cost" in extras:#move system cost to the end
         extras.remove("System cost")
         extras.append("System cost")
+        
     extra_labels = [tech_names.get(tech, tech) for tech in extras]
     contains_extras = len(extras) > 0
     contains_HP_sets = any("HP" in s.split("_")[0] for s in grouped_data)
@@ -43,6 +44,7 @@ def create_whisker_plots(grouped_data, pickle_timestamp, techs_to_plot=None):
     #{key: data for key, data in normalized_grouped_data.items() if 'singleyear' not in key and "HP" in key.split("_")[0]}
     nonHPsets_of_years_data = normalized_grouped_data.filter(items=[s for s in normalized_grouped_data.columns if 'singleyear' not in s and "opt" in s.split("_")[0]], axis=1)
     #{key: data for key, data in normalized_grouped_data.items() if 'singleyear' not in key and "opt" in key.split("_")[0]}
+    random_sets_of_years_data = normalized_grouped_data.filter(items=[s for s in normalized_grouped_data.columns if "random" in s.split("_")[0]], axis=1)
 
     # Filter for selected technologies
     individual_years_df = pd.DataFrame(individual_years_data)
@@ -82,6 +84,11 @@ def create_whisker_plots(grouped_data, pickle_timestamp, techs_to_plot=None):
       
     # Figure and Axes setup
     nr_of_rows = 1 + contains_HP_sets + contains_nonHP_sets
+    if separate_by_number_stochastic_years: 
+        # Add one row for each unique number of stochastic years
+        unique_numbers = set(separate_by_number_stochastic_years.values())
+        nr_of_rows = 1 + len(unique_numbers)
+
     nr_of_cols = 1 + contains_extras
     gridspec = {'width_ratios': [7, len(extras)] if contains_extras else [1], }
     fig, axs = plt.subplots(nrows=nr_of_rows, ncols=nr_of_cols, figsize=(8, 2 + 2 * nr_of_rows), gridspec_kw=gridspec)
@@ -90,23 +97,30 @@ def create_whisker_plots(grouped_data, pickle_timestamp, techs_to_plot=None):
     # Whisker settings
     whisker_props = dict(whis=1.5, showfliers=True, sym="o")
 
-    # Plotting
+    ## Plotting
     plot_idx = 0
     extra_ylabel = 'Normalized values' if 'System cost'  in extra_labels else 'Normalized energy'
+    
+    # Plot boxplots for individual years
     plot_boxplot(axs[plot_idx], individual_years_df.loc[techs_to_plot], tech_labels, 
                 'Normalized capacity', 'left', whisker_props)
     plot_idx += 1
-
     if contains_extras:
+        # Plot boxplots for the extra technologies
         plot_boxplot(axs[plot_idx], individual_years_df.loc[extras], extra_labels, 
                     extra_ylabel, 'right', whisker_props)
         plot_idx += 1
 
     datasets = [(contains_HP_sets, HPsets_of_years_df),
                 (contains_nonHP_sets, nonHPsets_of_years_df)]
+    if separate_by_number_stochastic_years:
+        datasets = []
+        for number in unique_numbers:
+            datasets.append((True, random_sets_of_years_data.filter(items=[s for s in random_sets_of_years_data.columns if separate_by_number_stochastic_years[s] == number], axis=1)))
 
     for contains_set, df in datasets:
         if contains_set:
+            # If there are HP or non-HP sets of years, plot them
             plot_boxplot(axs[plot_idx], df.loc[techs_to_plot], tech_labels, 
                         'Normalized capacity', 'left', whisker_props)
             plot_idx += 1
@@ -187,6 +201,10 @@ def main():
     bio_data = load_data(pickle_file, use_defaults="skip", data_key="biogas")
     export_data = load_data(pickle_file, use_defaults="skip", data_key="grossexport")
     cost_total = load_data(pickle_file, use_defaults="skip", data_key="cost_tot_onlynew")
+    if isinstance(pickle_file, list) and any("random" in f for f in pickle_file):
+        number_stochastic_years = load_data(pickle_file, use_defaults="skip", data_key="number_stochastic_years")
+    else:
+        number_stochastic_years = None
 
     print_yellow(f"Data loaded from pickle file")
     grouped_data = group_technologies(cap_data)
@@ -195,7 +213,7 @@ def main():
     
     print_green(f"Technologies grouped successfully")
     print_yellow(f"Grouped data: \n{pd.DataFrame(grouped_data)}")
-    create_whisker_plots(grouped_data, pickle_timestamp)
+    create_whisker_plots(grouped_data, pickle_timestamp, separate_by_number_stochastic_years=number_stochastic_years)
     #print_magenta(f"Figures created and saved in {figures_folder}")
     
     print_red(f"Script finished at: {datetime.now()}")

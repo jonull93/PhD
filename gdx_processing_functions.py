@@ -179,6 +179,8 @@ def run_case(scen_name, gdxpath, indicators, FC=False, print_FR_summary=False):
         discharge = gdx(f, "v_discharge")
         charge = gdx(f, "v_charge")
         demand = gdx(f, "o_load")
+        if demand == None:
+            demand = gdx(f, "o_demand")
         #yearly_elec_export = gdx(f, "o_net_export").sum(axis=1).rename_axis(index=["exporter", "importer", "stochastic_scenarios"])
         hourly_elec_trade = gdx(f, "o_net_export").rename_axis(index=["exporter", "importer", "stochastic_scenarios"])
         yearly_elec_grossexport = gdx(f, "o_net_export").apply(lambda x: x[x > 0].sum(), axis=1)
