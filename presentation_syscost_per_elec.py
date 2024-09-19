@@ -14,7 +14,7 @@ os.makedirs(fig_path, exist_ok=True)
 
 #"C:\Users\vijulk\OneDrive - Chalmers\notes.xlsx", Sheet3
 # Load data
-cost_df = pd.read_excel("C:\\Users\\vijulk\\OneDrive - Chalmers\\notes.xlsx", 
+cost_df = pd.read_excel(r"H:\OneDrive - Chalmers\notes.xlsx", 
                         sheet_name="Sheet3", index_col=[0,1],header=0)
 """
 		Brit	Iberia	Nordic
@@ -55,7 +55,7 @@ rects2 = ax.bar(brit_x, brit, bar_width, color=sns.color_palette('ch:start=.2,ro
 mark1 = ax.plot(nordic_x, sp_cost_df.loc["Thermal cycling cost [G€]", "Nordic"].values, 'd', color='black', label="Extra cycling cost")
 mark2 = ax.plot(brit_x, sp_cost_df.loc["Thermal cycling cost [G€]", "Brit"].values, 'd', color='black')
 plt.xticks([np.mean(nordic_x), np.mean(brit_x)], ["Nordic", "Brit"], fontsize=12)
-plt.ylabel("System cost increase [€/MWh] or [öre/kWh]")
+plt.ylabel("System cost increase [€/MWh]", fontsize=12)
 plt.legend(loc='lower center', bbox_to_anchor=(0.5, 1.03), ncol=1, fancybox=True)
 plt.savefig(fig_path + "/syscost_per_elec.png", bbox_inches='tight', dpi=500, transparent=True)
 print("Figure saved as syscost_per_elec.png in ", fig_path)

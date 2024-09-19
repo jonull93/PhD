@@ -20,6 +20,11 @@ if __name__ == "__main__":
     start_time_script = tm.time()
     print("Excel-writing script started at", datetime.now().strftime('%H:%M:%S'))
 
+    #set path to the relative subfolder \output
+    path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "output\\")
+    #set gdxpath to ..\multinode\results\ where .. is the parent folder of the current folder
+    gdxpath = os.path.join(os.path.dirname(os.path.dirname(os.path.realpath(__file__))), "multinode\\results\\")
+
     excel = True  # will only make a .pickle if excel == False
     run_output = "w"  # 'w' to (over)write or 'rw' to only add missing scenarios
     overwrite = []  # names of scenarios to overwrite regardless of existence in pickled data
@@ -170,6 +175,8 @@ if __name__ == "__main__":
         "allopt2_trueref", "allopt3_trueref", "allopt4_trueref", "allopt5_trueref", "allopt6_trueref",
         "allyears",
     ]
+    cases_random = [i.replace(".gdx","") for i in os.listdir(gdxpath) if "random" in i]
+
     #cases = cases1
     # instead of setting cases manually, prompt the user to select a set of cases
     print("Select a set of cases to run:")
@@ -181,6 +188,7 @@ if __name__ == "__main__":
     print("6: allyears (all years + allyears)")
     print("7: trueref_main (2HP_trueref + single years + allyears)")
     print("8: trueref_all (2HP_trueref + allopt_trueref + allyears)")
+    print("9: random (all random cases)")
     cases = []
     while cases not in [cases1, cases2, cases3, cases_test, cases_manyyears, cases_allyears, cases_truerefmixed, cases_truerefall]:
         cases = input("Enter a number: ")
@@ -208,6 +216,9 @@ if __name__ == "__main__":
         elif cases == "8":
             cases = cases_truerefall
             suffix = "_trueref_all"
+        elif cases == "9":
+            cases = cases_random
+            suffix = "_random"
         else:
             print("Invalid input")
     cases = list(set(cases))  # remove duplicates
@@ -229,17 +240,13 @@ if __name__ == "__main__":
         path = "C:\\Users\\jonathan\\git\\PhD\\output\\"
         gdxpath = "C:\\Users\\jonathan\\git\\multinode\\results\\"
     """
-    #set path to the relative subfolder \output
-    path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "output\\")
-    #set gdxpath to ..\multinode\results\ where .. is the parent folder of the current folder
-    gdxpath = os.path.join(os.path.dirname(os.path.dirname(os.path.realpath(__file__))), "multinode\\results\\")
-
 
     if run_output.lower() == "w" or run_output.lower() == "write":
         old_data = {}
-    elif run_output.lower() == "rw":
+    elif run_output.lower() in ["rw", "add", "append"]:
         try: old_data = pickle.load(open("PickleJar\\data_" + name + ".pickle", "rb"))
         except FileNotFoundError:
+            print_red("No pickle file found, starting from scratch")
             old_data = {}
     else:
         raise ValueError
@@ -288,7 +295,7 @@ if __name__ == "__main__":
     #new_data = {}
     # io_lock = threading.Lock()
     threads = {}
-    num_threads = min(max(cpu_count() - 5, 4), len(todo_gdx))
+    num_threads = min(max(cpu_count() - 5, 4), len(todo_gdx), 3)
     excel_name = path + name + suffix + ".xlsx"
     #writer = pd.ExcelWriter(excel_name, engine="openpyxl")
     opened_file = False
