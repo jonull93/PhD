@@ -373,7 +373,7 @@ def short_scen(scen):
 
     return shortened_scen
 
-def excel(scen:str, data, row, writer, indicators):
+def excel(scen:str, data, row, writer, indicators, individual_sheets=True):
     global scen_row
     global indicators_column
     try: type(indicators_column) == int
@@ -425,49 +425,50 @@ def excel(scen:str, data, row, writer, indicators):
             if isinstance({}, ind_type): print(thing.keys())
         c += 1
 
-    cap_len = len(cap.index.get_level_values(0).unique())+1
-    reg_len = len(cap.index.get_level_values(1).unique())+1
-    try:
-        cappy = cap.to_frame(name="Cap").join(new_cap).join(share).join(FLH_regional)
-    except: print(cap,new_cap,share,FLH_regional)
-    cappy["sort_by"] = cappy.index.get_level_values(0).map(order_map_cap)
-    cappy.sort_values("sort_by", inplace=True)
-    cappy.drop(columns="sort_by", inplace=True)
-    #print(cappy)
-    cappy = cappy.reorder_levels(["I_reg", "tech", "stochastic_scenarios"]).sort_index(level=0, sort_remaining=False)
-    mask = cappy.duplicated(subset=["New cap","Cap"], keep='first')
-    cappy2 = cappy[~mask]
-    cappy2[["New cap","Cap"]].groupby(level=["tech"]).sum().to_excel(writer, sheet_name=shortened_scen, startcol=1, startrow=1)
-    cappy_len = len(cappy2[["New cap","Cap"]].groupby(level=["tech"]).sum())
-    for i, reg in enumerate(cappy.index.get_level_values(0).unique()):
-        cappy.filter(like=reg,axis=0).to_excel(writer, sheet_name=shortened_scen, startcol=5+8*i, startrow=1)
-        if len(cappy.filter(like=reg,axis=0)) > cappy_len: cappy_len = len(cappy.filter(like=reg,axis=0))
-    # get the nr of rows in cappy.filter(like=reg,axis=0)
-    #print_yellow(scen_row)
-    scen_row += cappy_len+4
-    #print_yellow(scen_row)
-    try: print_df(writer, data["curtailment_profile_total"].round(decimals=3), "Curtailment", shortened_scen)
-    except AttributeError: print_red(f"could not print curtailment for {shortened_scen}")
-    try: print_df(writer, data["el_price"].round(decimals=3), "Elec. price", shortened_scen, row_inc=2)
-    except AttributeError: print_red(f"could not print elec price for {shortened_scen}")
+    if individual_sheets:
+        cap_len = len(cap.index.get_level_values(0).unique())+1
+        reg_len = len(cap.index.get_level_values(1).unique())+1
+        try:
+            cappy = cap.to_frame(name="Cap").join(new_cap).join(share).join(FLH_regional)
+        except: print(cap,new_cap,share,FLH_regional)
+        cappy["sort_by"] = cappy.index.get_level_values(0).map(order_map_cap)
+        cappy.sort_values("sort_by", inplace=True)
+        cappy.drop(columns="sort_by", inplace=True)
+        #print(cappy)
+        cappy = cappy.reorder_levels(["I_reg", "tech", "stochastic_scenarios"]).sort_index(level=0, sort_remaining=False)
+        mask = cappy.duplicated(subset=["New cap","Cap"], keep='first')
+        cappy2 = cappy[~mask]
+        cappy2[["New cap","Cap"]].groupby(level=["tech"]).sum().to_excel(writer, sheet_name=shortened_scen, startcol=1, startrow=1)
+        cappy_len = len(cappy2[["New cap","Cap"]].groupby(level=["tech"]).sum())
+        for i, reg in enumerate(cappy.index.get_level_values(0).unique()):
+            cappy.filter(like=reg,axis=0).to_excel(writer, sheet_name=shortened_scen, startcol=5+8*i, startrow=1)
+            if len(cappy.filter(like=reg,axis=0)) > cappy_len: cappy_len = len(cappy.filter(like=reg,axis=0))
+        # get the nr of rows in cappy.filter(like=reg,axis=0)
+        #print_yellow(scen_row)
+        scen_row += cappy_len+4
+        #print_yellow(scen_row)
+        try: print_df(writer, data["curtailment_profile_total"].round(decimals=3), "Curtailment", shortened_scen)
+        except AttributeError: print_red(f"could not print curtailment for {shortened_scen}")
+        try: print_df(writer, data["el_price"].round(decimals=3), "Elec. price", shortened_scen, row_inc=2)
+        except AttributeError: print_red(f"could not print elec price for {shortened_scen}")
 
-    if data["PS"]: print_df(writer, data["FR_period_cost"].round(decimals=3), "FR period cost", shortened_scen, row_inc=2)
-    try: print_gen(writer, shortened_scen, gen, data["gamsTimestep"])
-    except AttributeError: print_red(f"could not print gen for {shortened_scen}")
+        if data["PS"]: print_df(writer, data["FR_period_cost"].round(decimals=3), "FR period cost", shortened_scen, row_inc=2)
+        try: print_gen(writer, shortened_scen, gen, data["gamsTimestep"])
+        except AttributeError: print_red(f"could not print gen for {shortened_scen}")
 
-    if data["PS"]:
-        try: print_df(writer, data["FR_cost"].round(decimals=3), "FR: Cost", shortened_scen, row_inc=2)
-        except IndexError:
-            if "lowFlex" in stripped_scen and "fullFC" in stripped_scen: print(shortened_scen, data["FR_cost"])
-        print_df(writer, data["FR_available"].round(decimals=3), "FR: Available", shortened_scen, header=False)
-        print_df(writer, data["FR_deficiency"].round(decimals=2), "FR: Deficiency", shortened_scen, header=False)
-        print_df(writer, data["FR_net_import"].round(decimals=3), "FR: Net-import", shortened_scen, header=False)
-        print_df(writer, data["FR_demand"]["wind"].round(decimals=3), "FR demand: Wind", shortened_scen, header=True)
-        print_df(writer, data["FR_demand"]["PV"].round(decimals=3), "FR demand: PV", shortened_scen, header=True)
-        print_df(writer, data["FR_demand"]["other"].round(decimals=3), "FR demand: Other", shortened_scen, header=True)
-        print_df(writer, data["FR_demand"]["total"].round(decimals=3), "FR demand: Total", shortened_scen, header=True, row_inc=2)
-        print_df(writer, data["inertia_available"].round(decimals=3), "Inertia: Available", shortened_scen, header=True)
-        print_df(writer, data["inertia_available_thermals"].round(decimals=3), "Inertia: Thermals", shortened_scen, header=True, row_inc=2)
-    else:
-        #print("PS variables were not available for", scen)
-        pass
+        if data["PS"]:
+            try: print_df(writer, data["FR_cost"].round(decimals=3), "FR: Cost", shortened_scen, row_inc=2)
+            except IndexError:
+                if "lowFlex" in stripped_scen and "fullFC" in stripped_scen: print(shortened_scen, data["FR_cost"])
+            print_df(writer, data["FR_available"].round(decimals=3), "FR: Available", shortened_scen, header=False)
+            print_df(writer, data["FR_deficiency"].round(decimals=2), "FR: Deficiency", shortened_scen, header=False)
+            print_df(writer, data["FR_net_import"].round(decimals=3), "FR: Net-import", shortened_scen, header=False)
+            print_df(writer, data["FR_demand"]["wind"].round(decimals=3), "FR demand: Wind", shortened_scen, header=True)
+            print_df(writer, data["FR_demand"]["PV"].round(decimals=3), "FR demand: PV", shortened_scen, header=True)
+            print_df(writer, data["FR_demand"]["other"].round(decimals=3), "FR demand: Other", shortened_scen, header=True)
+            print_df(writer, data["FR_demand"]["total"].round(decimals=3), "FR demand: Total", shortened_scen, header=True, row_inc=2)
+            print_df(writer, data["inertia_available"].round(decimals=3), "Inertia: Available", shortened_scen, header=True)
+            print_df(writer, data["inertia_available_thermals"].round(decimals=3), "Inertia: Thermals", shortened_scen, header=True, row_inc=2)
+        else:
+            #print("PS variables were not available for", scen)
+            pass
