@@ -27,7 +27,7 @@ if __name__ == "__main__":
 
     excel = True  # will only make a .pickle if excel == False
     individual_sheets = False # if True, each scenario will be written to a separate sheet in the excel file
-    run_output = "w"  # 'w' to (over)write or 'rw' to only add missing scenarios
+    run_output = "rw"  # 'w' to (over)write or 'rw' to only add missing scenarios
     overwrite = []  # names of scenarios to overwrite regardless of existence in pickled data
     #overwrite = [reg+"_inertia_0.1x" for reg in ["ES3", "HU", "IE", "SE2"]]+\
     #            [reg+"_inertia" for reg in ["ES3", "HU", "IE", "SE2"]]+\
@@ -245,16 +245,21 @@ if __name__ == "__main__":
     if run_output.lower() == "w" or run_output.lower() == "write":
         old_data = {}
     elif run_output.lower() in ["rw", "add", "append"]:
-        try: old_data = pickle.load(open("PickleJar\\data_" + name + ".pickle", "rb"))
+        try:
+            most_recent_cases_file = max([f for f in os.listdir("PickleJar") if f.startswith(f"data_") 
+                                          and (f.endswith(f"{suffix}.pickle") or f.endswith(f"{suffix}.blosc"))])
+            old_data = pickle.load(open(f"PickleJar\\{most_recent_cases_file}", "rb"))
         except FileNotFoundError:
             print_red("No pickle file found, starting from scratch")
             old_data = {}
     else:
         raise ValueError
 
+    old_data_keys = list(old_data.keys())
+
     todo_gdx = []
     for j in cases:
-        if j not in old_data or j in overwrite:
+        if j not in old_data_keys or j in overwrite:
             todo_gdx.append(j)
 
     todo_gdx_len = len(todo_gdx)
@@ -296,7 +301,7 @@ if __name__ == "__main__":
     #new_data = {}
     # io_lock = threading.Lock()
     threads = {}
-    num_threads = min(max(cpu_count() - 5, 4), len(todo_gdx), 30)
+    num_threads = min(max(cpu_count() - 5, 4), len(todo_gdx), 10)
     excel_name = path + name + suffix + ".xlsx"
     #writer = pd.ExcelWriter(excel_name, engine="openpyxl")
     opened_file = False
@@ -311,7 +316,7 @@ if __name__ == "__main__":
             print_red("OBS: EXCEL FILE MAY BE OPEN - PLEASE CLOSE IT BEFORE SCRIPT FINISHES ", e)
 
 # Unfortunately, global variables can only be used within the same file, so not all functions can be imported
-def crawl_gdx(q_gdx, q_excel, old_data, gdxpath, overwrite, todo_gdx_len, new_data, files, thread_nr, run_output, indicators, errors, excel, replace_with_alternative_solver_if_missing=False, alternative_solutions=[]):
+def crawl_gdx(q_gdx, q_excel, old_data_keys, gdxpath, overwrite, todo_gdx_len, new_data, files, thread_nr, run_output, indicators, errors, excel, replace_with_alternative_solver_if_missing=False, alternative_solutions=[]):
     # Assign a unique identifier for the process
     pid = multiprocessing.current_process().pid
 
@@ -320,7 +325,7 @@ def crawl_gdx(q_gdx, q_excel, old_data, gdxpath, overwrite, todo_gdx_len, new_da
 
     while not q_gdx.empty():
         scen_i, scen_name = q_gdx.get()  # fetch new work from the Queue
-        if run_output == "rw" and scen_name not in overwrite and scen_name in old_data:
+        if run_output == "rw" and scen_name not in overwrite and scen_name in old_data_keys:
             q_gdx.task_done()
             continue
         try:
@@ -417,9 +422,10 @@ if __name__ == "__main__":
     # Starting worker threads on queue processing
     processes = []
     for i in range(num_threads):
-        p = multiprocessing.Process(target=crawl_gdx, args=(q_gdx, q_excel, old_data, gdxpath, overwrite, todo_gdx_len, 
+        print_cyan(f'Starting gdx thread {i + 1}')
+        p = multiprocessing.Process(target=crawl_gdx, args=(q_gdx, q_excel, old_data_keys, gdxpath, overwrite, todo_gdx_len, 
                                                             new_data, files, thread_nr, run_output, indicators, errors, excel))
-        tm.sleep(0.1*i)  # staggering gdx threads shouldnt matter as long as the excel process has something to work on
+        tm.sleep(0.1*i+0.5)  # staggering gdx threads shouldnt matter as long as the excel process has something to work on
         p.start()
         processes.append(p)
 
@@ -433,6 +439,7 @@ if __name__ == "__main__":
     for p in processes:
         p.join()
     isgdxdone.value = True
+
     print_green("Finished the GDX queue after ", str(round((tm.time() - start_time_script) / 60, 1)),
         "minutes - now saving pickle at", datetime.now().strftime('%H:%M:%S'))
 
@@ -448,8 +455,10 @@ if __name__ == "__main__":
     save_to_file(old_data, f"PickleJar\\data_{name}{suffix}") #specifying the file extension is no longer necessary
 
     print_green("Successfully pickled")
+    
     if opened_file: print_red(" ! REMINDER TO MAKE SURE EXCEL FILE IS CLOSED !")
-    p_excel.join()
+    if excel: p_excel.join() # wait for the excel process to finish
+
     print_green('Script finished completed after', str(round((tm.time() - start_time_script) / 60, 2)), 'minutes with',
         str(errors.value), "errors, at", datetime.now().strftime('%H:%M:%S'))
 
