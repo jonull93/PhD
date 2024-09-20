@@ -697,7 +697,8 @@ def load_from_file(filepath):
         import pandas as pd
         return pd.read_csv(filepath)
     elif filepath.endswith(".blosc"):
-        import blosc2 as blosc
+        try: import blosc2 as blosc
+        except ImportError: import blosc
         import pickle
         blosc.set_nthreads(4)
         with open(filepath, "rb") as f:
@@ -716,7 +717,7 @@ def save_to_file(data, filepath, clever=5, nthreads=4, max_compression=True, **k
     -----------
     data: the data to be saved
     filepath: the path to the file to be saved. If no file extension is specified, it defaults to .blosc
-    clever: the compression level to use. 0 is fastest, 9 is slowest. 5 is the default and recommended value as no big gains are made by going higher.
+    clevel: the compression level to use. 0 is fastest, 9 is slowest. 5 is the default and recommended value as no big gains are made by going higher.
     nthreads: the number of threads to use for compression. Large diminishing returns after 4 threads.
     max_compression: if False, use LZ4 compression instead of ZSTD. LZ4 is a lot faster, but ZSTD is a lot more efficient.
     **kwargs: additional arguments to be passed to blosc.compress2()
@@ -730,8 +731,12 @@ def save_to_file(data, filepath, clever=5, nthreads=4, max_compression=True, **k
     supported_filetypes = [".pickle", ".csv", ".blosc"]
     if not any([filepath.endswith(ft) for ft in supported_filetypes]):
         # check if the blosc2 module is available
+        legacy_blosc = False
         try:
-            import blosc2 as blosc
+            try: import blosc2 as blosc
+            except ImportError: 
+                import blosc
+                legacy_blosc = True
             filepath += ".blosc" #default to blosc
         except:
             print_red("Blosc2 module not found. Please install it using 'pip install blosc2' or use a different file extension.")
@@ -746,16 +751,23 @@ def save_to_file(data, filepath, clever=5, nthreads=4, max_compression=True, **k
         import pandas as pd
         data.to_csv(filepath)
     elif filepath.endswith(".blosc"):
-        import blosc2 as blosc
         import pickle
-        blosc.set_nthreads(nthreads)
-        if not max_compression:
-            codec_to_use = blosc.Codec.LZ4
-        else:
-            codec_to_use = blosc.Codec.ZSTD
         bytes_data = pickle.dumps(data, protocol=pickle.DEFAULT_PROTOCOL)
+        if legacy_blosc:
+            import blosc
+        else:
+            import blosc2 as blosc
+            if not max_compression:
+                codec_to_use = blosc.Codec.LZ4
+            else:
+                codec_to_use = blosc.Codec.ZSTD
+
+        blosc.set_nthreads(nthreads)
         with open(filepath, "wb") as f:
-            f.write(blosc.compress2(bytes_data, codec=codec_to_use, clevel=clever, filter=blosc.Filter.SHUFFLE, **kwargs))
+            if legacy_blosc:
+                f.write(blosc.compress(bytes_data, cname="lz4", clevel=9, **kwargs))
+            else:
+                f.write(blosc.compress2(bytes_data, codec=codec_to_use, clevel=clever, filter=blosc.Filter.SHUFFLE, **kwargs))
     else:
         print_red(f"File extension not recognized: {filepath}")
         return None
