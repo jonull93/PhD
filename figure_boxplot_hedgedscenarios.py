@@ -3,7 +3,7 @@ import pickle
 import pandas as pd
 import matplotlib.pyplot as plt
 import re
-from my_utils import color_dict, tech_names, print_red, print_cyan, print_green, print_magenta, print_blue, print_yellow, select_pickle
+from my_utils import color_dict, tech_names, print_red, print_cyan, print_green, print_magenta, print_blue, print_yellow, select_pickle, save_to_file
 from order_cap import wind, PV, baseload, peak, CCS, CHP, midload, hydro, PtH, order_cap, order_cap2, order_cap3
 from datetime import datetime
 
@@ -45,6 +45,8 @@ def create_whisker_plots(grouped_data, pickle_timestamp, techs_to_plot=None, sep
     nonHPsets_of_years_data = normalized_grouped_data.filter(items=[s for s in normalized_grouped_data.columns if 'singleyear' not in s and "opt" in s.split("_")[0]], axis=1)
     #{key: data for key, data in normalized_grouped_data.items() if 'singleyear' not in key and "opt" in key.split("_")[0]}
     random_sets_of_years_data = normalized_grouped_data.filter(items=[s for s in normalized_grouped_data.columns if "random" in s.split("_")[0]], axis=1)
+
+    save_to_file(random_sets_of_years_data, "PickleJar/random_sets_of_years_data")
 
     # Filter for selected technologies
     individual_years_df = pd.DataFrame(individual_years_data)
@@ -106,6 +108,7 @@ def create_whisker_plots(grouped_data, pickle_timestamp, techs_to_plot=None, sep
     ## Plotting
     plot_idx = 0
     extra_ylabel = 'Normalized values' if 'System cost'  in extra_labels else 'Normalized energy'
+    titles = [f'{len(individual_years_df.columns)} individual weather-years']
     
     # Plot boxplots for individual years
     plot_boxplot(axs[plot_idx], individual_years_df.loc[techs_to_plot], tech_labels, 
@@ -117,8 +120,7 @@ def create_whisker_plots(grouped_data, pickle_timestamp, techs_to_plot=None, sep
                     extra_ylabel, 'right', whisker_props)
         plot_idx += 1
 
-    datasets = [(contains_HP_sets, HPsets_of_years_df),
-                (contains_nonHP_sets, nonHPsets_of_years_df)]
+    # Prepare data for each row in the figure
     if separate_by_number_stochastic_years:
         datasets = []
         for number in unique_numbers:
@@ -126,8 +128,15 @@ def create_whisker_plots(grouped_data, pickle_timestamp, techs_to_plot=None, sep
                 (True, 
                  random_sets_of_years_data.filter(
                      items=[s for s in random_sets_of_years_data.columns if separate_by_number_stochastic_years[s] == number], axis=1)))
-        print(f"datasets: {datasets}")
-
+            titles.append(f'Random sets of {number} weather-years')
+    else:
+        datasets = [(contains_HP_sets, HPsets_of_years_df),
+                    (contains_nonHP_sets, nonHPsets_of_years_df)]
+        titles += [ f'{len(HPsets_of_years_df.columns)} sets of weather-years (with hand-picking)',
+                    f'{len(nonHPsets_of_years_df.columns)} sets of weather-years (without hand-picking)']
+    
+    print(f"datasets: {datasets}")
+    
     for contains_set, df in datasets:
         if contains_set:
             # If there are HP or non-HP sets of years, plot them
@@ -168,14 +177,13 @@ def create_whisker_plots(grouped_data, pickle_timestamp, techs_to_plot=None, sep
     fig.tight_layout()
     fig.subplots_adjust(hspace=0.43, top=0.96, wspace=0.04)
     if contains_extras:
-        center_title(axs[0], axs[1], f'{len(individual_years_df.columns)} individual weather-years')
-        center_title(axs[2], axs[3], f'{len(HPsets_of_years_df.columns)} sets of weather-years (with hand-picking)')
-        center_title(axs[4], axs[5], f'{len(nonHPsets_of_years_df.columns)} sets of weather-years (without hand-picking)')
+        for ax_idx in range(nr_of_rows):
+            left = axs[ax_idx * 2]
+            right = axs[ax_idx * 2 + 1]
+            center_title(left, right, titles[ax_idx])
     else:
-        center_title(axs[0], None, f'{len(individual_years_df.columns)} individual weather-years')
-        center_title(axs[1], None, f'{len(HPsets_of_years_df.columns)} sets of weather-years (with hand-picking)')
-        center_title(axs[2], None, f'{len(nonHPsets_of_years_df.columns)} sets of weather-years (without hand-picking)')
-
+        for ax_idx in range(nr_of_rows):
+            center_title(axs[ax_idx], None, titles[ax_idx])
 
     # Save the figure
     fig_name_base = f"figures/capacity/boxplots/{pickle_timestamp}"
@@ -214,8 +222,8 @@ def main():
     if isinstance(pickle_file, list) and any("random" in f for f in pickle_file):
         number_stochastic_years = load_data(pickle_file, use_defaults="skip", data_key="number_stochastic_years")
         number_stochastic_years = {k: v for k, v in number_stochastic_years.items() if v in [3,4,5,6]}
-        print_cyan(f"Number of stochastic years: {number_stochastic_years}")
-        input("Press ENTER to continue")
+        #print_cyan(f"Number of stochastic years: {number_stochastic_years}")
+        #input("Press ENTER to continue")
     else:
         number_stochastic_years = None
 
