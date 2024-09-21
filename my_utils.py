@@ -616,7 +616,7 @@ def select_pickle(predetermined_choice=False, pickle_folder="PickleJar\\"):
         allyears_pickle = max([f for f in pickle_files if "allyears" in f], key=os.path.getmtime)
         allopt_pickle = max([f for f in pickle_files if "allopt" in f or "trueref" in f], key=os.path.getmtime)
         random_pickle = max([f for f in pickle_files if "random" in f], key=os.path.getmtime)
-        return [allyears_pickle, allopt_pickle]
+        return [allyears_pickle, allopt_pickle, random_pickle]
 
 
 def shorten_year(scenario):
@@ -753,6 +753,12 @@ def save_to_file(data, filepath, clever=5, nthreads=4, max_compression=True, **k
     elif filepath.endswith(".blosc"):
         import pickle
         bytes_data = pickle.dumps(data, protocol=pickle.DEFAULT_PROTOCOL)
+        if len(bytes_data) > 2_147_483_631: # ValueError: bytesobj cannot be larger than 2147483631 bytes (2 GB)
+            print_red(f"Data is too large to be saved to a .blosc file. Saving as .pickle instead.")
+            with open(filepath.replace(".blosc", ".pickle"), "wb") as f:
+                pickle.dump(data, f, protocol=pickle.DEFAULT_PROTOCOL)
+            return None
+        
         if legacy_blosc:
             import blosc
         else:

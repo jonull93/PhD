@@ -45,7 +45,7 @@ def shorten_year(scenario):
     return re.sub(r'(19|20)\d{2}', replacer, scenario).removeprefix("singleyear_")
 
 
-def load_data(pickle_file, use_defaults=False, data_key='tot_cap'):
+def load_data(pickle_file, use_defaults=False, data_key='tot_cap', debug=False):
     # Load the pickle file
     #aggregate the dictionaries if pickle_file is a list
     if isinstance(pickle_file, list):
@@ -57,7 +57,7 @@ def load_data(pickle_file, use_defaults=False, data_key='tot_cap'):
     
     # Handle scenario selection
     all_scenarios = list(data.keys())
-    print_cyan(f"All scenarios: {all_scenarios}")
+    if debug: print_cyan(f"All scenarios: {all_scenarios}")
     
     selected_scenarios = []
     if use_defaults==True:
@@ -130,11 +130,14 @@ def load_data(pickle_file, use_defaults=False, data_key='tot_cap'):
     if data_key == 'biogas':
         selected_data = {}
         for scenario in selected_scenarios:
-            weights = data[scenario]['stochastic_probability'] # a Series of float(s)
-            hourly_use = get_biogas_use(data, scenario) #returns a dictionary of time-series for each year
-            total_use = 0
-            for year, df in hourly_use.items():
-                total_use += df.sum().sum()*weights[year]
+            if "yearly_biogas_use" in data[scenario].keys():
+                total_use = data[scenario]['yearly_biogas_use'].sum() # a float
+            else:
+                weights = data[scenario]['stochastic_probability'] # a Series of float(s)
+                hourly_use = get_biogas_use(data, scenario) #returns a dictionary of time-series for each year
+                total_use = 0
+                for year, df in hourly_use.items():
+                    total_use += df.sum().sum()*weights[year]
             selected_data[scenario] = pd.Series(total_use, index=['biogas'])
         
         #print_yellow(f"Selected data: \n{selected_data}")
@@ -162,7 +165,7 @@ def load_data(pickle_file, use_defaults=False, data_key='tot_cap'):
     elif data_key in ['cost_tot','cost_tot_onlynew']:
         selected_data = {scenario: pd.Series([data[scenario][data_key]], index=['System cost']) for scenario in selected_scenarios}
 
-    elif data_key == 'number_stochastic_scenarios':
+    elif data_key in ['number_stochastic_scenarios', 'number_stochastic_years']:
         # An int per scenario. Can be found by counting the number of elements in  data[scenario]["VRE_share"]
         selected_data = {scenario: len(data[scenario]["VRE_share"]) for scenario in selected_scenarios}
     else:
@@ -197,7 +200,7 @@ def load_data(pickle_file, use_defaults=False, data_key='tot_cap'):
     #sorted_keys = [s for s in sorted_keys.keys() if "opt" in s] + [s for s in sorted_keys.keys() if "opt" not in s]
     selected_data = {s: selected_data[s] for s in sorted_keys}
     selected_scenarios_to_print = "\n".join(selected_data.keys())
-    print_blue(f"Selected scenarios: \n{selected_scenarios_to_print}")
+    if debug: print_blue(f"Selected scenarios: \n{selected_scenarios_to_print}")
     return selected_data
 
 def custom_sort(item):

@@ -55,8 +55,25 @@ def print_cap(writer, num, sheet, row, col, ind):
     num_df = pd.DataFrame(data=num, index=ind).T  # columns = ["System cost:"]
     num_df.to_excel(writer, sheet_name=sheet, startcol=col, startrow=row)
 
+def get_yearly_biogas_use(gen, stochastic_probability, TT):
+    # gen is a dataframe with tech, I_reg and stochastic_scenarios as multiindex
+    efficiency = {"WG": 0.610606, "WG_peak": 0.420606}
+    if "WG_CHP" in gen.index.get_level_values("tech").unique():
+        df = gen.loc[["WG", "WG_peak", "WG_CHP"]]
+        efficiency["WG_CHP"] = 0.492604
+    else:
+        df = gen.loc[["WG", "WG_peak"]]
+    efficiency = pd.Series(efficiency)
+    # all values should be multiplies by TT
+    # tech should be divided by efficiency
+    # stochastic_probability should be multiplied by stochastic_probability
+    df = df.mul(TT, level="tech")
+    per_index = df.sum(axis=1)
+    per_index = per_index.mul(stochastic_probability, level="stochastic_scenarios")
+    per_index = per_index.div(efficiency, level="tech")
+    return per_index.groupby(level="stochastic_scenarios").sum()        
 
-def run_case(scen_name, gdxpath, indicators, FC=False, print_FR_summary=False):
+def run_case(scen_name, gdxpath, indicators, FC=False, print_FR_summary=False, slim_results=False):
     def get_from_cap(tech_name, round=False):
         # if tech_name is not a list, do the following
         if type(tech_name) != list:
@@ -103,11 +120,17 @@ def run_case(scen_name, gdxpath, indicators, FC=False, print_FR_summary=False):
     # year = k.split("_")[3]
     with gdxr.GdxFile(gdxpath + k + ".gdx") as f:
         before = [i for i in locals().keys()]  # variables defined before this line do not get pickled
+
+        gen = gdx(f, "o_generation") # needed for yearly_biogas_use, delete if slim_results
+        if not slim_results: 
+            charge = gdx(f, "v_charge")
+            discharge = gdx(f, "v_discharge")
+            curtailment_profiles = gdx(f, "o_curtailment_hourly")
+            curtailment_profiles.fillna(0, inplace=True)
+            curtailment_profiles[curtailment_profiles < 0] = 0
+        
         gamsTimestep = gdx(f, "timestep")
         I_reg = gdx(f, "I_reg")
-        curtailment_profiles = gdx(f, "o_curtailment_hourly")
-        curtailment_profiles.fillna(0, inplace=True)
-        curtailment_profiles[curtailment_profiles < 0] = 0
         curtailment_profile_total = gdx(f, "o_curtailment_hourly_total")
         curtailment = gdx(f, "o_curtailment_share_total")
         curtailment_regional = gdx(f, "o_curtailment_regional")
@@ -127,7 +150,6 @@ def run_case(scen_name, gdxpath, indicators, FC=False, print_FR_summary=False):
         for _index, vals in new_cap.iterrows():
             if (0 < vals.upper == vals.level) and _index[0] not in VRE:
                 print_magenta(f" !! Found capped investment ({vals.level}) at {_index} for {scen_name}")
-        gen = gdx(f, "o_generation")
         gen_per_eltech = gdx(f, "o_generation_el")
         el_price = gdx(f, "o_el_price")
         load_profile = gdx(f, "demandprofile_average")
@@ -137,6 +159,7 @@ def run_case(scen_name, gdxpath, indicators, FC=False, print_FR_summary=False):
         timestep = [i + 1 for i in iter_t]  # 1
         TT = 8760 / len(gams_timestep)
         stochastic_probability = gdx(f, "stochastic_year_probability")
+        yearly_biogas_use = get_yearly_biogas_use(gen, stochastic_probability, TT)
         allwind = gdx(f, "timestep")
         cost_tot = gdx(f, "o_cost_total_oldinv", silent=False)
         cost_tot_onlynew = gdx(f, "v_totcost").level
@@ -176,8 +199,6 @@ def run_case(scen_name, gdxpath, indicators, FC=False, print_FR_summary=False):
         PV_FLH = gdx(f, "o_full_load_PV")
         wind_FLH = gdx(f, "o_full_load_wind")
         heat_price = gdx(f, "o_heat_price")
-        discharge = gdx(f, "v_discharge")
-        charge = gdx(f, "v_charge")
         demand = gdx(f, "o_load")
         if demand == None:
             demand = gdx(f, "o_demand")
@@ -342,6 +363,8 @@ def run_case(scen_name, gdxpath, indicators, FC=False, print_FR_summary=False):
           + tot_cap.loc[TECH.BATTERY_CAP].sum().round(decimals=2).astype(str)
     except KeyError: battery = 0
 
+    if slim_results:
+        del gen
     after = locals().keys()
     to_save = [i for i in after if i not in before and "_" != i[0]]  # skip variables that start with _
     for i in indicators:
@@ -391,13 +414,7 @@ def excel(scen:str, data, row, writer, indicators, individual_sheets=True):
     FLH = data["FLH"].astype(int)
     FLH_regional = data["FLH_regional"].astype(int)
     share = data["gen_share"].round(decimals=3)
-    gen = data["gen"]
-    try:
-        if "electrolyser" in gen.index.unique(level="tech"):
-            gen = gen.drop("electrolyser", level="tech")
-    except KeyError:
-        print(f"! Could not find tech in gen.index, {scen} probably failed the gams run. Here's gen:",gen)
-        return
+
     for i, scen_part in enumerate(stripped_scen.split('_')):  # split up the scenario name on _
         print_num(writer, [scen_part], "Indicators", row.value + 1, i, 0)  # print the (split) scenario name in Indicators
         if i>indicators_column: indicators_column = i
@@ -428,6 +445,13 @@ def excel(scen:str, data, row, writer, indicators, individual_sheets=True):
         c += 1
 
     if individual_sheets:
+        gen = data["gen"]
+        try:
+            if "electrolyser" in gen.index.unique(level="tech"):
+                gen = gen.drop("electrolyser", level="tech")
+        except KeyError:
+            print(f"! Could not find tech in gen.index, {scen} probably failed the gams run. Here's gen:",gen)
+            return
         cap_len = len(cap.index.get_level_values(0).unique())+1
         reg_len = len(cap.index.get_level_values(1).unique())+1
         try:

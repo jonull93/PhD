@@ -50,11 +50,16 @@ def create_whisker_plots(grouped_data, pickle_timestamp, techs_to_plot=None, sep
     individual_years_df = pd.DataFrame(individual_years_data)
     HPsets_of_years_df = pd.DataFrame(HPsets_of_years_data)
     nonHPsets_of_years_df = pd.DataFrame(nonHPsets_of_years_data)
+    #random_sets_of_years_data = pd.DataFrame(random_sets_of_years_data) #already a dataframe
 
-    # Print the dataframes
-    #print(f"{grouped_data.items()=}")
-    print_yellow(f"Individual years data: \n{individual_years_df}")
-    print_yellow(f"Sets of years data: \n{HPsets_of_years_df}")
+    # Print a summary of the dataframes (sizes and min, mean and max for each row)
+    print(f"Individual years: {individual_years_df.shape[1]} \n{individual_years_df.T.describe().loc[['min', 'mean', 'max','std']]}")
+    print(f"HP sets of years df rows/cols: {HPsets_of_years_df.shape} \n{HPsets_of_years_df.T.describe().loc[['min', 'mean', 'max','std']]}")
+    print(f"Non-HP sets of years df rows/cols: {nonHPsets_of_years_df.shape} \n{nonHPsets_of_years_df.T.describe().loc[['min', 'mean', 'max','std']]}")
+    print(f"Random sets of years df rows/cols: {random_sets_of_years_data.shape} \n{random_sets_of_years_data.T.describe().loc[['min', 'mean', 'max','std']]}")
+    #print_yellow(f"Individual years data: \n{individual_years_df}")
+    #print_yellow(f"Sets of years data: \n{HPsets_of_years_df}")
+    #print_yellow(f"\nSets of random years data: \n{random_sets_of_years_data}")
     #print_yellow(f"Reference levels: \n{reference_levels}")
 
     secondary_axes = []
@@ -87,6 +92,7 @@ def create_whisker_plots(grouped_data, pickle_timestamp, techs_to_plot=None, sep
     if separate_by_number_stochastic_years: 
         # Add one row for each unique number of stochastic years
         unique_numbers = set(separate_by_number_stochastic_years.values())
+        print(f"unique_numbers: {unique_numbers}")
         nr_of_rows = 1 + len(unique_numbers)
 
     nr_of_cols = 1 + contains_extras
@@ -116,7 +122,11 @@ def create_whisker_plots(grouped_data, pickle_timestamp, techs_to_plot=None, sep
     if separate_by_number_stochastic_years:
         datasets = []
         for number in unique_numbers:
-            datasets.append((True, random_sets_of_years_data.filter(items=[s for s in random_sets_of_years_data.columns if separate_by_number_stochastic_years[s] == number], axis=1)))
+            datasets.append(
+                (True, 
+                 random_sets_of_years_data.filter(
+                     items=[s for s in random_sets_of_years_data.columns if separate_by_number_stochastic_years[s] == number], axis=1)))
+        print(f"datasets: {datasets}")
 
     for contains_set, df in datasets:
         if contains_set:
@@ -203,6 +213,9 @@ def main():
     cost_total = load_data(pickle_file, use_defaults="skip", data_key="cost_tot_onlynew")
     if isinstance(pickle_file, list) and any("random" in f for f in pickle_file):
         number_stochastic_years = load_data(pickle_file, use_defaults="skip", data_key="number_stochastic_years")
+        number_stochastic_years = {k: v for k, v in number_stochastic_years.items() if v in [3,4,5,6]}
+        print_cyan(f"Number of stochastic years: {number_stochastic_years}")
+        input("Press ENTER to continue")
     else:
         number_stochastic_years = None
 

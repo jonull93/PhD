@@ -25,9 +25,11 @@ if __name__ == "__main__":
     #set gdxpath to ..\multinode\results\ where .. is the parent folder of the current folder
     gdxpath = os.path.join(os.path.dirname(os.path.dirname(os.path.realpath(__file__))), "multinode\\results\\")
 
+    slim_results = True  # if True: do not read gen, curtailment_profiles, charge and discharge
+
     excel = True  # will only make a .pickle if excel == False
     individual_sheets = False # if True, each scenario will be written to a separate sheet in the excel file
-    run_output = "rw"  # 'w' to (over)write or 'rw' to only add missing scenarios
+    run_output = "w"  # 'w' to (over)write or 'rw' to only add missing scenarios
     overwrite = []  # names of scenarios to overwrite regardless of existence in pickled data
     #overwrite = [reg+"_inertia_0.1x" for reg in ["ES3", "HU", "IE", "SE2"]]+\
     #            [reg+"_inertia" for reg in ["ES3", "HU", "IE", "SE2"]]+\
@@ -301,7 +303,7 @@ if __name__ == "__main__":
     #new_data = {}
     # io_lock = threading.Lock()
     threads = {}
-    num_threads = min(max(cpu_count() - 5, 4), len(todo_gdx), 10)
+    num_threads = min(max(cpu_count() - 5, 4), len(todo_gdx), 20)
     excel_name = path + name + suffix + ".xlsx"
     #writer = pd.ExcelWriter(excel_name, engine="openpyxl")
     opened_file = False
@@ -316,7 +318,8 @@ if __name__ == "__main__":
             print_red("OBS: EXCEL FILE MAY BE OPEN - PLEASE CLOSE IT BEFORE SCRIPT FINISHES ", e)
 
 # Unfortunately, global variables can only be used within the same file, so not all functions can be imported
-def crawl_gdx(q_gdx, q_excel, old_data_keys, gdxpath, overwrite, todo_gdx_len, new_data, files, thread_nr, run_output, indicators, errors, excel, replace_with_alternative_solver_if_missing=False, alternative_solutions=[]):
+def crawl_gdx(q_gdx, q_excel, old_data_keys, gdxpath, overwrite, todo_gdx_len, new_data, files, thread_nr, run_output, indicators, 
+              errors, excel, replace_with_alternative_solver_if_missing=False, alternative_solutions=[], slim_results=False):
     # Assign a unique identifier for the process
     pid = multiprocessing.current_process().pid
 
@@ -333,7 +336,7 @@ def crawl_gdx(q_gdx, q_excel, old_data_keys, gdxpath, overwrite, todo_gdx_len, n
             if scen_name not in files:
                 raise FileNotFoundError
             start_time_thread = tm.time()
-            success, new_data[scen_name] = gpf.run_case(scen_name, gdxpath, indicators)
+            success, new_data[scen_name] = gpf.run_case(scen_name, gdxpath, indicators, slim_results=slim_results)
             #print_green("Finished " + scen_name.ljust(20) + " after " + str(round(tm.time() - start_time_thread,
             #                                                              1)) + f" seconds")
             print_green(f"Finished {scen_name.ljust(20)} after {round((tm.time()-start_time_thread)/60, 1)} minutes. {q_gdx.qsize()} gdx files left out of {todo_gdx_len}")
@@ -424,8 +427,8 @@ if __name__ == "__main__":
     for i in range(num_threads):
         print_cyan(f'Starting gdx thread {i + 1}')
         p = multiprocessing.Process(target=crawl_gdx, args=(q_gdx, q_excel, old_data_keys, gdxpath, overwrite, todo_gdx_len, 
-                                                            new_data, files, thread_nr, run_output, indicators, errors, excel))
-        tm.sleep(0.1*i+0.5)  # staggering gdx threads shouldnt matter as long as the excel process has something to work on
+                                                            new_data, files, thread_nr, run_output, indicators, errors, excel, slim_results))
+        tm.sleep(0.2)  # staggering gdx threads shouldnt matter as long as the excel process has something to work on
         p.start()
         processes.append(p)
 
