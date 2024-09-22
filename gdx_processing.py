@@ -251,20 +251,28 @@ if __name__ == "__main__":
     elif run_output.lower() in ["rw", "add", "append"]:
         old_data = {}
         try:
-            pickle_files = [f for f in os.listdir("PickleJar") if f.startswith(f"data_") and suffix in file and (f.endswith(f".pickle") or f.endswith(f".blosc"))]
-            # let "addme" be a sign that the file should be baked into the most recent non-addme file
-            most_recent_cases_file = max([f for f in pickle_files if "addme" not in f])
-            #old_data = pickle.load(open(f"PickleJar\\{most_recent_cases_file}", "rb"))
-            old_data = load_from_file(f"PickleJar\\{most_recent_cases_file}")
+            pickle_files = [f for f in os.listdir("PickleJar") if 
+                            f.startswith(f"data_") and 
+                            suffix in f and 
+                            (f.endswith(f".pickle") or f.endswith(f".blosc"))]
+            # Let "addme" be a sign that the file should be baked into the most recent non-addme file
+            try: 
+                most_recent_cases_file = max([f for f in pickle_files if "addme" not in f and "added" not in f])
+                old_data = load_from_file(f"PickleJar\\{most_recent_cases_file}")
+                print_green(f"Loaded {most_recent_cases_file} with {len(old_data)} scenarios")
+            except ValueError: # ValueError raised by max([])
+                print_red("No pickle files of this case found without 'addme' in the name")
             others_to_include = [f for f in pickle_files if "addme" in f]
             for other in others_to_include:
-                other_old_data = load_from_file(other)
+                other_old_data = load_from_file(f"PickleJar\\{other}")
                 common_scens = [i for i in other_old_data if i in old_data]
                 if common_scens: print_red(f"Found the same scenarios in both {most_recent_cases_file} and {other}: {common_scens}")
                 old_data = {**other_old_data, **old_data} # **old_data last means its content takes precedence for shared keys
+                print_green(f"Added {len(other_old_data)} scenarios from {other} to the data")
             
-        except (FileNotFoundError, ValueError): # ValueError raised by max([])
-            print_red("No pickle file found, starting from scratch")
+        except FileNotFoundError:
+            print_red("Failed to load pickle file!")
+        
             
     else:
         raise ValueError

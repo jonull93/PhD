@@ -615,7 +615,7 @@ def select_pickle(predetermined_choice=False, pickle_folder="PickleJar\\"):
         # A combination of the most recent allyears and allopt pickle files
         allyears_pickle = max([f for f in pickle_files if "allyears" in f], key=os.path.getmtime)
         allopt_pickle = max([f for f in pickle_files if "allopt" in f or "trueref" in f], key=os.path.getmtime)
-        random_pickle = max([f for f in pickle_files if "random" in f], key=os.path.getmtime)
+        random_pickle = max([f for f in pickle_files if "random" in f and "addme" not in f], key=os.path.getmtime)
         return [allyears_pickle, allopt_pickle, random_pickle]
 
 
