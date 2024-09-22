@@ -2,9 +2,10 @@ import os
 import pandas as pd
 import matplotlib.pyplot as plt
 import re
-from my_utils import color_dict, tech_names, print_red, print_cyan, print_green, print_magenta, print_blue, print_yellow, select_pickle
+from my_utils import color_dict, tech_names, print_red, print_cyan, print_green, print_magenta, print_blue, print_yellow, select_pickle, load_from_file, save_to_file
 from order_cap import wind, PV, baseload, peak, CCS, CHP, midload, hydro, PtH, order_cap, order_cap2, order_cap3
 from datetime import datetime
+from figure_bio_use import get_biogas_use
 
 # Path to the pickle files and figures
 pickle_folder = 'PickleJar/'
@@ -44,16 +45,22 @@ def shorten_year(scenario):
     return re.sub(r'(19|20)\d{2}', replacer, scenario).removeprefix("singleyear_")
 
 
-def load_data(pickle_file, use_defaults=False):
+def load_data(pickle_file, use_defaults=False, data_key='tot_cap', debug=False):
     # Load the pickle file
-    data = pd.read_pickle(pickle_file)
+    #aggregate the dictionaries if pickle_file is a list
+    if isinstance(pickle_file, list):
+        data = {}
+        for p in pickle_file:
+            data.update(load_from_file(p))
+    else:
+        data = load_from_file(pickle_file)
     
     # Handle scenario selection
     all_scenarios = list(data.keys())
-    print_cyan(f"All scenarios: {all_scenarios}")
+    if debug: print_cyan(f"All scenarios: {all_scenarios}")
     
     selected_scenarios = []
-    if use_defaults:
+    if use_defaults==True:
         # Use all scenarios, but if there's a scenarioname with "1h", skip the one with "3h" if there is one
         selected_scenarios = [i for i in all_scenarios if "singleyear" not in i]
         print_magenta(f"Included sets: {selected_scenarios}")
@@ -71,7 +78,9 @@ def load_data(pickle_file, use_defaults=False):
                 break
     else:
         # Let the user exclude some scenarios
-        excluded = input("Please enter the scenarios you want to exclude, separated by commas (or H for the hardcoded list): ").split(',')
+        excluded = []
+        if use_defaults==False: 
+            excluded = input("Please enter the scenarios you want to exclude, separated by commas (or H for the hardcoded list): ").split(',')
         if excluded == ['H'] or excluded == ['h']:
             # Use the hardcoded list
             selected_scenarios = [
@@ -118,7 +127,50 @@ def load_data(pickle_file, use_defaults=False):
                 print_red(f"No alternative scenarios found for {s}. Skipping that one...")
                
     # Extract 'tot_cap' data for the selected scenarios and replace NaNs with 0
-    selected_data = {scenario: data[scenario]['tot_cap'].fillna(0) for scenario in selected_scenarios}
+    if data_key == 'biogas':
+        selected_data = {}
+        for scenario in selected_scenarios:
+            if "yearly_biogas_use" in data[scenario].keys():
+                total_use = data[scenario]['yearly_biogas_use'].sum() # a float
+            else:
+                weights = data[scenario]['stochastic_probability'] # a Series of float(s)
+                hourly_use = get_biogas_use(data, scenario) #returns a dictionary of time-series for each year
+                total_use = 0
+                for year, df in hourly_use.items():
+                    total_use += df.sum().sum()*weights[year]
+            selected_data[scenario] = pd.Series(total_use, index=['biogas'])
+        
+        #print_yellow(f"Selected data: \n{selected_data}")
+        # probability needs to be considered, then years combined for each scenario and then repeated for all selected_scenarios
+    elif data_key == 'grossexport':
+        def weighted_average(group, weights):
+            return (group * weights).sum() / weights.sum()
+
+        selected_data = {}
+        for scenario in selected_scenarios:
+            weights = data[scenario]['stochastic_probability'] # a Series of float(s)
+            time_resolution_modifier = data[scenario]["TT"] #float
+            yearly_export = data[scenario]['yearly_elec_grossexport']*time_resolution_modifier
+            # Assuming 'yearly_export' has a MultiIndex with levels ['exporter', 'importer', 'stochastic_scenarios']
+            # and 'weights' is aligned with 'stochastic_scenarios'
+            weighted_grossexport = yearly_export.groupby(level=['exporter', 'importer']).apply(weighted_average, weights=weights)
+            # now find the gross export to and from continental Europe (DE_N)
+            northern_regions = ['NO_S', 'SE_S', 'FI']
+            southern_regions = ['DE_N','DE_S']
+            southwards = weighted_grossexport.loc[northern_regions, southern_regions].sum()
+            northwards = weighted_grossexport.loc[southern_regions, northern_regions].sum()
+            # Create a new series
+            gross_transfer = pd.Series([southwards, northwards], index=['Export south', 'Export north'])
+            selected_data[scenario] = gross_transfer
+    elif data_key in ['cost_tot','cost_tot_onlynew']:
+        selected_data = {scenario: pd.Series([data[scenario][data_key]], index=['System cost']) for scenario in selected_scenarios}
+
+    elif data_key in ['number_stochastic_scenarios', 'number_stochastic_years']:
+        # An int per scenario. Can be found by counting the number of elements in  data[scenario]["VRE_share"]
+        selected_data = {scenario: len(data[scenario]["VRE_share"]) for scenario in selected_scenarios}
+    else:
+        try: selected_data = {scenario: data[scenario][data_key].fillna(0) for scenario in selected_scenarios}
+        except AttributeError: selected_data = {scenario: data[scenario][data_key] for scenario in selected_scenarios}
 
     # Remove "ref_cap" from scenario names 
     selected_data = {s.replace("ref_cap_", ""): selected_data[s] for s in selected_data.keys()}
@@ -148,7 +200,7 @@ def load_data(pickle_file, use_defaults=False):
     #sorted_keys = [s for s in sorted_keys.keys() if "opt" in s] + [s for s in sorted_keys.keys() if "opt" not in s]
     selected_data = {s: selected_data[s] for s in sorted_keys}
     selected_scenarios_to_print = "\n".join(selected_data.keys())
-    print_blue(f"Selected scenarios: \n{selected_scenarios_to_print}")
+    if debug: print_blue(f"Selected scenarios: \n{selected_scenarios_to_print}")
     return selected_data
 
 def custom_sort(item):
@@ -171,6 +223,7 @@ def custom_sort(item):
     return (0, 0, item)
 
 def group_technologies(data):
+    """Group technologies according to the tech_groups dictionary"""
     # Create a dictionary of Series to hold the grouped data
     grouped_data = {s:pd.Series(dtype=float) for s in data.keys()}
 
@@ -217,7 +270,7 @@ def prettify_scenario_name(name):
         parts = name.split("_")
         opt = parts[1].replace("opt", "")
         extra = f" ({parts[-1]})" if len(parts) == 3 and parts[-1]!="mean" else "" 
-        if "trueref" in extra: extra = " *"
+        if "trueref" in extra: extra = "" #" *"
         if "2012" in extra:
             return f"{name[0]} HP + {opt} opt. (2012)" 
         elif "evenweights" in extra:
@@ -229,7 +282,7 @@ def prettify_scenario_name(name):
         # turn allopt2_final into All opt. (2 yr), and allopt2_final_a into All opt. (2 yr) a
         nr = name.split("_")[0].replace("allopt", "")
         extra = f" ({name.split('_')[-1]})" if len(name.split('_'))>1 else ""
-        if "trueref" in extra: extra = " *"
+        if "trueref" in extra: extra = ""#" *"
         #if len(name.split("_")) == 3:
         #    abc = name.split("_")[2]
         #    abc = f" ({abc})"
@@ -502,8 +555,6 @@ def create_figure_separated_techs(grouped_data, pickle_timestamp, use_defaults):
     # Close the figure to free memory
     plt.close(fig)
 
-
-
 def main():
     print_blue(f"Script started at: {datetime.now()}")
     
@@ -512,14 +563,19 @@ def main():
 
     print_blue(f"Script started at: {datetime.now()}")
     pickle_file = select_pickle(use_defaults)
-    pickle_timestamp = pickle_filename = os.path.basename(pickle_file).replace(".pickle", "").replace("data_results_", "")
+    if isinstance(pickle_file, list):
+        # use the most recently modified pickle file to determine the timestamp
+        pickle_file_for_timestamp = sorted(pickle_file, key=os.path.getmtime)[-1]
+        pickle_timestamp = "agg"+os.path.basename(pickle_file_for_timestamp).replace(".pickle", "").replace("data_results_", "")
+    else:
+        pickle_timestamp = os.path.basename(pickle_file).replace(".pickle", "").replace("data_results_", "")
     print_cyan(f"Selected pickle file: {pickle_file}")
     
     data = load_data(pickle_file, use_defaults)
     print_yellow(f"Data loaded from pickle file")
     grouped_data = group_technologies(data)
     print_green(f"Technologies grouped successfully")
-    #print_yellow(f"Grouped data: \n{grouped_data}")
+    print_yellow(f"Grouped data: \n{grouped_data}")
     create_figure_separated_techs(grouped_data, pickle_timestamp, use_defaults)
     print_magenta(f"Figures created and saved in {figures_folder}")
     

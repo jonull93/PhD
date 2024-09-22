@@ -63,7 +63,7 @@ fig_path = f"figures\\"
 os.makedirs(fig_path, exist_ok=True)
 regions = ["nordic", "brit", "iberia"]
 regions_corrected = {"brit": "Brit", "nordic": "Nordic+", "iberia": "Iberia"}
-modes = ["lowFlex_noFC"]
+modes = ["lowFlex_noFC","highFlex_noFC"]
 optional_titles = ["LowFlex", "HighFlex"]
 file_suffix = ""
 if len(file_suffix) > 0 and file_suffix[0] != "_": file_suffix = "_" + file_suffix
@@ -79,7 +79,7 @@ data = pickle.load(open(os.path.relpath(rf"PickleJar\data_results_{timestep}h{fi
 fig, axes = plt.subplots(nrows=len(modes), ncols=len(regions), figsize=(6+len(regions), 4+len(modes)))
 for i_r, reg in enumerate(regions):
     for i_m, mode in enumerate(modes):
-        ax, df = make_figure(data, reg, mode, timestep, suffix=scen_suffix, ax=axes[i_r], optional_title=optional_titles[i_m]) #ax=axes[i_m, i_r]
+        ax, df = make_figure(data, reg, mode, timestep, suffix=scen_suffix, ax=axes[i_m,i_r], optional_title=optional_titles[i_m]) #ax=axes[i_m, i_r]
         if i_r+i_m > 0:
             if len(modes)==1:
                 h, l = axes[0].get_legend_handles_labels()
@@ -98,4 +98,5 @@ except AttributeError:
 fig.tight_layout()
 plt.savefig(fig_path+f"yearly_elec_prod_{timestep}h.png", dpi=300, bbox_inches="tight")
 plt.savefig(fig_path+f"yearly_elec_prod_{timestep}h.svg", bbox_inches="tight")
+plt.savefig(fig_path+f"yearly_elec_prod_{timestep}h.pdf", bbox_inches="tight")
 

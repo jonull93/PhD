@@ -8,9 +8,9 @@ This repository is part of a broader research focused on electricity system mode
 - Ullmark et al. (2021), [Inclusion of frequency control constraints in energy system investment modeling](https://doi.org/10.1016/j.renene.2021.03.114)  
 - Licentiate thesis by J. Ullmark (2022), [Optimization modeling of frequency reserves and inertia in the transition to a climate-neutral electricity system](https://research.chalmers.se/en/publication/530495)  
 - Ullmark et al. (2023), [Frequency reserves and inertia in the transition to future electricity systems](https://doi.org/10.1007/s12667-023-00568-1)  
-- Ullmark et al., "Potential revenue from reserve market participation in wind power- and solar power-dominated electricity grids", submitted for publication  
-- Ullmark et al., "Selecting weather-years to represent high net load events in electricity system capacity expansion models", in progress
-- Doctoral thesis by J. Ullmark (2023), in progress
+- Ullmark et al. (2024), [Potential Revenue from Reserve Market Participation in Wind Power- and Solar Power-Dominated Electricity Grids: The Near-Term, Mid-Term, and Long-Term](https://doi.org/10.1155/2024/8470441)
+- Ullmark et al., "Representing net load variability in electricity system capacity expansion models - Accounting for challenging weather-years", submitted for publication
+- [Doctoral thesis](https://research.chalmers.se/en/publication/539696) by J. Ullmark (2024)
 
 
 ## Repository Contents

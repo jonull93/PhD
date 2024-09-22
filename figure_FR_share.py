@@ -137,17 +137,19 @@ def percent_stacked_area(axes, fig, data, regions, flex, timestep, indicator_str
                                             right_ylabel=right_ylabel_, _ax=axes[j])
     plt.sca(axes[1])
     #    fig.legend(handles,labels,bbox_to_anchor=(0.5, 0.92), ncol=4, loc="lower center")
-    fig.suptitle(f"{figtitle}: {flex}", y=1.05)
     plt.subplots_adjust(wspace=0.49, hspace=0.4)
     return handles, labels
 
 
-timestep = 1
-fig_file_suffix = "old"
+timestep = 3
+fig_file_suffix = "test"
 if len(fig_file_suffix) > 0: fig_file_suffix = "_" + fig_file_suffix
-pickle_suffix = "old"
+pickle_suffix = ""#"old"
 if len(pickle_suffix) > 0: pickle_suffix = "_" + pickle_suffix
 data = pickle.load(open(path.relpath(rf"PickleJar\data_results_{timestep}h{pickle_suffix}.pickle"), "rb"))
+# list the scenarios in the data dictionary
+print("Scenarios in data:")
+print(data.keys())
 
 scen_suffix = ""
 if len(scen_suffix) > 0: scen_suffix = "_" + scen_suffix
@@ -186,9 +188,11 @@ for i_t, type in enumerate(indicator_strings):
         (handles, labels) = percent_stacked_area(axes[i_f], fig, data, regions, flex, timestep, indicator_strings[i_t],
                                                  label_sets[type], secondary_y=secondary_y, right_ylabel=right_ylabel,
                                                  scen_suffix=scen_suffix, figtitle=figtitles[type])
-        axes[i_f][0].annotate(flex[0].upper()+flex[1:], xy=(-0.45, 0.5), xycoords='axes fraction', va="center", ha="right", fontsize=12)
+        if len(flexes)>1: axes[i_f][0].annotate(flex[0].upper()+flex[1:], xy=(-0.45, 0.5), xycoords='axes fraction', va="center", ha="right", fontsize=12)
+        else: fig.suptitle(f"{figtitles[type]}: {flex}", y=1.05)
+    if len(flexes)>1: fig.suptitle(f"{figtitles[type]}", y=1.05)
     fig.legend(handles, labels, bbox_to_anchor=(0.5, 0.92), ncol=4, loc="lower center")
     plt.savefig(rf"figures\{filenames[type]}{scen_suffix}{pickle_suffix}{timestep}{fig_file_suffix}.png", dpi=600,
                 bbox_inches="tight")
-    plt.savefig(rf"figures\{filenames[type]}{scen_suffix}{pickle_suffix}{timestep}{fig_file_suffix}.eps",
-                bbox_inches="tight", format="eps")
+    plt.savefig(rf"figures\{filenames[type]}{scen_suffix}{pickle_suffix}{timestep}{fig_file_suffix}.pdf",
+                bbox_inches="tight")

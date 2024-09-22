@@ -12,7 +12,7 @@ import time
 import traceback
 from traceback import format_exc
 import gdx_processing_functions as gpf
-from my_utils import print_red, print_cyan, print_green, print_magenta
+from my_utils import print_red, print_cyan, print_green, print_magenta, save_to_file
 from termcolor import colored
 from glob import glob
 
@@ -20,7 +20,15 @@ if __name__ == "__main__":
     start_time_script = tm.time()
     print("Excel-writing script started at", datetime.now().strftime('%H:%M:%S'))
 
+    #set path to the relative subfolder \output
+    path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "output\\")
+    #set gdxpath to ..\multinode\results\ where .. is the parent folder of the current folder
+    gdxpath = os.path.join(os.path.dirname(os.path.dirname(os.path.realpath(__file__))), "multinode\\results\\")
+
+    slim_results = True  # if True: do not read gen, curtailment_profiles, charge and discharge
+
     excel = True  # will only make a .pickle if excel == False
+    individual_sheets = False # if True, each scenario will be written to a separate sheet in the excel file
     run_output = "w"  # 'w' to (over)write or 'rw' to only add missing scenarios
     overwrite = []  # names of scenarios to overwrite regardless of existence in pickled data
     #overwrite = [reg+"_inertia_0.1x" for reg in ["ES3", "HU", "IE", "SE2"]]+\
@@ -150,7 +158,7 @@ if __name__ == "__main__":
         "singleyear_2004to2005_1h_flexlim_gurobi", "singleyear_2005to2006_1h_flexlim_gurobi","singleyear_2006to2007_1h_flexlim_gurobi",
         "singleyear_2007to2008_1h_flexlim_gurobi", "singleyear_2008to2009_1h_flexlim_gurobi","singleyear_2009to2010_1h_flexlim_gurobi",
         "singleyear_2010to2011_1h_flexlim_gurobi", "singleyear_2011to2012_1h_flexlim_gurobi","singleyear_2012to2013_1h_flexlim_gurobi",
-        "singleyear_1h_2012", "singleyear_2012_1h_flexlim_gurobi",
+        "singleyear_2012_1h_flexlim_gurobi",
         "singleyear_2013to2014_1h_flexlim_gurobi", "singleyear_2014to2015_1h_flexlim_gurobi","singleyear_2015to2016_1h_flexlim_gurobi",
         "singleyear_2016to2017_1h_flexlim_gurobi", "singleyear_2017to2018_1h_flexlim_gurobi","singleyear_2018to2019_1h_flexlim_gurobi",
     ]    
@@ -168,10 +176,12 @@ if __name__ == "__main__":
         "allyears",
     ]
     cases_truerefall = [
-        "2HP_1opt_trueref", "2HP_2opt_trueref", "2HP_3opt_trueref", "2HP_4opt_trueref", "2HP_5opt_trueref",
-        "allopt2_trueref", "allopt3_trueref", "allopt4_trueref", "allopt5_trueref",
+        "2HP_1opt_trueref", "2HP_2opt_trueref", "2HP_3opt_trueref", "2HP_4opt_trueref", "2HP_5opt_trueref", "2HP_6opt_trueref", "2HP_10opt_trueref",
+        "allopt2_trueref", "allopt3_trueref", "allopt4_trueref", "allopt5_trueref", "allopt6_trueref",
         "allyears",
     ]
+    cases_random = [i.replace(".gdx","") for i in os.listdir(gdxpath) if "random" in i]
+
     #cases = cases1
     # instead of setting cases manually, prompt the user to select a set of cases
     print("Select a set of cases to run:")
@@ -183,8 +193,9 @@ if __name__ == "__main__":
     print("6: allyears (all years + allyears)")
     print("7: trueref_main (2HP_trueref + single years + allyears)")
     print("8: trueref_all (2HP_trueref + allopt_trueref + allyears)")
+    print("9: random (all random cases)")
     cases = []
-    while cases not in [cases1, cases2, cases3, cases_test, cases_manyyears, cases_allyears, cases_truerefmixed, cases_truerefall]:
+    while cases not in [cases1, cases2, cases3, cases_test, cases_manyyears, cases_allyears, cases_truerefmixed, cases_truerefall, cases_random]:
         cases = input("Enter a number: ")
         if cases == "1":
             cases = cases1
@@ -210,6 +221,9 @@ if __name__ == "__main__":
         elif cases == "8":
             cases = cases_truerefall
             suffix = "_trueref_all"
+        elif cases == "9":
+            cases = cases_random
+            suffix = "_random"
         else:
             print("Invalid input")
     cases = list(set(cases))  # remove duplicates
@@ -231,24 +245,25 @@ if __name__ == "__main__":
         path = "C:\\Users\\jonathan\\git\\PhD\\output\\"
         gdxpath = "C:\\Users\\jonathan\\git\\multinode\\results\\"
     """
-    #set path to the relative subfolder \output
-    path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "output\\")
-    #set gdxpath to ..\multinode\results\ where .. is the parent folder of the current folder
-    gdxpath = os.path.join(os.path.dirname(os.path.dirname(os.path.realpath(__file__))), "multinode\\results\\")
-
 
     if run_output.lower() == "w" or run_output.lower() == "write":
         old_data = {}
-    elif run_output.lower() == "rw":
-        try: old_data = pickle.load(open("PickleJar\\data_" + name + ".pickle", "rb"))
+    elif run_output.lower() in ["rw", "add", "append"]:
+        try:
+            most_recent_cases_file = max([f for f in os.listdir("PickleJar") if f.startswith(f"data_") 
+                                          and (f.endswith(f"{suffix}.pickle") or f.endswith(f"{suffix}.blosc"))])
+            old_data = pickle.load(open(f"PickleJar\\{most_recent_cases_file}", "rb"))
         except FileNotFoundError:
+            print_red("No pickle file found, starting from scratch")
             old_data = {}
     else:
         raise ValueError
 
+    old_data_keys = list(old_data.keys())
+
     todo_gdx = []
     for j in cases:
-        if j not in old_data or j in overwrite:
+        if j not in old_data_keys or j in overwrite:
             todo_gdx.append(j)
 
     todo_gdx_len = len(todo_gdx)
@@ -290,7 +305,7 @@ if __name__ == "__main__":
     #new_data = {}
     # io_lock = threading.Lock()
     threads = {}
-    num_threads = min(max(cpu_count() - 5, 4), len(todo_gdx))
+    num_threads = min(max(cpu_count() - 5, 4), len(todo_gdx), 20)
     excel_name = path + name + suffix + ".xlsx"
     #writer = pd.ExcelWriter(excel_name, engine="openpyxl")
     opened_file = False
@@ -305,7 +320,8 @@ if __name__ == "__main__":
             print_red("OBS: EXCEL FILE MAY BE OPEN - PLEASE CLOSE IT BEFORE SCRIPT FINISHES ", e)
 
 # Unfortunately, global variables can only be used within the same file, so not all functions can be imported
-def crawl_gdx(q_gdx, q_excel, old_data, gdxpath, overwrite, todo_gdx_len, new_data, files, thread_nr, run_output, indicators, errors, excel, replace_with_alternative_solver_if_missing=False, alternative_solutions=[]):
+def crawl_gdx(q_gdx, q_excel, old_data_keys, gdxpath, overwrite, todo_gdx_len, new_data, files, thread_nr, run_output, indicators, 
+              errors, excel, replace_with_alternative_solver_if_missing=False, alternative_solutions=[], slim_results=False):
     # Assign a unique identifier for the process
     pid = multiprocessing.current_process().pid
 
@@ -314,7 +330,7 @@ def crawl_gdx(q_gdx, q_excel, old_data, gdxpath, overwrite, todo_gdx_len, new_da
 
     while not q_gdx.empty():
         scen_i, scen_name = q_gdx.get()  # fetch new work from the Queue
-        if run_output == "rw" and scen_name not in overwrite and scen_name in old_data:
+        if run_output == "rw" and scen_name not in overwrite and scen_name in old_data_keys:
             q_gdx.task_done()
             continue
         try:
@@ -322,10 +338,10 @@ def crawl_gdx(q_gdx, q_excel, old_data, gdxpath, overwrite, todo_gdx_len, new_da
             if scen_name not in files:
                 raise FileNotFoundError
             start_time_thread = tm.time()
-            success, new_data[scen_name] = gpf.run_case(scen_name, gdxpath, indicators)
+            success, new_data[scen_name] = gpf.run_case(scen_name, gdxpath, indicators, slim_results=slim_results)
             #print_green("Finished " + scen_name.ljust(20) + " after " + str(round(tm.time() - start_time_thread,
             #                                                              1)) + f" seconds")
-            print_green(f"Finished {scen_name.ljust(20)} after {round((tm.time()-start_time_thread)/60, 1)} minutes")
+            print_green(f"Finished {scen_name.ljust(20)} after {round((tm.time()-start_time_thread)/60, 1)} minutes. {q_gdx.qsize()} gdx files left out of {todo_gdx_len}")
             if success and excel:
                 q_excel.put((scen_name, True))
                 print(f' (q_excel appended and is now : {q_excel.qsize()} items long)')
@@ -358,7 +374,7 @@ def crawl_gdx(q_gdx, q_excel, old_data, gdxpath, overwrite, todo_gdx_len, new_da
             q_gdx.task_done()  # signal to the queue that task has been processed
     return True
 
-def crawl_excel(path, old_data, q_excel, new_data, row, indicators, isgdxdone, excel_name):
+def crawl_excel(path, old_data, q_excel, new_data, row, indicators, isgdxdone, excel_name, individual_sheets):
     #print(f"starting crawl_excel('{path}')")
     writer = pd.ExcelWriter(excel_name, engine="openpyxl")
     start_time_excel = False
@@ -376,7 +392,7 @@ def crawl_excel(path, old_data, q_excel, new_data, row, indicators, isgdxdone, e
                     continue
             else:
                 data = old_data[scen_name]
-            gpf.excel(scen_name, data, row, writer, indicators)
+            gpf.excel(scen_name, data, row, writer, indicators, individual_sheets=individual_sheets)
             row.value += 1
             q_excel.task_done()
         else:
@@ -418,9 +434,10 @@ if __name__ == "__main__":
     # Starting worker threads on queue processing
     processes = []
     for i in range(num_threads):
-        p = multiprocessing.Process(target=crawl_gdx, args=(q_gdx, q_excel, old_data, gdxpath, overwrite, todo_gdx_len, 
-                                                            new_data, files, thread_nr, run_output, indicators, errors, excel))
-        tm.sleep(0.1*i)  # staggering gdx threads shouldnt matter as long as the excel process has something to work on
+        print_cyan(f'Starting gdx thread {i + 1}')
+        p = multiprocessing.Process(target=crawl_gdx, args=(q_gdx, q_excel, old_data_keys, gdxpath, overwrite, todo_gdx_len, 
+                                                            new_data, files, thread_nr, run_output, indicators, errors, excel, slim_results))
+        tm.sleep(0.2)  # staggering gdx threads shouldnt matter as long as the excel process has something to work on
         p.start()
         processes.append(p)
 
@@ -428,12 +445,13 @@ if __name__ == "__main__":
         tm.sleep(1)
         print_magenta('Starting excel thread') # crawl_excel DOES NOT SUPPORT BEING RAN IN MULTIPLE INSTANCES
         p_excel = multiprocessing.Process(target=crawl_excel, args=(path, old_data, q_excel, new_data, row, indicators, 
-                                                                    isgdxdone, excel_name))
+                                                                    isgdxdone, excel_name, individual_sheets))
         p_excel.start()
 
     for p in processes:
         p.join()
     isgdxdone.value = True
+
     print_green("Finished the GDX queue after ", str(round((tm.time() - start_time_script) / 60, 1)),
         "minutes - now saving pickle at", datetime.now().strftime('%H:%M:%S'))
 
@@ -445,10 +463,14 @@ if __name__ == "__main__":
         except Exception as e:
             print_red("! Could not add", scen, "to the pickle jar because",str(e))
 
-    pickle.dump(old_data, open(f"PickleJar\\data_{name}{suffix}.pickle", "wb"))
+    #pickle.dump(old_data, open(f"PickleJar\\data_{name}{suffix}.pickle", "wb"))
+    save_to_file(old_data, f"PickleJar\\data_{name}{suffix}") #specifying the file extension is no longer necessary
+
     print_green("Successfully pickled")
+    
     if opened_file: print_red(" ! REMINDER TO MAKE SURE EXCEL FILE IS CLOSED !")
-    p_excel.join()
+    if excel: p_excel.join() # wait for the excel process to finish
+
     print_green('Script finished completed after', str(round((tm.time() - start_time_script) / 60, 2)), 'minutes with',
         str(errors.value), "errors, at", datetime.now().strftime('%H:%M:%S'))
 

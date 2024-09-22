@@ -55,8 +55,25 @@ def print_cap(writer, num, sheet, row, col, ind):
     num_df = pd.DataFrame(data=num, index=ind).T  # columns = ["System cost:"]
     num_df.to_excel(writer, sheet_name=sheet, startcol=col, startrow=row)
 
+def get_yearly_biogas_use(gen, stochastic_probability, TT):
+    # gen is a dataframe with tech, I_reg and stochastic_scenarios as multiindex
+    efficiency = {"WG": 0.610606, "WG_peak": 0.420606}
+    if "WG_CHP" in gen.index.get_level_values("tech").unique():
+        df = gen.loc[["WG", "WG_peak", "WG_CHP"]]
+        efficiency["WG_CHP"] = 0.492604
+    else:
+        df = gen.loc[["WG", "WG_peak"]]
+    efficiency = pd.Series(efficiency)
+    # all values should be multiplies by TT
+    # tech should be divided by efficiency
+    # stochastic_probability should be multiplied by stochastic_probability
+    df = df.mul(TT, level="tech")
+    per_index = df.sum(axis=1)
+    per_index = per_index.mul(stochastic_probability, level="stochastic_scenarios")
+    per_index = per_index.div(efficiency, level="tech")
+    return per_index.groupby(level="stochastic_scenarios").sum()        
 
-def run_case(scen_name, gdxpath, indicators, FC=False, print_FR_summary=False):
+def run_case(scen_name, gdxpath, indicators, FC=False, print_FR_summary=False, slim_results=False):
     def get_from_cap(tech_name, round=False):
         # if tech_name is not a list, do the following
         if type(tech_name) != list:
@@ -103,11 +120,17 @@ def run_case(scen_name, gdxpath, indicators, FC=False, print_FR_summary=False):
     # year = k.split("_")[3]
     with gdxr.GdxFile(gdxpath + k + ".gdx") as f:
         before = [i for i in locals().keys()]  # variables defined before this line do not get pickled
+
+        gen = gdx(f, "o_generation") # needed for yearly_biogas_use, delete if slim_results
+        if not slim_results: 
+            charge = gdx(f, "v_charge")
+            discharge = gdx(f, "v_discharge")
+            curtailment_profiles = gdx(f, "o_curtailment_hourly")
+            curtailment_profiles.fillna(0, inplace=True)
+            curtailment_profiles[curtailment_profiles < 0] = 0
+        
         gamsTimestep = gdx(f, "timestep")
         I_reg = gdx(f, "I_reg")
-        curtailment_profiles = gdx(f, "o_curtailment_hourly")
-        curtailment_profiles.fillna(0, inplace=True)
-        curtailment_profiles[curtailment_profiles < 0] = 0
         curtailment_profile_total = gdx(f, "o_curtailment_hourly_total")
         curtailment = gdx(f, "o_curtailment_share_total")
         curtailment_regional = gdx(f, "o_curtailment_regional")
@@ -116,18 +139,17 @@ def run_case(scen_name, gdxpath, indicators, FC=False, print_FR_summary=False):
         gen_share = gdx(f, "o_share_gen").rename("Share")
         VRE_share = gdx(f, "o_VRE_share")
         #VRE_share_total = gdx(f, "o_VRE_share_total")
-        #wind_share = gdx(f, "o_VRE_share")
-        PV_share = gdx(f, "o_VRE_share")
+        wind_share = gdx(f, "o_wind_share")
+        PV_share = gdx(f, "o_PV_share")
         U_share = gen_share["U"]
         tot_cap = gdx(f, "o_capacity")
         new_cap = gdx(f, "v_newcap")
         for reg in new_cap.index.unique(1):
             if reg not in I_reg:
                 new_cap.drop(reg, level="I_reg", inplace=True)
-        for index, vals in new_cap.iterrows():
-            if (0 < vals.upper == vals.level) and index[0] not in VRE:
-                print_magenta(f" !! Found capped investment ({vals.level}) at {index} for {scen_name}")
-        gen = gdx(f, "o_generation")
+        for _index, vals in new_cap.iterrows():
+            if (0 < vals.upper == vals.level) and _index[0] not in VRE:
+                print_magenta(f" !! Found capped investment ({vals.level}) at {_index} for {scen_name}")
         gen_per_eltech = gdx(f, "o_generation_el")
         el_price = gdx(f, "o_el_price")
         load_profile = gdx(f, "demandprofile_average")
@@ -137,6 +159,7 @@ def run_case(scen_name, gdxpath, indicators, FC=False, print_FR_summary=False):
         timestep = [i + 1 for i in iter_t]  # 1
         TT = 8760 / len(gams_timestep)
         stochastic_probability = gdx(f, "stochastic_year_probability")
+        yearly_biogas_use = get_yearly_biogas_use(gen, stochastic_probability, TT)
         allwind = gdx(f, "timestep")
         cost_tot = gdx(f, "o_cost_total_oldinv", silent=False)
         cost_tot_onlynew = gdx(f, "v_totcost").level
@@ -176,9 +199,13 @@ def run_case(scen_name, gdxpath, indicators, FC=False, print_FR_summary=False):
         PV_FLH = gdx(f, "o_full_load_PV")
         wind_FLH = gdx(f, "o_full_load_wind")
         heat_price = gdx(f, "o_heat_price")
-        discharge = gdx(f, "v_discharge")
-        charge = gdx(f, "v_charge")
         demand = gdx(f, "o_load")
+        if demand == None:
+            demand = gdx(f, "o_demand")
+        #yearly_elec_export = gdx(f, "o_net_export").sum(axis=1).rename_axis(index=["exporter", "importer", "stochastic_scenarios"])
+        hourly_elec_trade = gdx(f, "o_net_export").rename_axis(index=["exporter", "importer", "stochastic_scenarios"])
+        yearly_elec_grossexport = gdx(f, "o_net_export").apply(lambda x: x[x > 0].sum(), axis=1)
+        yearly_elec_grossexport = yearly_elec_grossexport.rename_axis(index=["exporter", "importer", "stochastic_scenarios"])
         inv_cost = gdx(f, "inv_cost")
         tech_revenue = gdx(f, "o_tech_revenue")
         tech_revenue_el = gdx(f, "o_tech_revenue_el")
@@ -337,6 +364,8 @@ def run_case(scen_name, gdxpath, indicators, FC=False, print_FR_summary=False):
           + tot_cap.loc[TECH.BATTERY_CAP].sum().round(decimals=2).astype(str)
     except KeyError: battery = 0
 
+    if slim_results:
+        del gen
     after = locals().keys()
     to_save = [i for i in after if i not in before and "_" != i[0]]  # skip variables that start with _
     for i in indicators:
@@ -370,7 +399,7 @@ def short_scen(scen):
 
     return shortened_scen
 
-def excel(scen:str, data, row, writer, indicators):
+def excel(scen:str, data, row, writer, indicators, individual_sheets=True):
     global scen_row
     global indicators_column
     try: type(indicators_column) == int
@@ -386,13 +415,7 @@ def excel(scen:str, data, row, writer, indicators):
     FLH = data["FLH"].astype(int)
     FLH_regional = data["FLH_regional"].astype(int)
     share = data["gen_share"].round(decimals=3)
-    gen = data["gen"]
-    try:
-        if "electrolyser" in gen.index.unique(level="tech"):
-            gen = gen.drop("electrolyser", level="tech")
-    except KeyError:
-        print(f"! Could not find tech in gen.index, {scen} probably failed the gams run. Here's gen:",gen)
-        return
+
     for i, scen_part in enumerate(stripped_scen.split('_')):  # split up the scenario name on _
         print_num(writer, [scen_part], "Indicators", row.value + 1, i, 0)  # print the (split) scenario name in Indicators
         if i>indicators_column: indicators_column = i
@@ -422,49 +445,57 @@ def excel(scen:str, data, row, writer, indicators):
             if isinstance({}, ind_type): print(thing.keys())
         c += 1
 
-    cap_len = len(cap.index.get_level_values(0).unique())+1
-    reg_len = len(cap.index.get_level_values(1).unique())+1
-    try:
-        cappy = cap.to_frame(name="Cap").join(new_cap).join(share).join(FLH_regional)
-    except: print(cap,new_cap,share,FLH_regional)
-    cappy["sort_by"] = cappy.index.get_level_values(0).map(order_map_cap)
-    cappy.sort_values("sort_by", inplace=True)
-    cappy.drop(columns="sort_by", inplace=True)
-    #print(cappy)
-    cappy = cappy.reorder_levels(["I_reg", "tech", "stochastic_scenarios"]).sort_index(level=0, sort_remaining=False)
-    mask = cappy.duplicated(subset=["New cap","Cap"], keep='first')
-    cappy2 = cappy[~mask]
-    cappy2[["New cap","Cap"]].groupby(level=["tech"]).sum().to_excel(writer, sheet_name=shortened_scen, startcol=1, startrow=1)
-    cappy_len = len(cappy2[["New cap","Cap"]].groupby(level=["tech"]).sum())
-    for i, reg in enumerate(cappy.index.get_level_values(0).unique()):
-        cappy.filter(like=reg,axis=0).to_excel(writer, sheet_name=shortened_scen, startcol=5+8*i, startrow=1)
-        if len(cappy.filter(like=reg,axis=0)) > cappy_len: cappy_len = len(cappy.filter(like=reg,axis=0))
-    # get the nr of rows in cappy.filter(like=reg,axis=0)
-    #print_yellow(scen_row)
-    scen_row += cappy_len+4
-    #print_yellow(scen_row)
-    try: print_df(writer, data["curtailment_profile_total"].round(decimals=3), "Curtailment", shortened_scen)
-    except AttributeError: print_red(f"could not print curtailment for {shortened_scen}")
-    try: print_df(writer, data["el_price"].round(decimals=3), "Elec. price", shortened_scen, row_inc=2)
-    except AttributeError: print_red(f"could not print elec price for {shortened_scen}")
+    if individual_sheets:
+        gen = data["gen"]
+        try:
+            if "electrolyser" in gen.index.unique(level="tech"):
+                gen = gen.drop("electrolyser", level="tech")
+        except KeyError:
+            print(f"! Could not find tech in gen.index, {scen} probably failed the gams run. Here's gen:",gen)
+            return
+        cap_len = len(cap.index.get_level_values(0).unique())+1
+        reg_len = len(cap.index.get_level_values(1).unique())+1
+        try:
+            cappy = cap.to_frame(name="Cap").join(new_cap).join(share).join(FLH_regional)
+        except: print(cap,new_cap,share,FLH_regional)
+        cappy["sort_by"] = cappy.index.get_level_values(0).map(order_map_cap)
+        cappy.sort_values("sort_by", inplace=True)
+        cappy.drop(columns="sort_by", inplace=True)
+        #print(cappy)
+        cappy = cappy.reorder_levels(["I_reg", "tech", "stochastic_scenarios"]).sort_index(level=0, sort_remaining=False)
+        mask = cappy.duplicated(subset=["New cap","Cap"], keep='first')
+        cappy2 = cappy[~mask]
+        cappy2[["New cap","Cap"]].groupby(level=["tech"]).sum().to_excel(writer, sheet_name=shortened_scen, startcol=1, startrow=1)
+        cappy_len = len(cappy2[["New cap","Cap"]].groupby(level=["tech"]).sum())
+        for i, reg in enumerate(cappy.index.get_level_values(0).unique()):
+            cappy.filter(like=reg,axis=0).to_excel(writer, sheet_name=shortened_scen, startcol=5+8*i, startrow=1)
+            if len(cappy.filter(like=reg,axis=0)) > cappy_len: cappy_len = len(cappy.filter(like=reg,axis=0))
+        # get the nr of rows in cappy.filter(like=reg,axis=0)
+        #print_yellow(scen_row)
+        scen_row += cappy_len+4
+        #print_yellow(scen_row)
+        try: print_df(writer, data["curtailment_profile_total"].round(decimals=3), "Curtailment", shortened_scen)
+        except AttributeError: print_red(f"could not print curtailment for {shortened_scen}")
+        try: print_df(writer, data["el_price"].round(decimals=3), "Elec. price", shortened_scen, row_inc=2)
+        except AttributeError: print_red(f"could not print elec price for {shortened_scen}")
 
-    if data["PS"]: print_df(writer, data["FR_period_cost"].round(decimals=3), "FR period cost", shortened_scen, row_inc=2)
-    try: print_gen(writer, shortened_scen, gen, data["gamsTimestep"])
-    except AttributeError: print_red(f"could not print gen for {shortened_scen}")
+        if data["PS"]: print_df(writer, data["FR_period_cost"].round(decimals=3), "FR period cost", shortened_scen, row_inc=2)
+        try: print_gen(writer, shortened_scen, gen, data["gamsTimestep"])
+        except AttributeError: print_red(f"could not print gen for {shortened_scen}")
 
-    if data["PS"]:
-        try: print_df(writer, data["FR_cost"].round(decimals=3), "FR: Cost", shortened_scen, row_inc=2)
-        except IndexError:
-            if "lowFlex" in stripped_scen and "fullFC" in stripped_scen: print(shortened_scen, data["FR_cost"])
-        print_df(writer, data["FR_available"].round(decimals=3), "FR: Available", shortened_scen, header=False)
-        print_df(writer, data["FR_deficiency"].round(decimals=2), "FR: Deficiency", shortened_scen, header=False)
-        print_df(writer, data["FR_net_import"].round(decimals=3), "FR: Net-import", shortened_scen, header=False)
-        print_df(writer, data["FR_demand"]["wind"].round(decimals=3), "FR demand: Wind", shortened_scen, header=True)
-        print_df(writer, data["FR_demand"]["PV"].round(decimals=3), "FR demand: PV", shortened_scen, header=True)
-        print_df(writer, data["FR_demand"]["other"].round(decimals=3), "FR demand: Other", shortened_scen, header=True)
-        print_df(writer, data["FR_demand"]["total"].round(decimals=3), "FR demand: Total", shortened_scen, header=True, row_inc=2)
-        print_df(writer, data["inertia_available"].round(decimals=3), "Inertia: Available", shortened_scen, header=True)
-        print_df(writer, data["inertia_available_thermals"].round(decimals=3), "Inertia: Thermals", shortened_scen, header=True, row_inc=2)
-    else:
-        #print("PS variables were not available for", scen)
-        pass
+        if data["PS"]:
+            try: print_df(writer, data["FR_cost"].round(decimals=3), "FR: Cost", shortened_scen, row_inc=2)
+            except IndexError:
+                if "lowFlex" in stripped_scen and "fullFC" in stripped_scen: print(shortened_scen, data["FR_cost"])
+            print_df(writer, data["FR_available"].round(decimals=3), "FR: Available", shortened_scen, header=False)
+            print_df(writer, data["FR_deficiency"].round(decimals=2), "FR: Deficiency", shortened_scen, header=False)
+            print_df(writer, data["FR_net_import"].round(decimals=3), "FR: Net-import", shortened_scen, header=False)
+            print_df(writer, data["FR_demand"]["wind"].round(decimals=3), "FR demand: Wind", shortened_scen, header=True)
+            print_df(writer, data["FR_demand"]["PV"].round(decimals=3), "FR demand: PV", shortened_scen, header=True)
+            print_df(writer, data["FR_demand"]["other"].round(decimals=3), "FR demand: Other", shortened_scen, header=True)
+            print_df(writer, data["FR_demand"]["total"].round(decimals=3), "FR demand: Total", shortened_scen, header=True, row_inc=2)
+            print_df(writer, data["inertia_available"].round(decimals=3), "Inertia: Available", shortened_scen, header=True)
+            print_df(writer, data["inertia_available_thermals"].round(decimals=3), "Inertia: Thermals", shortened_scen, header=True, row_inc=2)
+        else:
+            #print("PS variables were not available for", scen)
+            pass

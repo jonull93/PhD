@@ -2,10 +2,12 @@
 !input/*
 till_*
 *_old*
+test*
 
 !results/FP*
 !fingerprintmatching_includefiles/*
 !*.mat
+!juliaenv/*
 $*
 ~*
 PickleJar/netload_components_1980-1982.pickle

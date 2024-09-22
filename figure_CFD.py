@@ -10,7 +10,7 @@ import threading
 import time as tm
 import datetime as dt
 from timeit import default_timer as timer
-from my_utils import print_red, print_cyan, print_green, fast_rolling_average, print_magenta, print_blue, print_yellow
+from my_utils import print_red, print_cyan, print_green, fast_rolling_average, print_magenta, print_blue, print_yellow, load_from_file, save_to_file
 import scipy.io
 import h5py
 import json
@@ -75,6 +75,7 @@ def get_contour(Z, transpose=False):
 
 
 def fast_cfd(df_netload, xmin, xmax, amp_length=0.1, area_method=False, thread=False, debugging=False):
+    # a significantly faster version of of the original recurrence-matrix function
     if not thread: thread = "main"
     df_freq = pd.DataFrame()
     output = {}
@@ -142,23 +143,25 @@ def fast_cfd(df_netload, xmin, xmax, amp_length=0.1, area_method=False, thread=F
         df_out = pd.concat([df_out], keys=[amp], names=['Amplitude'])
         df_out.rename(columns={'count2': 'Occurences'}, inplace=True)
         df_out_list.append(df_out)
-    df_out_tot = pd.concat(df_out_list)
-    print_green(f"time to build df_out_tot = {round((timer() - timer_dfouttot)/60, 1)} min")
+    df_out_tot = pd.concat(df_out_list) #roughly a 700*3000 dataframe
+    print_green(f"time to build df_out_tot = {round((timer() - start_time)/60, 1)} min")
     if area_method:
+        # this section takes almost all of the execution time and can probably be improved
         print_red(f"Starting second area_method loop with {len(df_out_tot.index)} rows at {dt.datetime.now().strftime('%H:%M:%S')}")
         start_time = timer()
         #print_red(df_out_tot.index.get_level_values(0).unique())
         # df_out_tot hold a single column and a few multiindexed rows
         if debugging: print("Amps2: ", end="")
-        for amp in df_out_tot.index.get_level_values(0).unique():
+        amps = df_out_tot.index.get_level_values(0).unique().tolist()
+        for amp in amps: #roughly 700 amps
             if debugging: print(f"{amp},", end="")
             to_pass_on = 0
             df = df_out_tot.loc[amp].copy()
-            df = df.reindex(range(0, df.index.max() + 1), fill_value=0).sort_index(ascending=False)
+            df = df.reindex(range(0, df.index.max() + 1), fill_value=0).sort_index(ascending=False) # reindexing and sorting a 3000*1 dataframe 700 times cannot be efficient
             indexes = df_out_tot.loc[amp].index
-            for index, val in df.iterrows():
+            for index, val in df.iterrows(): # apparently using iterrows is generally discouraged due to its slow speed
                 if (amp, index) in indexes:
-                    df_out_tot.loc[(amp, index), :] += to_pass_on
+                    df_out_tot.loc[(amp, index), :] += to_pass_on # the only thng slower than iterrows is supposedly updating a dataframe cell-by-cell
                 else:
                     df_out_tot.loc[(amp, index), :] = to_pass_on
                 to_pass_on = to_pass_on + val[0]
@@ -167,10 +170,111 @@ def fast_cfd(df_netload, xmin, xmax, amp_length=0.1, area_method=False, thread=F
     #print(f"time to build CFD data = {round(timer() - start_time, 1)}")
     return df_out_tot
 
+def faster_cfd(df_netload, xmin, xmax, amp_length=0.1, area_method=False, thread=False, debugging=False):
+    # a significantly faster version of of the original recurrence-matrix function
+    if not thread: thread = "main"
+    df_freq = pd.DataFrame()
+    output = {}
+    net_loads_array = np.array(df_netload["net load"].values)
+    amps = np.arange(xmin, xmax, amp_length).tolist()
+    start_time = timer()
+    if debugging: print("Amps1: ", end="")
+    for amp in amps:
+        if debugging: print(amp, end=",")
+        # initiate variables before hour loop
+        d = {'net load': net_loads_array, 'count1': 0, 'count2': 0}
+        df_netload = pd.DataFrame(data=d)
+        hours = df_netload.index
+        previous_hour = hours[0]
+        previous_net_load_val = net_loads_array[0]
+        amp_positive = amp >= 0
+        amp_negative = not amp_positive
+        for i_h, hour in enumerate(hours):
+            # net_load_val = df_netload.at[hour,'net load']
+            net_load_val = net_loads_array[i_h]
+            netload_greater_than_amp = net_load_val >= amp
+            netload_smaller_than_amp = not netload_greater_than_amp
+            previous_netload_greater_than_amp = previous_net_load_val >= amp
+            previous_netload_smaller_than_amp = not previous_netload_greater_than_amp
+            # both count1 and count2 are related to the duration of events
+            if amp_positive and netload_greater_than_amp:
+                # df_netload.set_value(hour, 'count1', df_netload.at[previous_hour,'count1']+1)
+                try:
+                    df_netload.at[hour, 'count1'] = df_netload.at[previous_hour, 'count1'] + 1
+                except KeyError as e:
+                    print(hour, amp)
+                    print(df_netload.at[hour, 'count1'])
+                    print(df_netload.at[previous_hour, 'count1'])
+                    raise e
+            elif amp_negative and netload_smaller_than_amp:
+                # df_netload.set_value(hour, 'count1', df_netload.at[previous_hour,'count1']+1)
+                try:
+                    df_netload.at[hour, 'count1'] = df_netload.at[previous_hour, 'count1'] + 1
+                except KeyError as e:
+                    print(hour, amp)
+                    print(df_netload.at[hour, 'count1'])
+                    print(df_netload.at[previous_hour, 'count1'])
+                    raise e
+            # spara sedan varje periods längd vid sluttillfället
+            if amp_positive and previous_netload_greater_than_amp and netload_smaller_than_amp:
+                #            df_netload.set_value(previous_hour, 'count2', df_netload.at[previous_hour,'count1'])
+                df_netload.at[previous_hour, 'count2'] = df_netload.at[previous_hour, 'count1']
+            elif amp_negative and previous_netload_smaller_than_amp and netload_greater_than_amp:
+                #            df_netload.set_value(previous_hour, 'count2', df_netload.at[previous_hour,'count1'])
+                df_netload.at[previous_hour, 'count2'] = df_netload.at[previous_hour, 'count1']
+            previous_hour = hour
+            previous_net_load_val = net_load_val
+        # this sets the recurrence by counting the durations for each amplitude
+        s = df_netload.count2.value_counts()
+        df_freq = pd.DataFrame(data=s)
+        output[amp] = df_freq
+    if debugging: print(f"{thread} finished building output[amp] after {round((timer() - start_time)/60, 1)} minutes. Now building df_out_tot")
+    timer_dfouttot = timer()
+    #df_out_tot = pd.DataFrame()
+    df_out_list = []
+    for amp in amps:
+        df_out = output[amp]
+        df_out = df_out.iloc[1:]
+        df_out.index.name = 'Duration'
+        df_out = pd.concat([df_out], keys=[amp], names=['Amplitude'])
+        df_out.rename(columns={'count2': 'Occurences'}, inplace=True)
+        df_out_list.append(df_out)
+    df_out_tot = pd.concat(df_out_list) #roughly a 700*3000 dataframe
+    print_green(f"time to build df_out_tot = {round((timer() - start_time)/60, 1)} min")
+    if area_method:
+        # this section takes almost all of the execution time and can probably be improved
+        print_red(f"Starting second area_method loop with {len(df_out_tot.index)} rows at {dt.datetime.now().strftime('%H:%M:%S')}")
+        start_time = timer()
+        #print_red(df_out_tot.index.get_level_values(0).unique())
+        # df_out_tot hold a single column and a few multiindexed rows
+        if debugging: print("Amps2: ", end="")
+        amps = df_out_tot.index.get_level_values(0).unique().tolist()
+        amp_dfs = {amp: 0. for amp in amps}
+        for amp in amps: #roughly 700 amps
+            if debugging: print(f"{amp},", end="")
+            df = df_out_tot.loc[amp].copy()
+            df = df.reindex(range(0, df.index.max() + 1), fill_value=0).sort_index(ascending=False) # reindexing and sorting a 3000*1 dataframe 700 times cannot be efficient
+            #indexes = df_out_tot.loc[amp].index
+            #for index, val in df.iterrows(): # apparently using iterrows is generally discouraged due to its slow speed
+            #    if (amp, index) in indexes:
+            #        df_out_tot.loc[(amp, index), :] += to_pass_on # the only thng slower than iterrows is supposedly updating a dataframe cell-by-cell
+            #    else:
+            #        df_out_tot.loc[(amp, index), :] = to_pass_on
+            #    to_pass_on = to_pass_on + val[0]
+            df["cumulative"] = df["Occurences"].cumsum()
+            amp_dfs[amp] = df["cumulative"]
+        df_out_tot = pd.concat(amp_dfs) # this alternative to the above loop appears to have almost completely eliminated the execution time of this section
+        df_out_tot.index.names = ["Amplitude", "Duration"]
+        df_out_tot.rename("Occurences", inplace=True)
+        if debugging: print("")
+        print_green(f"Done with second area_method loop after {round((timer() - start_time)/60, 1)} minutes")
+    #print(f"time to build CFD data = {round(timer() - start_time, 1)}")
+    return df_out_tot
+
 
 def create_df_out_tot(year, xmin, xmax, ref_folder, rolling_hours=12, amp_length=1, area_mode_in_cfd=True, debugging=False, thread=False):
     print_cyan(f"create_df_out_tot({year}, {xmin}, {xmax}, {rolling_hours}, {amp_length}, {area_mode_in_cfd})")
-    data = pickle.load(open(f"PickleJar\\{ref_folder}\\netload_components_small_{year}.pickle", "rb"))
+    data = load_from_file(f"PickleJar\\{ref_folder}\\netload_components_small_{year}")
     #VRE_profiles = data["VRE_profiles"]
     #load = data["total_hourly_load"]
     #cap = data["cap"]
@@ -199,8 +303,8 @@ def create_df_out_tot(year, xmin, xmax, ref_folder, rolling_hours=12, amp_length
     df_netload = pd.DataFrame(data={'net load': RA_netload, 'count1': 0, 'count2': 0})
     xmax = max(xmax, int(math.ceil(df_netload["net load"].max())))
     xmin = min(xmin, int(math.floor(df_netload["net load"].min())))
-    print_cyan(f"Done preparing the netload ({round(max(RA_netload))}/{round(RA_netload.mean())}/{round(min(RA_netload))}), starting fast_cfd now")
-    df_out_tot = fast_cfd(df_netload, xmin, xmax, amp_length=amp_length, area_method=area_mode_in_cfd, debugging=debugging, thread=thread)
+    print_cyan(f"Done preparing the netload for {year} ({round(max(RA_netload))}/{round(RA_netload.mean())}/{round(min(RA_netload))}), starting fast_cfd now")
+    df_out_tot = faster_cfd(df_netload, xmin, xmax, amp_length=amp_length, area_method=area_mode_in_cfd, debugging=debugging, thread=thread)
     return df_out_tot, xmin, xmax
 
 
@@ -230,16 +334,17 @@ def main(year, ref_folder, amp_length=1, rolling_hours=12, area_mode_in_cfd=True
     if not thread_nr:
         thread_nr = "MAIN"
     if type(year) != list and type(year) != tuple:
-        print_cyan(f"\nStarting loop for year -- {year} --")
-        pickle_read_name = rf"PickleJar\{ref_folder}\{year}_CFD_netload_df_amp{amp_length}_window{rolling_hours}{'_area'*area_mode_in_cfd}.pickle"
-        pickle_dump_name = rf"PickleJar\{ref_folder}\{year}_CFD_netload_df_amp{amp_length}_window{rolling_hours}{'_area'*area_mode_in_cfd}.pickle"
+        #print_cyan(f"\nStarting loop for year -- {year} --")
+        pickle_read_name = rf"PickleJar\{ref_folder}\{year}_CFD_netload_df_amp{amp_length}_window{rolling_hours}{'_area'*area_mode_in_cfd}"
+        pickle_dump_name = rf"PickleJar\{ref_folder}\{year}_CFD_netload_df_amp{amp_length}_window{rolling_hours}{'_area'*area_mode_in_cfd}"
         # df_netload = df_netload.reset_index()[["net load", "count1", "count2"]]
         try:
             if not read_pickle: raise ImportError
-            print_yellow(f" Attempting to read pickle")#{pickle_read_name}")
-            df_out_tot = pickle.load(open(pickle_read_name, "rb"))
+            #print_yellow(f" Attempting to read pickle")#{pickle_read_name}")
+            df_out_tot = load_from_file(pickle_read_name)
+            save_to_file(df_out_tot, pickle_dump_name)
         except Exception as e:
-            if read_pickle: print_red(f"Failed due to {type(e)} .. creating a new one instead")
+            #if read_pickle: print_red(f"Failed due to {type(e)} .. creating a new one instead")
             start_time = timer()
             df_out_tot, xmin, xmax = create_df_out_tot(year, xmin, xmax, ref_folder, rolling_hours=rolling_hours, amp_length=amp_length, debugging=debugging, thread=thread_nr, area_mode_in_cfd=area_mode_in_cfd)
             # 248s at 1 year then more changes and now 156-157s at 1 year
@@ -247,7 +352,7 @@ def main(year, ref_folder, amp_length=1, rolling_hours=12, area_mode_in_cfd=True
             print(f"elapsed time to build CFD in thread {thread_nr} = {round(end_time - start_time, 1)}")
             if write_files: 
                 print_yellow(f"Writing {pickle_dump_name}")
-                pickle.dump(df_out_tot, open(pickle_dump_name, 'wb'))
+                save_to_file(df_out_tot, pickle_dump_name)
             else:
                 print_yellow(f"NOT writing {pickle_dump_name}")
         df_reset = df_out_tot.reset_index()
@@ -402,12 +507,11 @@ def crawler(queue_years,thread_nr,amp_length,rolling_hours,area_mode_in_cfd,writ
         #queue_years.task_done()
     return None
 
-def initiate(ref_folder):
+def initiate(ref_folder,rolling_window=12):
     print_magenta(f"ref_folder: {ref_folder}")
     os.makedirs(f"figures\\CFD plots\\{ref_folder}", exist_ok=True)
 
     amp_length = 1
-    rolling_hours = 12
     test_mode = False
     write_pickle = not test_mode
     area_mode_in_cfd = True
@@ -419,13 +523,13 @@ def initiate(ref_folder):
     long_period = f"1980-2019"
 
     xmax= 0
-    xmin, xmax, ymin, ymax = main(long_period, ref_folder, amp_length=amp_length, rolling_hours=rolling_hours, area_mode_in_cfd=area_mode_in_cfd,
+    xmin, xmax, ymin, ymax = main(long_period, ref_folder, amp_length=amp_length, rolling_hours=rolling_window, area_mode_in_cfd=area_mode_in_cfd,
                                   write_files=True, read_pickle=True, debugging=debugging)
     print("Xmin =", xmin, "Xmax =", xmax, "Ymin =", ymin, "Ymax =", round(ymax, 1))
     queue_years = Queue(maxsize=0)
     sum_func = ""
     make_fingerprinted_figures = os.path.exists(f"results\\{ref_folder}/most_recent_results.txt")
-    if make_fingerprinted_figures: # Load results from most recent fingerprinting run
+    if make_fingerprinted_figures and False: # Load results from most recent fingerprinting run
         with open(f"results\\{ref_folder}/most_recent_results.txt", "r") as f:
             results_folder_name = f.read().strip()
 #            results_folder_name = r"results\ref14\FP sse Jun_06_16.52.18".strip()
@@ -541,7 +645,7 @@ def initiate(ref_folder):
         #if errors is not defined, make it None
         if "errors" not in locals():
             errors = None
-        workers.append(Process(target=crawler, args=(queue_years,i,amp_length,rolling_hours,area_mode_in_cfd,write_pickle,read_pickle,xmin,xmax,ymin,ymax,sum_func,errors,ref_folder)))
+        workers.append(Process(target=crawler, args=(queue_years,i,amp_length,rolling_window,area_mode_in_cfd,write_pickle,read_pickle,xmin,xmax,ymin,ymax,sum_func,errors,ref_folder)))
         # setting threads as "daemon" allows main program to exit eventually even if these dont finish correctly
         workers[-1].start()
         tm.sleep(0.05)
@@ -552,4 +656,4 @@ def initiate(ref_folder):
 if __name__ == "__main__":
     ref_folder = get_ref_folder()
     #ref_folder = "ref23"
-    initiate(ref_folder)
+    initiate(ref_folder, rolling_window=12)
