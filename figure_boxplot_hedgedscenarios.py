@@ -45,8 +45,18 @@ def create_whisker_plots(grouped_data, pickle_timestamp, techs_to_plot=None, sep
     nonHPsets_of_years_data = normalized_grouped_data.filter(items=[s for s in normalized_grouped_data.columns if 'singleyear' not in s and "opt" in s.split("_")[0]], axis=1)
     #{key: data for key, data in normalized_grouped_data.items() if 'singleyear' not in key and "opt" in key.split("_")[0]}
     random_sets_of_years_data = normalized_grouped_data.filter(items=[s for s in normalized_grouped_data.columns if "random" in s.split("_")[0]], axis=1)
+    save_to_file(random_sets_of_years_data, "PickleJar/random_sets_of_years_data") # for debugging
 
-    save_to_file(random_sets_of_years_data, "PickleJar/random_sets_of_years_data")
+    # For each set size, extract reference values for the HP and non-HP sets
+    if separate_by_number_stochastic_years:
+        HP_reference_levels = {number: HPsets_of_years_data.filter(items=[s for s in HPsets_of_years_data.columns if separate_by_number_stochastic_years.get(s) == number], axis=1) for number in set(separate_by_number_stochastic_years.values())}
+        nonHP_reference_levels = {number: nonHPsets_of_years_data.filter(items=[s for s in nonHPsets_of_years_data.columns if separate_by_number_stochastic_years.get(s) == number], axis=1) for number in set(separate_by_number_stochastic_years.values())}
+        # If there is more than one scenario with the same number of stochastic years, print a warning and continue
+        for number in set(separate_by_number_stochastic_years.values()):
+            if len(HP_reference_levels[number].columns) > 1:
+                print(f"Warning: More than one HP scenario with {number} stochastic years: {HP_reference_levels[number].columns}")
+            if len(nonHP_reference_levels[number].columns) > 1:
+                print(f"Warning: More than one non-HP scenario with {number} stochastic years: {nonHP_reference_levels[number].columns}")
 
     # Filter for selected technologies
     individual_years_df = pd.DataFrame(individual_years_data)
@@ -56,25 +66,32 @@ def create_whisker_plots(grouped_data, pickle_timestamp, techs_to_plot=None, sep
 
     # Print a summary of the dataframes (sizes and min, mean and max for each row)
     print(f"Individual years: {individual_years_df.shape[1]} \n{individual_years_df.T.describe().loc[['min', 'mean', 'max','std']]}")
-    print(f"HP sets of years df rows/cols: {HPsets_of_years_df.shape} \n{HPsets_of_years_df.T.describe().loc[['min', 'mean', 'max','std']]}")
-    print(f"Non-HP sets of years df rows/cols: {nonHPsets_of_years_df.shape} \n{nonHPsets_of_years_df.T.describe().loc[['min', 'mean', 'max','std']]}")
-    print(f"Random sets of years df rows/cols: {random_sets_of_years_data.shape} \n{random_sets_of_years_data.T.describe().loc[['min', 'mean', 'max','std']]}")
+    print(f"HP sets of years df rows/cols: {HPsets_of_years_df.shape[1]} \n{HPsets_of_years_df.T.describe().loc[['min', 'mean', 'max','std']]}")
+    print(f"Non-HP sets of years df rows/cols: {nonHPsets_of_years_df.shape[1]} \n{nonHPsets_of_years_df.T.describe().loc[['min', 'mean', 'max','std']]}")
+    print(f"Random sets of years df rows/cols: {random_sets_of_years_data.shape[1]} \n{random_sets_of_years_data.T.describe().loc[['min', 'mean', 'max','std']]}")
     #print_yellow(f"Individual years data: \n{individual_years_df}")
     #print_yellow(f"Sets of years data: \n{HPsets_of_years_df}")
     #print_yellow(f"\nSets of random years data: \n{random_sets_of_years_data}")
     #print_yellow(f"Reference levels: \n{reference_levels}")
 
     secondary_axes = []
-    def plot_boxplot(ax, data, labels, ylabel, yside, whisker_props, width=0.5):
+    def plot_boxplot(ax, data, rows, labels, ylabel, yside, whisker_props, width=0.5, marker_data_A=None, marker_data_B=None):
         if yside.lower() in ['right', 'r']:
             ax2 = ax.twinx()  # Create a new y-axis that shares the same x-axis
             secondary_axes.append(ax2)
         else:
             ax2 = ax
-        ax2.boxplot(data.T, widths=width, labels=labels, vert=True, patch_artist=True, **whisker_props, )
+        ax2.boxplot(data.loc[rows].T, widths=width, labels=labels, vert=True, patch_artist=True, **whisker_props, )
         ax.set_xticklabels(labels, rotation=15, ha='right', rotation_mode="anchor") #must be applied to the original axis, not the twin
         ax2.set_ylabel(ylabel, color='black')
         ax2.axhline(y=1, color='black', linestyle='-', linewidth=0.7)
+        if marker_data_A is not None:
+            # add markers from the HP and nonHP reference levels
+            for idx, tech in enumerate(marker_data_A.loc[rows].index):
+                ax2.plot(idx + 1, marker_data_A.loc[tech], 'bx')
+        if marker_data_B is not None:
+            for idx, tech in enumerate(marker_data_B.loc[rows].index):
+                ax2.plot(idx + 1, marker_data_B.loc[tech], 'rx')
 
     def center_title(ax_left, ax_right, title, y_position=1.06):
         if ax_right:  # If the right axis exists
@@ -111,41 +128,46 @@ def create_whisker_plots(grouped_data, pickle_timestamp, techs_to_plot=None, sep
     titles = [f'{len(individual_years_df.columns)} individual weather-years']
     
     # Plot boxplots for individual years
-    plot_boxplot(axs[plot_idx], individual_years_df.loc[techs_to_plot], tech_labels, 
+    plot_boxplot(axs[plot_idx], individual_years_df, techs_to_plot, tech_labels, 
                 'Normalized capacity', 'left', whisker_props)
     plot_idx += 1
     if contains_extras:
         # Plot boxplots for the extra technologies
-        plot_boxplot(axs[plot_idx], individual_years_df.loc[extras], extra_labels, 
+        plot_boxplot(axs[plot_idx], individual_years_df, extras, extra_labels, 
                     extra_ylabel, 'right', whisker_props)
         plot_idx += 1
 
     # Prepare data for each row in the figure
     if separate_by_number_stochastic_years:
         datasets = []
+        number_to_random_scens = {number: [s for s in random_sets_of_years_data.columns if separate_by_number_stochastic_years[s] == number] for number in unique_numbers}
         for number in unique_numbers:
             datasets.append(
-                (True, 
+                (number, 
                  random_sets_of_years_data.filter(
-                     items=[s for s in random_sets_of_years_data.columns if separate_by_number_stochastic_years[s] == number], axis=1)))
-            titles.append(f'Random sets of {number} weather-years')
+                     items=[s for s in number_to_random_scens[number]], axis=1)))
+            titles.append(f'{len(number_to_random_scens[number])} sets, each with {number} random weather-years')
     else:
         datasets = [(contains_HP_sets, HPsets_of_years_df),
                     (contains_nonHP_sets, nonHPsets_of_years_df)]
         titles += [ f'{len(HPsets_of_years_df.columns)} sets of weather-years (with hand-picking)',
                     f'{len(nonHPsets_of_years_df.columns)} sets of weather-years (without hand-picking)']
     
-    print(f"datasets: {datasets}")
+    #print(f"datasets: {datasets}")
     
-    for contains_set, df in datasets:
-        if contains_set:
+    for number, df in datasets:
+        if number:
             # If there are HP or non-HP sets of years, plot them
-            plot_boxplot(axs[plot_idx], df.loc[techs_to_plot], tech_labels, 
-                        'Normalized capacity', 'left', whisker_props)
+            plot_boxplot(axs[plot_idx], df, techs_to_plot, tech_labels, 
+                        'Normalized capacity', 'left', whisker_props, 
+                        marker_data_A=HP_reference_levels.get(number, None),
+                        marker_data_B=nonHP_reference_levels.get(number, None))
             plot_idx += 1
             if contains_extras:
-                plot_boxplot(axs[plot_idx], df.loc[extras], extra_labels, 
-                            extra_ylabel, 'right', whisker_props)
+                plot_boxplot(axs[plot_idx], df, extras, extra_labels, 
+                            extra_ylabel, 'right', whisker_props, 
+                            marker_data_A=HP_reference_levels.get(number, None),
+                            marker_data_B=nonHP_reference_levels.get(number, None))
                 plot_idx += 1
     """
     # Plot red 'X' markers for 'singleyear_1989-1990'
