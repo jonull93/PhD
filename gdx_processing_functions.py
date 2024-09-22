@@ -344,8 +344,9 @@ def run_case(scen_name, gdxpath, indicators, FC=False, print_FR_summary=False, s
             FR_value_share_VRE = False
     #flywheel = get_from_cap(TECH.FLYWHEEL)
     sync_cond = get_from_cap(TECH.SYNCHRONOUS_CONDENSER)
-    wind = get_from_cap([TECH.WIND_OFFSHORE_1,TECH.WIND_OFFSHORE_2,TECH.WIND_OFFSHORE_3,TECH.WIND_OFFSHORE_4,TECH.WIND_OFFSHORE_5,
-                         TECH.WIND_ONSHORE_1, TECH.WIND_ONSHORE_2, TECH.WIND_ONSHORE_3, TECH.WIND_ONSHORE_4, TECH.WIND_ONSHORE_5])
+    WOFF = get_from_cap([TECH.WIND_OFFSHORE_1, TECH.WIND_OFFSHORE_2, TECH.WIND_OFFSHORE_3, TECH.WIND_OFFSHORE_4, TECH.WIND_OFFSHORE_5])
+    WON = get_from_cap([TECH.WIND_ONSHORE_1, TECH.WIND_ONSHORE_2, TECH.WIND_ONSHORE_3, TECH.WIND_ONSHORE_4, TECH.WIND_ONSHORE_5])
+    wind = WOFF + WON
     PV = get_from_cap([TECH.PV_A1, TECH.PV_A2, TECH.PV_A3, TECH.PV_A4, TECH.PV_A5, 
                        TECH.PV_R1, TECH.PV_R2, TECH.PV_R3, TECH.PV_R4, TECH.PV_R5])
     FC = get_from_cap(TECH.FUEL_CELL)

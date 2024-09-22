@@ -12,7 +12,7 @@ import time
 import traceback
 from traceback import format_exc
 import gdx_processing_functions as gpf
-from my_utils import print_red, print_cyan, print_green, print_magenta, save_to_file
+from my_utils import print_red, print_cyan, print_green, print_magenta, save_to_file, load_from_file
 from termcolor import colored
 from glob import glob
 
@@ -29,7 +29,7 @@ if __name__ == "__main__":
 
     excel = True  # will only make a .pickle if excel == False
     individual_sheets = False # if True, each scenario will be written to a separate sheet in the excel file
-    run_output = "w"  # 'w' to (over)write or 'rw' to only add missing scenarios
+    run_output = "rw"  # 'w' to (over)write or 'rw' to only add missing scenarios
     overwrite = []  # names of scenarios to overwrite regardless of existence in pickled data
     #overwrite = [reg+"_inertia_0.1x" for reg in ["ES3", "HU", "IE", "SE2"]]+\
     #            [reg+"_inertia" for reg in ["ES3", "HU", "IE", "SE2"]]+\
@@ -42,6 +42,8 @@ if __name__ == "__main__":
                 "VRE_share",
                 "bio_use",
                 'curtailment',
+                "WOFF",
+                "WON",
                 "wind",
                 "PV",
                 "U",
@@ -178,7 +180,7 @@ if __name__ == "__main__":
         "allopt2_trueref", "allopt3_trueref", "allopt4_trueref", "allopt5_trueref", "allopt6_trueref",
         "allyears",
     ]
-    cases_random = [i.replace(".gdx","") for i in os.listdir(gdxpath) if "random" in i]
+    cases_random = [i.replace(".gdx","") for i in os.listdir(gdxpath) if i.split("_")[0]=="random"]
 
     #cases = cases1
     # instead of setting cases manually, prompt the user to select a set of cases
@@ -247,13 +249,23 @@ if __name__ == "__main__":
     if run_output.lower() == "w" or run_output.lower() == "write":
         old_data = {}
     elif run_output.lower() in ["rw", "add", "append"]:
+        old_data = {}
         try:
-            most_recent_cases_file = max([f for f in os.listdir("PickleJar") if f.startswith(f"data_") 
-                                          and (f.endswith(f"{suffix}.pickle") or f.endswith(f"{suffix}.blosc"))])
-            old_data = pickle.load(open(f"PickleJar\\{most_recent_cases_file}", "rb"))
-        except FileNotFoundError:
+            pickle_files = [f for f in os.listdir("PickleJar") if f.startswith(f"data_") and suffix in file and (f.endswith(f".pickle") or f.endswith(f".blosc"))]
+            # let "addme" be a sign that the file should be baked into the most recent non-addme file
+            most_recent_cases_file = max([f for f in pickle_files if "addme" not in f])
+            #old_data = pickle.load(open(f"PickleJar\\{most_recent_cases_file}", "rb"))
+            old_data = load_from_file(f"PickleJar\\{most_recent_cases_file}")
+            others_to_include = [f for f in pickle_files if "addme" in f]
+            for other in others_to_include:
+                other_old_data = load_from_file(other)
+                common_scens = [i for i in other_old_data if i in old_data]
+                if common_scens: print_red(f"Found the same scenarios in both {most_recent_cases_file} and {other}: {common_scens}")
+                old_data = {**other_old_data, **old_data} # **old_data last means its content takes precedence for shared keys
+            
+        except (FileNotFoundError, ValueError): # ValueError raised by max([])
             print_red("No pickle file found, starting from scratch")
-            old_data = {}
+            
     else:
         raise ValueError
 
@@ -396,6 +408,13 @@ def crawl_excel(path, old_data, q_excel, new_data, row, indicators, isgdxdone, e
         else:
             tm.sleep(0.3)
         if q_excel.empty() and isgdxdone.value == True:
+            #order the sheets in alphabetical order, with "Indicators" first
+            sheets = list(writer.sheets.keys())
+            sheets.sort()
+            sheets.remove("Indicators")
+            sheets.insert(0, "Indicators")
+            writer.book._sheets = [writer.book._sheets[i] for i in [writer.book._sheets.index(writer.sheets[sheet]) for sheet in sheets]]
+
             print("Finished excel queue after ", str(round((tm.time() - start_time_excel) / 60, 2)),
                 "minutes - now saving excel file at", datetime.now().strftime('%H:%M:%S'))
             try:
