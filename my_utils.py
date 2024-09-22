@@ -614,9 +614,10 @@ def select_pickle(predetermined_choice=False, pickle_folder="PickleJar\\"):
     elif user_input == '5':
         # A combination of the most recent allyears and allopt pickle files
         allyears_pickle = max([f for f in pickle_files if "allyears" in f], key=os.path.getmtime)
-        allopt_pickle = max([f for f in pickle_files if "allopt" in f or "trueref" in f], key=os.path.getmtime)
+        sets_pickle = max([f for f in pickle_files if "allopt" in f], key=os.path.getmtime)
+        trueref_sets_pickle = max([f for f in pickle_files if "trueref_all" in f], key=os.path.getmtime)
         random_pickle = max([f for f in pickle_files if "random" in f and "addme" not in f], key=os.path.getmtime)
-        return [allyears_pickle, allopt_pickle, random_pickle]
+        return [allyears_pickle, sets_pickle, trueref_sets_pickle, random_pickle]
 
 
 def shorten_year(scenario):
