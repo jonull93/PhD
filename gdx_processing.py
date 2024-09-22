@@ -480,6 +480,15 @@ if __name__ == "__main__":
             print_red("! Not saved (probably a missing gdx):", scen)
         except Exception as e:
             print_red("! Could not add", scen, "to the pickle jar because",str(e))
+    if cases is cases_random:
+        # Check if there are any cases with the wrong number of years
+        for scen in old_data:
+            # The scenario name is in the format "random_YY1_YY2_1h_flexlim"
+            stripped_scen = scen.replace("random_", "").replace("_1h", "").replace("_3h", "").replace("_flexlim", "")
+            expected_nr_years = len(stripped_scen.split("_"))
+            actual_nr_years = len(old_data[scen]["VRE_share"])
+            if expected_nr_years != actual_nr_years:
+                print_red(f"! {scen} has {actual_nr_years} years, expected {expected_nr_years}")
 
     #pickle.dump(old_data, open(f"PickleJar\\data_{name}{suffix}.pickle", "wb"))
     save_to_file(old_data, f"PickleJar\\data_{name}{suffix}") #specifying the file extension is no longer necessary
