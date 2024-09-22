@@ -24,7 +24,10 @@ netload_duration_allyears = netload_duration_allyears.set_index('rank', append=T
 # Now, group by the new rank and compute the mean
 average_net_load_duration = netload_duration_allyears.groupby(level=1).mean()
 
-years_to_plot = ["2016-2017","2012",]
+years_to_plot = ["2016-2017","2012"]#,"1989-1990","1994-1995"]
+years_to_plot = ["2016-2017","2012","1989-1990","1994-1995"]
+normalized = False
+#normalized = True
 
 def extract_data_for_year(year_str, df):
     if "-" in year_str:
@@ -51,24 +54,38 @@ print(duration_curves)
 
 # Plot the average net load duration curve along with the specified years
 fig, ax = plt.subplots(figsize=(6, 4))
-ax.plot(average_net_load_duration / average_net_load_duration.max(), label="Average", linewidth=2, color="black")
+if normalized:
+    to_plot = average_net_load_duration / average_net_load_duration.max()
+else:
+    to_plot = average_net_load_duration
+ax.plot(to_plot, label="Average", linewidth=2, color="black")
+
 for year_str in years_to_plot:
-    data_for_year = duration_curves[year_str]
-    ax.plot(data_for_year / data_for_year.max(), label=year_str, linewidth=1)
+    if normalized:
+        data_for_year = duration_curves[year_str] / duration_curves[year_str].max()
+    else:
+        data_for_year = duration_curves[year_str]
+    ax.plot(data_for_year, label=year_str, linewidth=1)
 ax.set_xlabel("Hours")
-ax.set_ylabel("Net load [GW]")
+if normalized:
+    ax.set_ylabel("Normalized net load")
+else:
+    ax.set_ylabel("Net load [GW]")
 ax.legend()
 ax.grid()
-ax.set_title("Net load duration curves")
+if normalized:
+    ax.set_title("Normalized net load duration curves")
+else:
+    ax.set_title("Net load duration curves")
 #set the ymin to -0.1
-ax.set_ylim(0, 1.02)
+ax.set_ylim(0, None)
 plt.tight_layout()
 #before saving, check if there already is a figure with the same name, and if so, add a number at the end
 i = 1
 os.makedirs("figures/netload_duration", exist_ok=True)
-while os.path.exists(f"figures/netload_duration/figure_netload_duration_{i}.png"):
+while os.path.exists(f"figures/netload_duration/figure_{'normalized_'*normalized}netload_duration_{i}.png"):
     i += 1
-plt.savefig(f"figures/netload_duration/figure_netload_duration_{i}.png", dpi=500)
+plt.savefig(f"figures/netload_duration/figure_{'normalized_'*normalized}netload_duration_{i}.png", dpi=500)
 
 
 # identify the 5 years with the highest net load

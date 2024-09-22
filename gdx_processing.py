@@ -34,6 +34,8 @@ if __name__ == "__main__":
                 "VRE_share",
                 "bio_use",
                 'curtailment',
+                "WOFF",
+                "WON",
                 "wind",
                 "PV",
                 "U",
@@ -148,7 +150,7 @@ if __name__ == "__main__":
         "singleyear_2004to2005_1h_flexlim_gurobi", "singleyear_2005to2006_1h_flexlim_gurobi","singleyear_2006to2007_1h_flexlim_gurobi",
         "singleyear_2007to2008_1h_flexlim_gurobi", "singleyear_2008to2009_1h_flexlim_gurobi","singleyear_2009to2010_1h_flexlim_gurobi",
         "singleyear_2010to2011_1h_flexlim_gurobi", "singleyear_2011to2012_1h_flexlim_gurobi","singleyear_2012to2013_1h_flexlim_gurobi",
-        "singleyear_1h_2012",
+        "singleyear_1h_2012", "singleyear_2012_1h_flexlim_gurobi",
         "singleyear_2013to2014_1h_flexlim_gurobi", "singleyear_2014to2015_1h_flexlim_gurobi","singleyear_2015to2016_1h_flexlim_gurobi",
         "singleyear_2016to2017_1h_flexlim_gurobi", "singleyear_2017to2018_1h_flexlim_gurobi","singleyear_2018to2019_1h_flexlim_gurobi",
     ]    
@@ -380,6 +382,13 @@ def crawl_excel(path, old_data, q_excel, new_data, row, indicators, isgdxdone, e
         else:
             tm.sleep(0.3)
         if q_excel.empty() and isgdxdone.value == True:
+            #order the sheets in alphabetical order, with "Indicators" first
+            sheets = list(writer.sheets.keys())
+            sheets.sort()
+            sheets.remove("Indicators")
+            sheets.insert(0, "Indicators")
+            writer.book._sheets = [writer.book._sheets[i] for i in [writer.book._sheets.index(writer.sheets[sheet]) for sheet in sheets]]
+
             print("Finished excel queue after ", str(round((tm.time() - start_time_excel) / 60, 2)),
                 "minutes - now saving excel file at", datetime.now().strftime('%H:%M:%S'))
             try:
